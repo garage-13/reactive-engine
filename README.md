@@ -2,207 +2,213 @@
 
 Scaffold TypeScript npm packages using this template to bootstrap your next library.
 
+Built with **Vite** for fast builds and development with HMR, plus **vite-plugin-dts** for bundled type definitions.
+
 > [!TIP]
-> Looking for a JavaScript version of this template?  Try: [Vite JavaScript NPM Package](https://github.com/jasonsturges/vite-npm-package)
+> Looking for a JavaScript version of this template? Try: [Vite JavaScript NPM Package](https://github.com/jasonsturges/vite-npm-package)
 >
 > Or, try a tsup version of this template: [tsup NPM Package](https://github.com/jasonsturges/tsup-npm-package)
 
 
 ## Getting Started
 
-Begin via any of the following:
+Use this template via GitHub's "Use this template" button or:
 
-- Press the "*Use this template*" button
+```bash
+gh repo create <name> --template="https://github.com/jasonsturges/vite-typescript-npm-package"
+```
 
-- Use [GitHub CLI](https://cli.github.com/) to execute:
+**Important**: Check package name availability before you start to avoid renaming later:
 
-    ```
-    gh repo create <name> --template="https://github.com/jasonsturges/vite-typescript-npm-package"
-    ```
-
-- Simply `git clone`, delete the existing .git folder, and initialize a fresh repo:
-
-    ```
-    git clone https://github.com/jasonsturges/vite-typescript-npm-package.git
-    cd vite-typescript-npm-package
-    rm -rf .git
-    git init
-    git add -A
-    git commit -m "Initial commit"
-    ````
-
-Remember to use `npm search <term>` to avoid naming conflicts in the NPM Registery for your new package name.
+```bash
+npm search <term>
+```
 
 
 ## Usage
 
 The following tasks are available:
 
-- `dev`: Run Vite in watch mode to detect changes - all modules are compiled to the `dist/` folder, as well as rollup of all types to a d.ts declaration file
-- `start`: Run Vite in host mode to work in a local development environment within this package - vite hosts the `index.html` with real time HMR updates
-- `build`: Run Vite to build a production release distributable
-- `build:types`: Run DTS Generator to build d.ts type declarations only
+- `npm run build` - Build production distributable (JS + types)
+- `npm run dev` - Watch mode to detect changes (rebuilds dist/ and types)
+- `npm start` - Vite dev server with HMR for local development
+- `npm run build:types` - Build only TypeScript declarations
 
-Rollup all your exports to the top-level index.ts for inclusion into the build distributable.
+### Output Formats
 
-For example, if you have a `utils/` folder that contains an `arrayUtils.ts` file.
+This template builds multiple distribution formats:
 
-/src/utils/arrayUtils.ts:
+- **ESM** (`dist/index.es.js`) - Modern ES modules
+- **CommonJS** (`dist/index.cjs.js`) - Node.js compatibility
+- **UMD** (`dist/index.umd.js`) - Universal module definition
+- **IIFE** (`dist/index.iife.js`) - Browser global variable
+- **Types** (`dist/index.d.ts`) - Bundled TypeScript declaration file
+
+### Exports
+
+Export everything from the top-level `index.ts` for inclusion in the build.
+
+For example, if you have a `utils/` folder with an `arrayUtils.ts` file:
+
 ```ts
+// src/utils/arrayUtils.ts
 export const distinct = <T>(array: T[] = []) => [...new Set(array)];
 ```
 
-Include that export in the top-level `index.ts` .
+Include that export in the top-level `index.ts`:
 
-/src/index.ts:
 ```ts
-// Main library exports - these are packaged in your distributable
+// src/index.ts
 export { distinct } from "./utils/arrayUtils"
 ```
 
 
 ## Development
 
-There are multiple strategies for development, either working directly from the library or from a linked project.
+Multiple strategies for development are available.
 
-### Local Development
+### Local Development with HMR
 
-Vite features a host mode for development with real time HMR updates directly from the library via the `start` script.  This enables rapid development within the library instead of linking from other projects.
+Vite's dev server provides real-time HMR updates:
 
-Using the `start` task, Vite hosts the `index.html` for a local development environment.  This file is not included in the production build.  Note that only exports specified from the `index.ts` are ultimately bundled into the library.
+```bash
+npm start
+```
 
-As an example, this template includes a React app, which could be replaced with a different framework such as Vue, Solid.js, Svelte, etc...
+This starts Vite's dev server hosting `index.html` for local development with hot module replacement. This file is not included in the production build. Only exports from `src/index.ts` are bundled into the library.
 
-For UI projects, you may want to consider adding tools such as [Storybook](https://storybook.js.org/) to isolate UI component development by running a `storybook` script from this package.
+The template includes a React app example, which can be replaced with Vue, Solid.js, Svelte, or any framework.
 
+For UI projects, consider adding [Storybook](https://storybook.js.org/) to isolate component development.
 
-### Project Development
+### Watch Mode Development
 
-To use this library with other app projects before submitting to a registry such as NPM, either `link` or `pack` to test.
+For development with `npm link` or when working with other projects:
+
+```bash
+npm run dev
+```
+
+Vite detects changes and compiles all modules to `dist/`, including bundled type declarations.
+
+### Linked Project Development
+
+To test your library in other projects before publishing:
 
 #### Using Link
 
-Run the `dev` script and link packages.
+1. **From this library**: Start watch mode and link the package
+   ```bash
+   npm run dev
+   npm link
+   ```
 
-Using the `dev` task, Vite detects changes and compiles all modules to the `dist/` folder, as well as rollup of all types to a d.ts declaration file.
+2. **From your app**: Link to this library
+   ```bash
+   npm link "mylib"
+   ```
 
-To test your library from within an app:
-
-- **From this library**: run `npm link` or `yarn link` command to register the package
-- **From your app**: run `npm link "mylib"` or `yarn link "mylib"` command to use the library inside your app during development
-
-Inside your app's `node_modules/` folder, a symlink is created to the library.
+A symlink is created in your app's `node_modules/`. Changes to your library are automatically rebuilt and reflected in your app.
 
 #### Using Pack
 
-From you library, pack it to create a tarball:
+Create a tarball to test the exact package that will be published:
 
 ```bash
 npm pack
 ```
 
-This will create a [name].tgz tarball that includes the result of what will be uploaded to npm.
-
-Install the pack file in a test app:
+This creates a `[name].tgz` tarball. Install it in your test app:
 
 ```bash
-npm install [name].tgz
+npm install /path/to/[name].tgz
 ```
 
 
 ## Development Cleanup
 
-Once development completes, `unlink` both your library and test app projects.
+Once development completes, unlink both projects:
 
-- **From your app**: run `npm unlink "mylib"` or `yarn unlink "mylib"` command to remove the library symlink
-- **From your library**: run `npm unlink` or `yarn unlink` command to unregister the package
+- **From your app**:
+  ```bash
+  npm unlink "mylib"
+  ```
 
-If you mistakenly forget to `unlink`, you can manually clean up artifacts from `yarn` or `npm`.
+- **From your library**:
+  ```bash
+  npm unlink
+  ```
 
-For `yarn`, the `link` command creates symlinks which can be deleted from your home directory:
+If you forget to unlink, manually clean up:
+
+**For yarn**:
+```bash
+rm -rf ~/.config/yarn/link/mylib
 ```
-~/.config/yarn/link
-```
 
-For `npm`, the `link` command creates global packages which can be removed by executing:
+**For npm**:
 ```bash
 sudo npm rm --global "mylib"
+npm ls --global --depth 0  # confirm removal
 ```
 
-Confirm your npm global packages with the command:
+Or simply reinstall dependencies in your app to clear symlinks:
 ```bash
-npm ls --global --depth 0
+rm -rf node_modules && npm install
 ```
-
-For your app, simply reinstall dependencies to clear any forgotten linked packages.  This will remove any symlinks in the `node_modules/` folder.
 
 
 ## Release Publishing
 
 Update your `package.json` to the next version number and tag a release.
 
-Assure that your package lockfile is also updated by running an install.  For npm, this will assure the lockfile has the updated version number.  Yarn does not duplicate the version number in the lockfile.
+### Configuration
 
-Assure either a `.npmrc` or `publishConfig` in your `package.json`:
+Add `publishConfig` to your `package.json`:
 
-package.json:
 ```json
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/",
-    "scope": "username"
-    "access": "public",
-  }
+"publishConfig": {
+  "registry": "https://registry.npmjs.org/",
+  "access": "public"
+}
 ```
 
-If you are publishing to a private registry such as GitHub packages, update your `package.json` to include `publishConfig` and `repository`:
+For private GitHub packages:
 
-package.json:
 ```json
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/@MyOrg"
-  }
+"publishConfig": {
+  "registry": "https://npm.pkg.github.com/@MyOrg"
+}
 ```
 
-Unless you are using a continuous integration service such as GitHub Actions, assure that your `dist/` folder is cleanly build.  Note that `npm publish` will ship anything inside the distributable folder.
+### Publishing
 
-For clean builds, you may want to install the `rimraf` package and add a `clean` or `prebuild` script to your `package.json` to remove any artifacts from your `dist/` folder.  Or, manually delete the `dist/` folder yourself.
+Before publishing, ensure a clean build:
 
-package.json:
-```json
-  "scripts": {
-    "clean": "rimraf dist"
-  }
+```bash
+rm -rf dist
+npm run build
 ```
 
-Before you submit for the first time, make sure your package name is available by using `npm search`.  If npm rejects your package name, update your `package.json` and resubmit.
+Verify your package name is available:
 
 ```bash
 npm search <term>
 ```
 
-Once ready to submit your package to the NPM Registry, execute the following tasks via `npm` (or `yarn`):
-
-```bash
-npm run build
-```
-
-Assure the proper npm login:
+Once ready to publish:
 
 ```bash
 npm login
-```
-
-Submit your package to the registry:
-
-```bash
 npm publish --access public
 ```
 
+
 ## Continuous Integration
 
-For continuous integration with GitHub Actions, create a `.github/workflows/publish.yml`
+For continuous integration with GitHub Actions, create `.github/workflows/publish.yml`
 
-For public NPM packages, use the following workflow:
+### Public NPM Packages
 
 ```yml
 name: Publish Package to npmjs
@@ -229,7 +235,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```
 
-For private GitHub packages, use the following workflow:
+### Private GitHub Packages
 
 ```yml
 name: Publish Package to GitHub Packages
@@ -248,29 +254,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: "https://registry.npmjs.org"
+          registry-url: "https://npm.pkg.github.com"
           scope: "@MyOrg"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm ci
       - run: npm run build
       - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-This will deploy your build artifact when a release is tagged.
+### Setup Secrets
 
-Obtain an "Automation" CI/CD access token to bypass 2FA from [npm](https://www.npmjs.com/) by selecting your profile image in the upper right, and chosing "Access Tokens".
+Obtain an "Automation" CI/CD access token from [npm](https://www.npmjs.com/) to bypass 2FA:
+1. Click your profile image � Access Tokens
+2. Generate a new Automation token
 
-To add secrets to your repository:
-- From your repository, select _Settings_
-- From the _Security_ section of the sidebar, expand _Secrets and variables_ and select _Actions_
-- From the _Secrets_ tab, press _New repository secret_ to add the `NPM_TOKEN` key
+Add secrets to your repository:
+1. Repository � Settings � Security � Secrets and variables � Actions
+2. Add `NPM_TOKEN` secret
 
-To add secrets to your organization:
-- From your organization, select _Settings_
-- From the _Security_ section of the sidebar, expand _Secrets and variables_ and select _Actions_
-- From the _Secrets_ tab, press _New organization secret_ to add the `NPM_TOKEN` key
-
-For more information, see:
+For more information:
 - [Using secrets in GitHub Actions](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions)
 - [Publish to npmjs and GPR with npm](https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md#publish-to-npmjs-and-gpr-with-npm)
