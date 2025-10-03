@@ -5,10 +5,11 @@ Scaffold TypeScript npm packages using this template to bootstrap your next libr
 Built with **Vite** for fast builds and development with HMR, plus **vite-plugin-dts** for bundled type definitions.
 
 > [!TIP]
-> Looking for a JavaScript version of this template? Try: [Vite JavaScript NPM Package](https://github.com/jasonsturges/vite-npm-package)
+> Looking for alternatives to this Vite-based template?
 >
-> Or, try a tsup version of this template: [tsup NPM Package](https://github.com/jasonsturges/tsup-npm-package)
-
+> - [JavaScript version](https://github.com/jasonsturges/vite-npm-package)
+> - [tsup version](https://github.com/jasonsturges/tsup-npm-package)
+> - [ESBuild version](https://github.com/jasonsturges/esbuild-typescript-npm-package)
 
 ## Getting Started
 
