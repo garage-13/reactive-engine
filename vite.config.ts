@@ -6,13 +6,17 @@ import { defineConfig, UserConfig } from "vite";
 export default defineConfig({
   base: "./",
   plugins: [dts({ rollupTypes: true }), react()],
+  resolve: {
+    dedupe: ["react", "react-dom"], // Prevents multiple React instances
+  },
   build: {
     sourcemap: true,
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
-      name: "mylib",
-      formats: ["es", "cjs", "umd", "iife"],
-      fileName: (format) => `index.${format}.js`,
+      name: "MyLib", // Global variable name for IIFE
+      formats: ["es", "cjs", "iife"], // ES/CJS for npm, IIFE for CDN
+      fileName: (format) =>
+        `index.${format === "es" ? "mjs" : format === "cjs" ? "cjs" : "iife.js"}`,
     },
     rollupOptions: {
       external: ["react", "react-dom"],
