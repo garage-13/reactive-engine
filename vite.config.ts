@@ -5,7 +5,7 @@ import { defineConfig, UserConfig } from "vite";
 
 export default defineConfig({
   base: "./",
-  plugins: [dts({ rollupTypes: true }), react()],
+  plugins: [dts({ rollupTypes: true, insertTypesEntry: true }), react()],
   resolve: {
     dedupe: ["react", "react-dom"], // Prevents multiple React instances
   },
