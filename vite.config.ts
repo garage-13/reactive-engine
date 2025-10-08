@@ -10,6 +10,7 @@ export default defineConfig({
     dedupe: ["react", "react-dom"], // Prevents multiple React instances
   },
   build: {
+    emptyOutDir: true,
     sourcemap: true,
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
