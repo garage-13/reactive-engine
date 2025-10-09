@@ -33,17 +33,18 @@ The following tasks are available:
 - `npm run build` - Build production distributable (JS + types)
 - `npm run dev` - Watch mode to detect changes (rebuilds dist/ and types)
 - `npm start` - Vite dev server with HMR for local development
-- `npm run build:types` - Build only TypeScript declarations
 
 ### Output Formats
 
 This template builds multiple distribution formats:
 
-- **ESM** (`dist/index.es.js`) - Modern ES modules
-- **CommonJS** (`dist/index.cjs.js`) - Node.js compatibility
-- **UMD** (`dist/index.umd.js`) - Universal module definition
-- **IIFE** (`dist/index.iife.js`) - Browser global variable
+- **ESM** (`dist/index.mjs`) - Modern ES modules for `import`
+- **CommonJS** (`dist/index.cjs`) - Node.js compatibility for `require()`
+- **IIFE** (`dist/index.iife.js`) - Browser global variable for CDN usage
 - **Types** (`dist/index.d.ts`) - Bundled TypeScript declaration file
+
+> [!NOTE]
+> Need UMD format? Add `"umd"` to the `formats` array in `vite.config.ts` and update the `fileName` function to handle it.
 
 ### Exports
 
