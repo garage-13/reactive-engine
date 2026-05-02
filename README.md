@@ -111,13 +111,11 @@ engine.onSignalChange = (name, next, prev) => {
 ## Possible project structure (for example)
 ```
 src/
-├── core/                         # Framework core
-│   ├── BaseREService.ts          # Base service class (based on ReactiveEngine)
-│   ├── types.ts                  # Types (Signal, Resource, etc.)
-│   └── index.ts                  # Public core API
+├── utils/
+│   └── engine.ts                 # ReactiveEngine instance
 │
 ├── services/                     # Business-logic (Store)
-│   ├── index.ts                  # engine instance & DI exports
+│   ├── index.ts                  # DI exports (?)
 │   ├── User/
 │   │   ├── UserService.ts        # User logic
 │   │   └── types.ts              # DTO & data interfaces
