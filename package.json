@@ -1,16 +1,18 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "0.2.6-beta",
+  "version": "0.2.7-beta",
   "description": "JS Reactive Engine",
   "author": "Den Pol <selection4test@gmail.com> (https://pravosleva.pro)",
   "homepage": "https://github.com/garage-13/reactive-engine",
   "repository": "github:garage-13/reactive-engine",
   "license": "MIT",
   "keywords": [
-    "vite",
-    "typescript",
-    "npm",
-    "package"
+    "reactive",
+    "engine",
+    "react",
+    "fast",
+    "state",
+    "manager"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",

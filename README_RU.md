@@ -5,6 +5,8 @@
 yarn add @pravosleva/reactive-engine
 ```
 
+https://t.me/bash_exp_ru/3393
+
 ## 📦 Основные компоненты
 
 ### 1. ReactiveEngine
@@ -343,7 +345,7 @@ export class Logic extends BaseREServiceEnhanced {
 
       // Подписываемся на изменение комнаты
       const room = this.currentRoom.value;
-      const url = 'ws://pravosleva.pro';
+      const url = 'ws://your-socket-server.ru';
 
       this.status.value = 'connecting';
       this.messages.value = []; // Очищаем чат при смене комнаты

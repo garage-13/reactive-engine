@@ -1,6 +1,8 @@
 # 🚀 ReactiveEngine Core Framework
 A lightweight, type-safe reactive engine built with TypeScript, featuring Dependency Injection and seamless React integration.
 
+https://t.me/bash_exp_ru/3393
+
 ```bash
 yarn add @pravosleva/reactive-engine
 ```
@@ -86,7 +88,7 @@ The resource method automatically re-fetches data whenever its source dependency
 ```ts
 this.userProfile = this.engine.resource(
   async (id, signal) => {
-    const res = await fetch(`https://example.com{id}`, { signal });
+    const res = await fetch(`https://example.com/{id}`, { signal });
     if (!res.ok) throw new Error('Not found');
     return res.json();
   },
