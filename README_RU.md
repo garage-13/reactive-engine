@@ -317,7 +317,7 @@ export { engine }
 `~/services/SimpleChat/Logic.socket.io.ts`
 ```ts
 import { io, Socket } from 'socket.io-client';
-import { BaseServiceEnhanced } from '~/utils/ReactiveEngine';
+import { BaseServiceEnhanced } from '@pravosleva/reactive-engine';
 import { ChatMessage } from './types';
 
 export class Logic extends BaseServiceEnhanced {
