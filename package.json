@@ -1,6 +1,6 @@
 {
-  "name": "reactive-engine",
-  "version": "0.2.0-beta",
+  "name": "@pravosleva/reactive-engine",
+  "version": "0.2.1-beta",
   "description": "JS Reactive Engine",
   "author": "Den Pol <selection4test@gmail.com> (https://pravosleva.pro)",
   "homepage": "https://github.com/garage-13/reactive-engine",

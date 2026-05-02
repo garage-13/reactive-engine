@@ -1,6 +1,10 @@
 # 🚀 ReactiveEngine
 Минималистичный реактивный движок на TypeScript с Dependency Injection и интеграцией для React.
 
+```bash
+yarn add @pravosleva/reactive-engine
+```
+
 ## 📦 Основные компоненты
 
 ### 1. ReactiveEngine
@@ -13,16 +17,18 @@
 - inject<T>(Class) — получение или создание синглтон-сервиса.
 - use(signal) — React-хук для подписки на изменения.
 
-### 2. BaseService
+### 2. BaseREService
 Абстрактный класс для бизнес-логики.
 - Правило: Всегда инициализируйте сигналы напрямую в полях класса для корректной работы типов и DI.
 
 ## 🛠 Руководство пользователя
 ### Шаг 1: Настройка (Entry Point)
 Создайте и экспортируйте единственный экземпляр движка.
+
+Ваш инстанс движка в локальном проекте `~/utils/engine.ts`:
 ```ts
 import { useState, useEffect } from 'react';
-import { ReactiveEngine } from './utils/ReactiveEngine';
+import { ReactiveEngine } from '@pravosleva/reactive-engine';
 
 export const engine = new ReactiveEngine();
 engine.setReactAdapters(useState, useEffect); // Связываем с React
@@ -31,9 +37,9 @@ engine.setReactAdapters(useState, useEffect); // Связываем с React
 ### Шаг 2: Создание логики (Service)
 Опишите данные и методы их изменения.
 ```ts
-import { BaseService } from './BaseService';
+import { BaseREService } from '@pravosleva/reactive-engine';
 
-export class CounterService extends BaseService {
+export class CounterService extends BaseREService {
   // Сигналы с runtime-валидацией
   public count = this.engine.signal(0, {
     name: 'counter',
@@ -50,7 +56,7 @@ export class CounterService extends BaseService {
 ### Шаг 3: Использование в React
 Подключайте логику к компонентам без лишнего бойлерплейта.
 ```ts
-import { engine } from './reactive';
+import { engine } from '~/utils/engine';
 import { CounterService } from './CounterService';
 
 export const Counter = () => {
@@ -87,12 +93,11 @@ engine.onSignalChange = (name, next, prev) => {
 - Имена сигналов: Всегда давайте имена сигналам (this.engine.signal(0, 'my_name')) для удобной отладки в логах.
 - Untrack: Если нужно прочитать значение сигнала внутри эффекта, не создавая зависимости, используйте engine.untrack(() => signal.value).
 
-## Вариант стандарта структуры папок
+## Вариант (один из примеров) стандарта структуры папок
 ```
 src/
 ├── core/                         # Ядро фреймворка (не зависит от проекта)
-│   ├── ReactiveEngine.ts         # Основной класс движка
-│   ├── BaseService.ts            # Базовый класс для сервисов
+│   ├── BaseREService.ts          # Базовый класс для сервисов
 │   ├── types.ts                  # Общие интерфейсы (Signal, Resource, etc.)
 │   └── index.ts                  # Публичное API ядра
 │
@@ -155,7 +160,7 @@ export const useUserStore = () => engine.inject(UserService);
 Здесь мы собираем все системные файлы.
 ```ts
 export * from './ReactiveEngine';
-export * from './BaseService';
+export * from './BaseREService';
 export * from './types';
 ```
 

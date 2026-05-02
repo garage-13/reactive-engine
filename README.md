@@ -1,6 +1,10 @@
 # 🚀 ReactiveEngine Core Framework
 A lightweight, type-safe reactive engine built with TypeScript, featuring Dependency Injection and seamless React integration.
 
+```bash
+yarn add @pravosleva/reactive-engine
+```
+
 ## 📦 Core Components
 ### 1. ReactiveEngine
 The central hub of the system. It manages state, effects, DI, and the bridge to React.
@@ -13,16 +17,18 @@ The central hub of the system. It manages state, effects, DI, and the bridge to 
 - use(signal) — A React hook to subscribe to reactive updates.
 - untrack(fn) — Executes a function without creating reactive dependencies.
 
-### 2. BaseService
+### 2. BaseREService
 An abstract class for encapsulating business logic.
 - Rule: Always initialize signals and resources directly in class fields to ensure correct DI instantiation and type inference.
 
 ## 🛠 Quick Start
 ### Step 1: Initialization (Entry Point)
 Create and export a single instance of the engine to be used throughout your app.
+
+Your instance in your local `~/utils/engine.ts`:
 ```ts
 import { useState, useEffect } from 'react';
-import { ReactiveEngine } from './utils/ReactiveEngine';
+import { ReactiveEngine } from '@pravosleva/reactive-engine';
 
 export const engine = new ReactiveEngine();
 // Bridge the engine with React hooks
@@ -30,11 +36,11 @@ engine.setReactAdapters(useState, useEffect);
 ```
 
 ### Step 2: Define Business Logic (Service)
-Inherit from BaseService to create a reactive store.
+Inherit from BaseREService to create a reactive store.
 ```ts
-import { BaseService, Signal, Computed } from './ReactiveFramework';
+import { BaseREService, Signal, Computed } from '@pravosleva/reactive-engine';
 
-export class CounterService extends BaseService {
+export class CounterService extends BaseREService {
   // Initialize signals with runtime validation
   public count = this.engine.signal(0, {
     name: 'counter',
@@ -51,8 +57,9 @@ export class CounterService extends BaseService {
 
 ### Step 3: Use in React Components
 Connect your logic to the UI with minimal boilerplate.
+
 ```ts
-import { engine } from './reactive';
+import { engine } from '~/utils/engine';
 import { CounterService } from './CounterService';
 
 export const Counter = () => {
@@ -100,3 +107,32 @@ engine.onSignalChange = (name, next, prev) => {
 - Naming Convention: Provide clear names for signals (e.g., this.engine.signal(0, 'my_signal_name')) for better debugging logs.
 - Batching: Use engine.batch(() => { ... }) when updating multiple signals to prevent unnecessary re-renders.
 - Untrack: Use engine.untrack(() => signal.value) inside effects if you need to read a value without subscribing to it.
+
+## Possible project structure (for example)
+```
+src/
+├── core/                         # Framework core
+│   ├── BaseREService.ts          # Base service class (based on ReactiveEngine)
+│   ├── types.ts                  # Types (Signal, Resource, etc.)
+│   └── index.ts                  # Public core API
+│
+├── services/                     # Business-logic (Store)
+│   ├── index.ts                  # engine instance & DI exports
+│   ├── User/
+│   │   ├── UserService.ts        # User logic
+│   │   └── types.ts              # DTO & data interfaces
+│   └── Counter/
+│       └── CounterService.ts
+│
+├── components/                   # UI-layer (React)
+│   ├── Shared/                   # Common components
+│   └── Features/                 # Components with logic
+│       └── UserProfile/
+│           ├── UserProfile.tsx   # Usage of engine.use(store.user)
+│           └── styles.module.css
+│
+├── hooks/                        # Global React-hooks
+│   └── useStore.ts               # Helpers like useUserStore()
+│
+└── main.tsx                      # Entry point (settings like engine.setReactAdapters)
+```
