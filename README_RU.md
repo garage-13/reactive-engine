@@ -247,19 +247,17 @@ export const Counter = () => {
 
 Б. Тест "1000 счетчиков"
 Создайте страницу с 1000 независимых компонентов-счетчиков.
-- В Redux: При изменении одного счетчика проверку пройдут все 1000 селекторов.
-- В ReactiveEngine: Сработает только 1 подписка.
+- **В Redux**: При изменении одного счетчика проверку пройдут все 1000 селекторов.
+- **В ReactiveEngine**: Сработает только 1 подписка.
 - Замерьте FPS (кадры в секунду) при частом нажатии на кнопку.
 
 ### 3. Сравнение "на бумаге"
-Критерий          Redux	                               ReactiveEngine
 
-Сложность         O(N), где N - кол-во подписчиков	   O(K), где K - кол-во реально изменившихся полей
-обновления
-
-Память	          Низкая (простые объекты)	           Чуть выше (из-за хранения объектов Proxy и Set подписчиков)
-
-Масштабируемость  Требует ручной оптимизации	         Масштабируется автоматически
+| Критерий | Redux | ReactiveEngine |
+| -------- | -------- | -------- |
+| Сложность обновления | O(N), где N - кол-во подписчиков | O(K), где K - кол-во реально изменившихся полей |
+| Память | Низкая (простые объекты) | Чуть выше (из-за хранения объектов Proxy и Set подписчиков) |
+| Масштабируемость | Требует ручной оптимизации | Масштабируется автоматически |
 
 ### 4. Где Redux может выиграть?
 Redux использует обычные JS-объекты. Движок **ReactiveEngine** использует Proxy. Чтение данных через Proxy на доли наносекунд медленнее, чем чтение из обычного объекта. Если Вам нужно совершить 1 000 000 математических операций над данными в секунду, Redux (точнее, чистый JS) будет быстрее. Но в контексте UI-фреймворка эти задержки незаметны.
@@ -474,30 +472,48 @@ NOTE: Про комнаты.
 Благодаря тому, что currentRoom — это сигнал,
 переключение комнат превращается в одну строку кода,
 а всё «тяжелое» переподключение сокета происходит под капотом в движке.
+```
 
-const chat = engine.inject(SimpleChatServiceLogic);
-const room = engine.use(chat.currentRoom);
-const messages = engine.use(chat.messages);
+`~/services/SimpleChat/index.ts`
+```ts
+export * from './Logic.socket.io.ts';
+```
 
-return (
-  <div>
-    <h2>Room: {room}</h2>
+`~/services/index.ts`
+```ts
+export * from './SimpleChat';
+```
 
-    <div className="tabs">
-      <button onClick={() => chat.switchRoom('general')}>General</button>
-      <button onClick={() => chat.switchRoom('crypto')}>Crypto</button>
-      <button onClick={() => chat.switchRoom('dev')}>Dev</button>
+`~/components/SimpleChat.tsx`
+```tsx
+import { engine } from '~/utils/engine'
+import { Logic as SimpleChatService } from '~/services'
+
+export const SimpleChat = () => {
+  const chat = engine.inject(SimpleChatService)
+  const room = engine.use(chat.currentRoom)
+  const messages = engine.use(chat.messages)
+
+  return (
+    <div>
+      <h2>Room: {room}</h2>
+
+      <div className="tabs">
+        <button onClick={() => chat.switchRoom('general')}>General</button>
+        <button onClick={() => chat.switchRoom('crypto')}>Crypto</button>
+        <button onClick={() => chat.switchRoom('dev')}>Dev</button>
+      </div>
+
+      <div className="messages">
+        {messages.map(m => (
+          <p key={m.timestamp}><b>{m.user}:</b> {m.text}</p>
+        ))}
+      </div>
+
+      <input onKeyDown={(e) => e.key === 'Enter' && chat.sendMessage(e.currentTarget.value)} />
     </div>
-
-    <div className="messages">
-      {messages.map(m => (
-        <p key={m.timestamp}><b>{m.user}:</b> {m.text}</p>
-      ))}
-    </div>
-
-    <input onKeyDown={(e) => e.key === 'Enter' && chat.sendMessage(e.currentTarget.value)} />
-  </div>
-);
+  );
+}
 ```
 
 *Преимущества такой реализации:*
@@ -518,12 +534,12 @@ return (
 Теперь мы просто подписываемся на сигнал typingUsers и вызываем уведомление в onChange инпута.
 ```tsx
 export const ChatInput = () => {
-  const chat = engine.inject(SimpleChatServiceLogic);
-  const typingUsers = engine.use(chat.typingUsers);
+  const chat = engine.inject(SimpleChatServiceLogic)
+  const typingUsers = engine.use(chat.typingUsers)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Уведомляем сервер, что мы печатаем
-    chat.sendTypingNotification();
+    chat.sendTypingNotification()
   };
 
   return (
@@ -540,8 +556,8 @@ export const ChatInput = () => {
         placeholder="Введите сообщение..."
       />
     </div>
-  );
-};
+  )
+}
 ```
 
 Почему это решение надежное:
@@ -598,10 +614,10 @@ const capitalize = (str: string): string =>
   : str;
 
 export const SimpleChatService = () => {
-  const chatStore = engine.inject(SimpleChatServiceLogic);
-  const room = engine.use(chatStore.currentRoom);
-  const messages = engine.use(chatStore.messages);
-  const status = engine.use(chatStore.status);
+  const chatStore = engine.inject(SimpleChatServiceLogic)
+  const room = engine.use(chatStore.currentRoom)
+  const messages = engine.use(chatStore.messages)
+  const status = engine.use(chatStore.status)
 
   return (
     <div
@@ -641,8 +657,8 @@ export const SimpleChatService = () => {
         Send tst msg
       </Button>
     </div>
-  );
-};
+  )
+}
 ```
 
 *Пару комментариев:*

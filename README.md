@@ -10,18 +10,17 @@ yarn add @pravosleva/reactive-engine
 ## 📦 Core Components
 ### 1. ReactiveEngine
 The central hub of the system. It manages state, effects, DI, and the bridge to React.
-
-- signal<T>(value, options) — Creates an atomic state unit.
-- computed<T>(fn) — Derives data with automatic caching.
-- reactive<T>(obj) — Provides deep reactivity for objects and arrays via Proxy.
-- resource<T>(fetcher, source?) — Handles async requests with auto-abort (Race Condition protection).
-- inject<T>(Class) — Retrieves or instantiates a singleton service.
-- use(signal) — A React hook to subscribe to reactive updates.
-- untrack(fn) — Executes a function without creating reactive dependencies.
+- `signal<T>(value, options)` — Creates an atomic state unit.
+- `computed<T>(fn)` — Derives data with automatic caching.
+- `reactive<T>(obj)` — Provides deep reactivity for objects and arrays via Proxy.
+- `resource<T>(fetcher, source?)` — Handles async requests with auto-abort (Race Condition protection).
+- `inject<T>(Class)` — Retrieves or instantiates a singleton service.
+- `use(signal)` — A React hook to subscribe to reactive updates.
+- `untrack(fn)` — Executes a function without creating reactive dependencies.
 
 ### 2. BaseREService
 An abstract class for encapsulating business logic.
-- Rule: Always initialize signals and resources directly in class fields to ensure correct DI instantiation and type inference.
+- **Rule:** Always initialize signals and resources directly in class fields to ensure correct DI instantiation and type inference.
 
 ## 🛠 Quick Start
 ### Step 1: Initialization (Entry Point)
@@ -39,6 +38,7 @@ engine.setReactAdapters(useState, useEffect);
 
 ### Step 2: Define Business Logic (Service)
 Inherit from BaseREService to create a reactive store.
+`~/services/Counter/CounterService.ts`
 ```ts
 import { BaseREService, Signal, Computed } from '@pravosleva/reactive-engine';
 
@@ -57,12 +57,22 @@ export class CounterService extends BaseREService {
 }
 ```
 
+`~/services/Counter/index.ts`
+```ts
+export * from './CounterService';
+```
+
+`~/services/index.ts`
+```ts
+export * from './Counter';
+```
+
 ### Step 3: Use in React Components
 Connect your logic to the UI with minimal boilerplate.
 
 ```ts
 import { engine } from '~/utils/engine';
-import { CounterService } from './CounterService';
+import { CounterService } from '~/services';
 
 export const Counter = () => {
   // Get the service singleton via DI
