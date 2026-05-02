@@ -317,10 +317,10 @@ export { engine }
 `~/services/SimpleChat/Logic.socket.io.ts`
 ```ts
 import { io, Socket } from 'socket.io-client';
-import { BaseServiceEnhanced } from '@pravosleva/reactive-engine';
+import { BaseREServiceEnhanced } from '@pravosleva/reactive-engine';
 import { ChatMessage } from './types';
 
-export class Logic extends BaseServiceEnhanced {
+export class Logic extends BaseREServiceEnhanced {
   public messages = this.engine.signal<ChatMessage[]>([], 'SimpleChatService:socket.io:signal:messages');
   public status = this.engine.signal<'connecting' | 'open' | 'closed'>('closed', 'SimpleChatService:socket.io:signal:connection');
 
@@ -585,12 +585,15 @@ export type AppMessage = ChatMessage | NotificationMessage | SystemMessage;
 
 `~/components/SimpleChat.tsx`
 ```tsx
-import { engine } from '~/utils/ReactiveEngine'
+import { engine } from '~/utils/engine'
 import { Button } from '~/components/Button';
 import baseClasses from '~/baseClasses.module.scss'
 import { Logic as SimpleChatServiceLogic } from '~/services/SimpleChat/Logic.socket.io'
 
-const capitalize = (str: string): string => !!str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+const capitalize = (str: string): string =>
+  !!str
+  ? str.charAt(0).toUpperCase() + str.slice(1)
+  : str;
 
 export const SimpleChatService = () => {
   const chatStore = engine.inject(SimpleChatServiceLogic);
@@ -643,7 +646,7 @@ export const SimpleChatService = () => {
 *Пару комментариев:*
 1. Метод `engine.inject()` работает как **Shared State**.
 При первом вызове он создает экземпляр класса, а при всех последующих (включая ре-рендеры компонента) — просто возвращает ссылку на уже созданный объект из **Map**.
-Результат: Переменная chat всегда ссылается на один и тот же объект в памяти.
+Результат: Переменная `chat` всегда ссылается на один и тот же объект в памяти.
 Это не вызывает лишних аллокаций или тяжелых вычислений при обновлении компонента.
 
 2. Когда это МОЖЕТ стать проблемой?
