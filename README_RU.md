@@ -1,4 +1,4 @@
-# 🚀 ReactiveEngine
+# 🚀 ReactiveEngine (Инструкция на русском 🇷🇺)
 Минималистичный реактивный движок на TypeScript с Dependency Injection и интеграцией для React.
 
 ```bash

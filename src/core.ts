@@ -17,28 +17,166 @@ export interface ResourceState<T> {
   error: any | null;
 }
 
+/**
+ * Функция для очистки эффекта.
+ * @typedef {() => void} CleanupFn
+ */
+
+/**
+ * Функция эффекта, которая может возвращать функцию очистки.
+ * @typedef {() => CleanupFn | void} EffectFn
+ */
+
+/**
+ * Токен для зависимости.
+ * @typedef {string | symbol | { new(engine: ReactiveEngine, ...args: any[]): T }} Token<T>
+ */
+
+/**
+ * Фабрика для создания сервиса.
+ * @template T
+ * @typedef {(engine: ReactiveEngine) => T} Factory<T>
+ */
+
+/**
+ * Интерфейс для эффекта.
+ * @interface IEffect
+ */
+export interface IEffect {
+  /**
+   * Запуск эффекта.
+   * @function run
+   * @returns {void}
+   */
+  run: () => void;
+
+  /**
+   * Коллекция функций очистки.
+   * @type {Set<CleanupFn>}
+   */
+  cleanups: Set<CleanupFn>;
+}
+
+/**
+ * Интерфейс для состояния ресурса.
+ * @template T
+ * @interface ResourceState<T>
+ */
+export interface ResourceState<T> {
+  /**
+   * Данные ресурса.
+   * @type {T | null}
+   */
+  data: T | null;
+
+  /**
+   * Состояние загрузки ресурса.
+   * @type {boolean}
+   */
+  loading: boolean;
+
+  /**
+   * Ошибка ресурса.
+   * @type {any | null}
+   */
+  error: any | null;
+}
+
+/**
+ * Интерфейс для сигнала.
+ * @template T
+ * @interface Signal<T>
+ */
 export interface Signal<T> {
+  /**
+   * Значение сигнала.
+   * @type {T}
+   */
   value: T;
+
+  /**
+   * Подписка на изменение значения сигнала.
+   * @function subscribe
+   * @param {Function} cb - Коллбек функция для обработки изменения.
+   * @returns {CleanupFn} - Функция для очистки подписки.
+   */
   subscribe: (cb: (val: T) => void) => CleanupFn;
 }
 
+/**
+ * Интерфейс для вычисляемого значения.
+ * @template T
+ * @interface Computed<T>
+ */
 export interface Computed<T> {
+  /**
+   * Только читаемое значение вычисляемого значения.
+   * @type {T}
+   */
   readonly value: T;
+
+  /**
+   * Подписка на изменение вычисляемого значения.
+   * @function subscribe
+   * @param {Function} cb - Коллбек функция для обработки изменения.
+   * @returns {CleanupFn} - Функция для очистки подписки.
+   */
   subscribe: (cb: (val: T) => void) => CleanupFn;
 }
 
+/**
+ * Интерфейс для ресурса.
+ * @template T
+ * @interface Resource<T>
+ */
 export interface Resource<T> extends ResourceState<T> {
+  /**
+   * Перезагрузка ресурса.
+   * @function refetch
+   * @returns {void}
+   */
   refetch: () => void;
+
+  /**
+   * Подписка на изменение состояния ресурса.
+   * @function subscribe
+   * @param {Function} cb - Коллбек функция для обработки изменения.
+   * @returns {CleanupFn} - Функция для очистки подписки.
+   */
   subscribe: (cb: (val: ResourceState<T>) => void) => CleanupFn;
+
+  /**
+   * Только читаемое состояние ресурса.
+   * @type {ResourceState<T>}
+   */
   readonly value: ResourceState<T>;
 }
 
-interface SignalOptions<T> {
+/**
+ * Интерфейс для опций сигнала.
+ * @template T
+ * @interface SignalOptions<T>
+ */
+export interface SignalOptions<T> {
+  /**
+   * Имя сигнала.
+   * @type {string}
+   */
   name?: string;
+
+  /**
+   * Валидатор значения сигнала.
+   * @function validate
+   * @param {T} val - Значение для валидации.
+   * @returns {boolean | string} - Результат валидации.
+   */
   validate?: (val: T) => boolean | string;
 }
 
 // --- ЯДРО ---
+/**
+ * Класс реактивного движка.
+ */
 export class ReactiveEngine {
   private activeEffect: IEffect | null = null;
   private isBatching = false;
@@ -48,6 +186,10 @@ export class ReactiveEngine {
   private proxyCache = new WeakMap<object, any>();
   private allEffects = new Set<IEffect>();
 
+  /**
+   * Коллбек для уведомления о изменении сигнала.
+   * @type {Function}
+   */
   public onSignalChange?: (name: string, next: any, prev: any) => void;
 
   private reactAdapters = {
@@ -55,7 +197,14 @@ export class ReactiveEngine {
     useEffect: useEffect as any,
   };
 
-  /** DI: Регистрация */
+  /**
+   * DI: Регистрация зависимости.
+   * @template T
+   * @function provide
+   * @param {Token<T>} token - Токен для зависимости.
+   * @param {T | Factory<T>} valueOrFactory - Значение или фабрика для создания сервиса.
+   * @returns {void}
+   */
   public provide<T>(token: Token<T>, valueOrFactory: T | Factory<T>): void {
     if (typeof valueOrFactory === 'function' && !valueOrFactory.prototype) {
       this.factories.set(token, valueOrFactory as Factory<T>);
@@ -64,7 +213,13 @@ export class ReactiveEngine {
     }
   }
 
-  /** DI: Инъекция */
+  /**
+   * DI: Инъекция; Получение сервиса по токену.
+   * @template T
+   * @function inject
+   * @param {Token<T>} token - Токен для зависимости.
+   * @returns {T} - Сервис.
+   */
   public inject<T>(token: Token<T>): T {
     if (!token) {
       throw new Error(`[DI Error]: Вы пытаетесь внедрить пустой токен (undefined/null). Проверьте импорты.`);
@@ -92,7 +247,14 @@ export class ReactiveEngine {
     }
   }
 
-  /** Создание Сигнала */
+  /**
+   * Создание сигнала.
+   * @template T
+   * @function signal
+   * @param {T} initialValue - Начальное значение сигнала.
+   * @param {string | SignalOptions<T>} [optionsOrName] - Имя или опции сигнала.
+   * @returns {Signal<T>} - Сигнал.
+   */
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
     const engine = this;
     let val = initialValue;
@@ -142,7 +304,12 @@ export class ReactiveEngine {
     };
   }
 
-  /** Эффект */
+  /**
+   * Создание эффекта.
+   * @function effect
+   * @param {EffectFn} fn - Функция эффекта.
+   * @returns {CleanupFn} - Функция для очистки эффекта.
+   */
   public effect(fn: EffectFn): CleanupFn {
     const engine = this;
     const effectObj: IEffect = {
@@ -167,7 +334,14 @@ export class ReactiveEngine {
     };
   }
 
-  /** Вычисляемое значение */
+  /**
+   * Создание вычисляемого значения.
+   * @template T
+   * @function computed
+   * @param {Function} fn - Функция для вычисления значения.
+   * @param {string} [signalName] - Имя сигнала.
+   * @returns {Computed<T>} - Вычисляемое значение.
+   */
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
     const sig = this.signal<T>(undefined as any, signalName || 'unnamed_computed');
     this.effect(() => {
@@ -183,7 +357,14 @@ export class ReactiveEngine {
     };
   }
 
-  /** Реактивный объект (Proxy) */
+  /**
+   * Создание реактивного объекта (Proxy).
+   * @template T
+   * @function reactive
+   * @param {T} target - Целевой объект для проксирования.
+   * @param {string} [name] - Имя проксируемого объекта.
+   * @returns {T} - Реактивный объект.
+   */
   public reactive<T extends object>(target: T, name: string = 'reactive'): T {
     if (this.proxyCache.has(target)) return this.proxyCache.get(target);
     const engine = this;
@@ -219,7 +400,12 @@ export class ReactiveEngine {
     return proxy;
   }
 
-  /** Группировка изменений */
+  /**
+   * Группировка изменений.
+   * @function batch
+   * @param {Function} fn - Функция для выполнения в группе.
+   * @returns {void}
+   */
   public batch(fn: () => void): void {
     this.isBatching = true;
     try { fn(); } finally {
@@ -232,7 +418,15 @@ export class ReactiveEngine {
     }
   }
 
-  /** Асинхронный ресурс */
+  /**
+   * Создание асинхронного ресурса.
+   * @template T
+   * @function resource
+   * @param {Function} fetcher - Функция для загрузки данных.
+   * @param {{ value: S }} [source] - Источник данных.
+   * @param {string} [signalName] - Имя сигнала ресурса.
+   * @returns {Resource<T>} - Асинхронный ресурс.
+   */
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
     source?: { value: S },
@@ -287,7 +481,11 @@ export class ReactiveEngine {
   }
 
   /**
-   * Выполняет функцию без отслеживания зависимостей
+   * Выполняет функцию без отслеживания зависимостей.
+   * @template T
+   * @function untrack
+   * @param {Function} fn - Функция для выполнения.
+   * @returns {T} - Результат выполнения функции.
    */
   public untrack<T>(fn: () => T): T {
     const prev = this.activeEffect;
@@ -299,11 +497,24 @@ export class ReactiveEngine {
     }
   }
 
-  /** React Хук */
+  /**
+   * Установка адаптеров React.
+   * @function setReactAdapters
+   * @param {Function} useState - Функция useState из React.
+   * @param {Function} useEffect - Функция useEffect из React.
+   * @returns {void}
+   */
   public setReactAdapters(useState: any, useEffect: any) {
     this.reactAdapters = { useState, useEffect };
   }
 
+  /**
+   * Использование реактивного значения в React компоненте.
+   * @template T
+   * @function use
+   * @param {{ value: T; subscribe: (cb: (v: T) => void) => CleanupFn }} item - Реактивный объект.
+   * @returns {T} - Значение реактивного объекта.
+   */
   public use<T>(item: { value: T; subscribe: (cb: (v: T) => void) => CleanupFn }): T {
     if (!this.reactAdapters) {
       throw new Error("[React Error]: Адаптеры React не установлены. Вызовите engine.setReactAdapters(useState, useEffect).");
@@ -331,6 +542,14 @@ export class ReactiveEngine {
     return val;
   }
 
+  /**
+   * Безопасное выполнение функции.
+   * @private
+   * @function safeRun
+   * @param {IEffect} effect - Эффект.
+   * @param {Function} fn - Функция для выполнения.
+   * @returns {void}
+   */
   private safeRun(effect: IEffect, fn: () => void) {
     try {
       fn();
