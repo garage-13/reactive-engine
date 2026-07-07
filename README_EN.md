@@ -284,6 +284,44 @@ export const AudioPlayer = () => {
 };
 ```
 
+## ⚠️ Troubleshooting & Gotchas
+
+Because `@pravosleva/reactive-engine` relies on runtime dependency tracking via JavaScript Proxy and Signals, there are a few architectural rules you should follow to avoid hidden bugs:
+
+### 1. Destructuring Loss
+Objects created via `engine.reactive()` are native JavaScript Proxies. The engine intercepts property getters to subscribe components or effects to updates.
+* **What NOT to do:** Destructure a proxy object at the top of a component or effect.
+  ```ts
+  const user = engine.reactive({ name: 'Ivan', age: 30 });
+  const { name } = user; // ❌ REACTIVITY LOST! The `name` variable is disconnected from the Proxy.
+  ```
+* **What to do instead:** Access properties directly where they are evaluated (e.g., inside your JSX or effect block): `user.name`.
+
+### 2. Infinite Update Loops
+Reading and mutating the exact same signal inside an `engine.effect` or `engine.computed` simultaneously will trigger an endless update loop, causing a "Maximum call stack size exceeded" crash.
+* **Solution:** Wrap the mutational update inside the built-in `engine.untrack()` helper to isolate the dependency tracking tracker:
+  ```ts
+  engine.effect(() => {
+    const current = counterSignal.value; // Read and subscribe safely
+    engine.untrack(() => {
+      counterSignal.value = current + 1; // ✅ Safe mutation without infinite loops
+    });
+  });
+  ```
+
+### 3. Memory Leaks Outside the React Tree
+While React hooks like `useReactiveValue` clean up after themselves automatically, manually invoking `engine.effect()` inside long-lived standalone vanilla services or singletons registers a strong reference in the engine's memory.
+* **Solution:** Always capture the returned destructor and call it when the parent service gets destroyed:
+  ```ts
+  const unsubscribe = engine.effect(() => { ... });
+  // Call this when cleaning up the module:
+  unsubscribe();
+  ```
+
+### 4. Complex Objects as `withCache` Dependencies
+The `withCache` utility decorator serializes the `source` arguments using `JSON.stringify()` to form unique cache keys.
+* **Limitation:** Avoid passing objects with circular references, functions, or complex class instances (like `Map`, `Set`, or `Date`) as resource dependencies. Stick to flat objects, arrays, and primitives.
+
 ---
 
 ## 🗂️ License
