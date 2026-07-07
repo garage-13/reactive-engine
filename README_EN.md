@@ -509,6 +509,38 @@ export const AudioPlayer = () => {
 };
 ```
 
+### 6. Smart Automated Memory Cleanup (Zero-Config Garbage Collection)
+
+You no longer need to invoke `.destroy()` manually or wrap things in a React `useEffect` to prevent memory leaks when declaring dynamic computed properties (e.g., inside a React `useMemo` hook).
+
+Under the hood, the engine leverages modern JavaScript **`FinalizationRegistry`** API. The moment React unmounts a component or updates dependencies within a `useMemo` block, the previous computation reference is garbage-collected. The core engine detects this event instantly, safely purging orphaned reactive effects and evacuating the internal cache.
+
+#### Example: Bulletproof Inline Computations Without Leaks
+
+```tsx
+import React, { useMemo } from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { engine, globalProductsSignal } from './store';
+
+export const FilteredCatalog = ({ category }: { category: string }) => {
+  // Completely safe to consume inside standard useMemo.
+  // When 'category' changes, the previous ref is dropped, and the engine automatically wipes its effects from RAM!
+  const dynamicComputed = useMemo(() => {
+    return engine.computed(() =>
+      globalProductsSignal.value.filter(p => p.category === category)
+    );
+  }, [category]);
+
+  const filteredList = useReactiveValue(dynamicComputed);
+
+  return (
+    <ul>
+      {filteredList.map(p => <li key={p.id}>{p.name}</li>)}
+    </ul>
+  );
+};
+```
+
 ## ⚠️ Troubleshooting & Gotchas
 
 Because `@pravosleva/reactive-engine` relies on runtime dependency tracking via JavaScript Proxy and Signals, there are a few architectural rules you should follow to avoid hidden bugs:

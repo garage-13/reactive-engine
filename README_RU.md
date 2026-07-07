@@ -449,7 +449,7 @@ src/
 │       └── ui/          # Сетка товаров и фильтры
 ```
 
-### 3. Реакции и побочные эффекты через `useReactiveSubscription`
+### Реакции и побочные эффекты через `useReactiveSubscription`
 
 Иногда вам нужно просто **отреагировать** на изменение сигнала (например, запустить анимацию, вызвать уведомление или отправить метрику в аналитику), но при этом **не нужно перерисовывать сам компонент**. Для этого используется хук подписки.
 
@@ -511,6 +511,38 @@ export const AudioPlayer = () => {
 ```
 
 Таким образом, библиотека предоставляет полный цикл управления потоком данных: `State (Signal) -> Derivatives (Computed) -> UI (useReactiveValue) -> Reactions (useReactiveSubscription)`
+
+### Умная автоочистка вычислений (Zero-Config Garbage Collection)
+
+Вам больше не нужно вручную вызывать `.destroy()` или использовать `useEffect` для предотвращения утечек памяти при динамическом создании `computed`-свойств (например, внутри хука `useMemo` React).
+
+Движок под капотом использует современное JavaScript API — `FinalizationRegistry`. Как только React удаляет компонент или меняет зависимости в `useMemo`, старая ссылка на вычисление уничтожается, а ядро автоматически удаляет брошенные реактивные эффекты и очищает внутренний кэш.
+
+#### Пример: Безопасное инлайн-вычисление без утечек памяти
+
+```tsx
+import React, { useMemo } from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { engine, globalProductsSignal } from './store';
+
+export const FilteredCatalog = ({ category }: { category: string }) => {
+  // Вы можете безбоязненно использовать стандартныйuseMemo.
+  // При смене категории старая ссылка сотрется, а движок сам зачистит allEffects ядра!
+  const dynamicComputed = useMemo(() => {
+    return engine.computed(() =>
+      globalProductsSignal.value.filter(p => p.category === category)
+    );
+  }, [category]);
+
+  const filteredList = useReactiveValue(dynamicComputed);
+
+  return (
+    <ul>
+      {filteredList.map(p => <li key={p.id}>{p.name}</li>)}
+    </ul>
+  );
+};
+```
 
 ## ⚠️ Возможные проблемы и их решение (Troubleshooting)
 

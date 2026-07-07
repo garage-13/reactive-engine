@@ -370,7 +370,15 @@ export class ReactiveEngine {
   }
 
   // Кэш для вычисляемых свойств: Вместо Map<Function, any> используем строгий интерфейс с unknown дженериком
-  private computedCache = new Map<Function, Computed<unknown>>();
+  private computedCache = new Map<Function, WeakRef<Computed<unknown>>>();
+
+  // 1. Создаем реестр финализации под капотом движка.
+  // В качестве токена очистки передаем функцию, которую нужно выполнить.
+  private cleanupRegistry = new FinalizationRegistry<() => void>(
+    (cleanupFn) => {
+      cleanupFn(); // Вызовется автоматически, когда сборщик мусора удалит computedInstance
+    }
+  );
 
   /**
    * Создание вычисляемого значения.
@@ -381,14 +389,16 @@ export class ReactiveEngine {
    * @returns {Computed<T>} - Вычисляемое значение с методом destroy.
    */
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
-    // 1. Если для этой функции вычисление уже создано — приводим unknown к целевому типу T
+    // 1. Проверяем кэш. Если WeakRef существует и объект внутри него еще не удален GC:
     if (this.computedCache.has(fn)) {
-      return this.computedCache.get(fn) as Computed<T>;
+      const cachedRef = this.computedCache.get(fn);
+      const cachedInstance = cachedRef?.deref();
+      if (cachedInstance) {
+        return cachedInstance as Computed<T>;
+      }
     }
 
     const engine = this;
-
-    // 2. Избавляемся от any при инициализации пустого сигнала через двойной кастинг типов
     const sig = this.signal<T>(undefined as unknown as T, signalName || 'unnamed_computed');
 
     const unsubscribeEffect = this.effect(() => {
@@ -396,25 +406,30 @@ export class ReactiveEngine {
       sig.value = newValue;
     });
 
-    // Извлекаем ссылку на объект эффекта, который только что зарегистрировался в конце Set
     const effectObj = Array.from(this.allEffects)[this.allEffects.size - 1];
+
+    const performCleanup = () => {
+      unsubscribeEffect();
+      if (effectObj) {
+        engine.allEffects.delete(effectObj);
+      }
+      engine.computedCache.delete(fn);
+    };
 
     // Создаем инстанс computed
     const computedInstance: Computed<T> = {
       get value() { return sig.value; },
       subscribe: (cb) => sig.subscribe(cb),
       destroy() {
-        unsubscribeEffect();
-        if (effectObj) {
-          engine.allEffects.delete(effectObj);
-        }
-        // Не забываем удалить из кэша при принудительном уничтожении
-        engine.computedCache.delete(fn);
+        performCleanup();
       }
     };
 
-    // 3. Сохраняем в кэш. TypeScript автоматически приведёт Computed<T> к Computed<unknown>
-    this.computedCache.set(fn, computedInstance as Computed<unknown>);
+    this.cleanupRegistry.register(computedInstance, performCleanup);
+
+    // 2. Сохраняем в кэш СЛАБУЮ ССЫЛКУ (WeakRef) на наш объект.
+    // Теперь этот кэш больше НЕ будет удерживать объект в памяти насильно!
+    this.computedCache.set(fn, new WeakRef(computedInstance as Computed<unknown>));
 
     return computedInstance;
   }

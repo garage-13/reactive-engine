@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "0.3.1-beta",
+  "version": "0.3.2-beta",
   "engines": {
     "node": "22.20.0"
   },
@@ -37,8 +37,8 @@
     "dev": "vite build --watch",
     "start": "vite --host --open",
     "build": "vite build",
-    "test": "vitest run",
-    "test:ui": "vitest --ui",
+    "test": "NODE_OPTIONS='--expose-gc' vitest run",
+    "test:ui": "NODE_OPTIONS='--expose-gc' vitest --ui",
     "test:watch": "vitest",
     "preversion": "npm run test",
     "prepublishOnly": "npm run test && npm run build",
@@ -52,7 +52,7 @@
     "@microsoft/api-extractor": "^7.58.9",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^24.7.0",
+    "@types/node": "^26.1.0",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
