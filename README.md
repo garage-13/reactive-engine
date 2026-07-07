@@ -5,6 +5,18 @@ A lightweight, type-safe reactive engine built with TypeScript, featuring Depend
 - 🇬🇧 [In English](https://github.com/garage-13/reactive-engine/blob/main/README_EN.md)
 - 🇷🇺 [In Russian](https://github.com/garage-13/reactive-engine/blob/main/README_RU.md)
 
+## 📦 Installation
+
+Install the package via your favorite package manager:
+
+```bash
+npm install @pravosleva/reactive-engine
+# or
+yarn add @pravosleva/reactive-engine
+# or
+pnpm add @pravosleva/reactive-engine
+```
+
 ## 🎯 What Problems This Library Solves
 
 When building large-scale React applications, developers constantly run into architectural bottlenecks imposed by built-in state tools. `@pravosleva/reactive-engine` is designed to elegantly solve the following pain points:
