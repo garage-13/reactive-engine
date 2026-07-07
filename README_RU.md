@@ -1,21 +1,11 @@
 # 🚀 ReactiveEngine (Инструкция на русском 🇷🇺)
 Минималистичный реактивный движок на TypeScript с Dependency Injection и интеграцией для React.
 
-```bash
-yarn add @pravosleva/reactive-engine
-```
-
 https://t.me/bash_exp_ru/3393
 
 # @pravosleva/reactive-engine 🚀
 
 Легковесный, ультра-производительный и независимый реактивный движок на базе сигналов (Signals) и прозрачного отслеживания зависимостей для React и TypeScript приложений.
-
----
-
-## 📦 Установка
-
-Установите пакет через ваш любимый менеджер пакетов:
 
 ```bash
 npm install @pravosleva/reactive-engine

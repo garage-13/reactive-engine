@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState as useStateFromReact, useEffect as useEffectFromReact } from 'react';
 
 // --- ТИПЫ ---
 export type CleanupFn = () => void;
@@ -187,21 +187,30 @@ export class ReactiveEngine {
   private activeEffect: IEffect | null = null;
   private isBatching = false;
   private pendingEffects = new Set<IEffect>();
-  private services = new Map<Token<any>, any>();
-  private factories = new Map<Token<any>, Factory<any>>();
-  private proxyCache = new WeakMap<object, any>();
+
+  // В контейнерах DI вместо any используем unknown. Это заставит методы inject/provide
+  // явно приводить типы через дженерики <T>, защищая от рантайм-ошибок.
+  private services = new Map<Token<unknown>, unknown>();
+  private factories = new Map<Token<unknown>, Factory<unknown>>();
+
+  // Объект-ключ мапится на объект-прокси. Здесь идеально подходит тип object.
+  private proxyCache = new WeakMap<object, object>();
   private allEffects = new Set<IEffect>();
 
   /**
-   * Коллбек для уведомления о изменении сигнала.
-   * @type {Function}
+   * Коллбек для уведомления об изменении сигнала.
+   * Использование unknown вместо any гарантирует безопасную работу с типами prev/next.
    */
-  public onSignalChange?: (name: string, next: any, prev: any) => void;
+  public onSignalChange?: (name: string, next: unknown, prev: unknown) => void;
 
-  private reactAdapters = {
-    useState: useState as any,
-    useEffect: useEffect as any,
-  };
+  // Описываем строгие типы для адаптеров React, чтобы не ломать встроенные типы React.
+  private reactAdapters: {
+    useState: typeof useStateFromReact;
+    useEffect: typeof useEffectFromReact;
+  } = {
+      useState: useStateFromReact,
+      useEffect: useEffectFromReact,
+    };
 
   /**
    * DI: Регистрация зависимости.
@@ -231,20 +240,23 @@ export class ReactiveEngine {
       throw new Error(`[DI Error]: Вы пытаетесь внедрить пустой токен (undefined/null). Проверьте импорты.`);
     }
 
-    if (this.services.has(token)) return this.services.get(token);
+    // Приводим токен к базовому типу Token<unknown> для совместимости с Map
+    const targetToken = token as Token<unknown>;
 
-    // NOTE: (new way) Если это класс, но мы забыли его унаследовать от BaseService или передать engine
+    if (this.services.has(targetToken)) {
+      return this.services.get(targetToken) as T;
+    }
+
     try {
-      // NOTE: Логика создания инстанса
-      const factory = this.factories.get(token);
+      const factory = this.factories.get(targetToken);
       if (factory) {
-        const instance = factory(this);
-        this.services.set(token, instance);
+        const instance = factory(this) as T;
+        this.services.set(targetToken, instance);
         return instance;
       }
       if (typeof token === 'function' && token.prototype) {
         const instance = new (token as { new(eng: ReactiveEngine): T })(this);
-        this.services.set(token, instance);
+        this.services.set(targetToken, instance);
         return instance;
       }
       throw new Error(`Service not found: ${String(token)}`);
@@ -357,8 +369,8 @@ export class ReactiveEngine {
     };
   }
 
-  // Добавляем кэш для вычисляемых свойств
-  private computedCache = new Map<Function, any>();
+  // Кэш для вычисляемых свойств: Вместо Map<Function, any> используем строгий интерфейс с unknown дженериком
+  private computedCache = new Map<Function, Computed<unknown>>();
 
   /**
    * Создание вычисляемого значения.
@@ -369,20 +381,22 @@ export class ReactiveEngine {
    * @returns {Computed<T>} - Вычисляемое значение с методом destroy.
    */
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
-    // Если для этой функции вычисление уже создано — просто возвращаем его!
+    // 1. Если для этой функции вычисление уже создано — приводим unknown к целевому типу T
     if (this.computedCache.has(fn)) {
-      return this.computedCache.get(fn);
+      return this.computedCache.get(fn) as Computed<T>;
     }
 
     const engine = this;
-    const sig = this.signal<T>(undefined as any, signalName || 'unnamed_computed');
+
+    // 2. Избавляемся от any при инициализации пустого сигнала через двойной кастинг типов
+    const sig = this.signal<T>(undefined as unknown as T, signalName || 'unnamed_computed');
 
     const unsubscribeEffect = this.effect(() => {
       const newValue = fn();
       sig.value = newValue;
     });
 
-    // Извлекаем ссылку на объект эффекта, который только что зарегистировался в конце Set
+    // Извлекаем ссылку на объект эффекта, который только что зарегистрировался в конце Set
     const effectObj = Array.from(this.allEffects)[this.allEffects.size - 1];
 
     // Создаем инстанс computed
@@ -399,10 +413,10 @@ export class ReactiveEngine {
       }
     };
 
-    // Сохраняем в кэш перед возвратом
-    this.computedCache.set(fn, computedInstance);
+    // 3. Сохраняем в кэш. TypeScript автоматически приведёт Computed<T> к Computed<unknown>
+    this.computedCache.set(fn, computedInstance as Computed<unknown>);
 
-    return computedInstance
+    return computedInstance;
   }
 
   /**
@@ -414,7 +428,9 @@ export class ReactiveEngine {
    * @returns {T} - Реактивный объект.
    */
   public reactive<T extends object>(target: T, name: string = 'reactive'): T {
-    if (this.proxyCache.has(target)) return this.proxyCache.get(target);
+    if (this.proxyCache.has(target)) {
+      return this.proxyCache.get(target) as T;
+    }
     const engine = this;
     const propsSubscribers = new Map<string | symbol, Set<IEffect>>();
 
@@ -459,7 +475,6 @@ export class ReactiveEngine {
     // поэтому здесь мы можем просто выполнить функцию
     fn();
   }
-
 
   /**
    * Создание асинхронного ресурса.
@@ -547,9 +562,14 @@ export class ReactiveEngine {
    * @param {Function} useEffect - Функция useEffect из React.
    * @returns {void}
    */
-  public setReactAdapters(useState: any, useEffect: any) {
+  // Импортируйте useState и useEffect на верхнем уровне файла из 'react'
+  public setReactAdapters(
+    useState: typeof useStateFromReact,
+    useEffect: typeof useEffectFromReact
+  ): void {
     this.reactAdapters = { useState, useEffect };
   }
+
 
   /**
    * Использование реактивного значения в React компоненте.

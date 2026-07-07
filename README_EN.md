@@ -7,12 +7,6 @@ https://t.me/bash_exp_ru/3393
 
 A lightweight, ultra-performant, and framework-agnostic reactive engine powered by Signals and transparent dependency tracking, tailored for React and TypeScript applications.
 
----
-
-## 📦 Installation
-
-Install the package via your favorite package manager:
-
 ```bash
 npm install @pravosleva/reactive-engine
 # or

@@ -338,11 +338,15 @@ describe('ReactiveEngine', () => {
   describe('React Adapters (engine.use)', () => {
     it('должен выбрасывать ошибку, если адаптеры React не установлены', () => {
       const engineWithoutAdapters = new ReactiveEngine();
-      // Зануляем дефолтные, если они проставились
-      engineWithoutAdapters.setReactAdapters(null, null);
+
+      // Принудительно передаем null через as any, чтобы обойти строгую проверку типов в тесте
+      engineWithoutAdapters.setReactAdapters(null as any, null as any);
+
       const sig = engineWithoutAdapters.signal(0);
 
-      expect(() => engineWithoutAdapters.use(sig)).toThrow('this.reactAdapters.useState is not a function or its return value is not iterable');
+      expect(() => engineWithoutAdapters.use(sig)).toThrow(
+        'this.reactAdapters.useState is not a function or its return value is not iterable'
+      );
     });
 
     it('должен успешно синхронизировать сигнал с хуками React', async () => {
@@ -360,6 +364,5 @@ describe('ReactiveEngine', () => {
 
       expect(result.current).toBe('world');
     });
-
   });
 });
