@@ -223,6 +223,67 @@ src/
 │       └── ui/          # Product grid and filters
 ```
 
+### 3. Side Effects and Reactions via `useReactiveSubscription`
+
+Sometimes you need to simply **react** to a signal change (e.g., trigger an animation, show a notification, or send a metric to your analytics provider) **without re-rendering the component itself**. This is where the subscription hook shines.
+
+#### Simple Example: Change Logging
+The component below will not trigger any React re-renders when clicked, yet the subscription callback runs perfectly on every signal update.
+
+```tsx
+import React from 'react';
+import { useReactiveSubscription } from '@pravosleva/reactive-engine';
+import { counterSignal } from './store';
+
+export const LoggerButton = () => {
+  // Decoupled from the React render loop. It just runs the callback when the signal updates.
+  useReactiveSubscription(counterSignal, (newValue) => {
+    console.log(`[Feedback] Counter mutated to: ${newValue}`);
+  });
+
+  return (
+    <button onClick={() => counterSignal.value++}>
+      Click Me (No re-renders, but check your console!)
+    </button>
+  );
+};
+```
+
+#### Advanced Example: Synchronizing with Imperative Browser APIs
+This hook is perfect for gluing your reactive state to third-party libraries, HTML5 `<canvas>`, maps, or native browser APIs (such as media players, toast managers, or `localStorage`).
+
+```ts
+// store.ts
+export const isMutedSignal = engine.signal(false, 'isMuted');
+```
+
+```tsx
+// AudioPlayer.tsx
+import React, { useRef } from 'react';
+import { useReactiveSubscription } from '@pravosleva/reactive-engine';
+import { isMutedSignal } from './store';
+
+export const AudioPlayer = () => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Seamlessly sync reactive state into an imperative native DOM node property
+  useReactiveSubscription(isMutedSignal, (isMuted) => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  });
+
+  return (
+    <div>
+      <video ref={videoRef} src="video.mp4" controls />
+      <button onClick={() => { isMutedSignal.value = !isMutedSignal.value; }}>
+        Toggle Mute State
+      </button>
+    </div>
+  );
+};
+```
+
 ---
 
 ## 🗂️ License

@@ -227,6 +227,67 @@ src/
 │       └── ui/          # Сетка товаров и фильтры
 ```
 
+### 3. Реакции и побочные эффекты через `useReactiveSubscription`
+
+Иногда вам нужно просто **отреагировать** на изменение сигнала (например, запустить анимацию, вызвать уведомление или отправить метрику в аналитику), но при этом **не нужно перерисовывать сам компонент**. Для этого используется хук подписки.
+
+#### Простой пример: Логирование изменений
+Компонент ниже вообще не будет делать ререндер при кликах, но эффект внутри хука отработает на каждое изменение сигнала.
+
+```tsx
+import React from 'react';
+import { useReactiveSubscription } from '@pravosleva/reactive-engine';
+import { counterSignal } from './store';
+
+export const LoggerButton = () => {
+  // Хук изолирован от рендеров. Он просто выполнит коллбек при изменении сигнала
+  useReactiveSubscription(counterSignal, (newValue) => {
+    console.log(`[Фидбек] Счетчик изменился на: ${newValue}`);
+  });
+
+  return (
+    <button onClick={() => counterSignal.value++}>
+      Кликни меня (Компонент не рендерится, но лог идет)
+    </button>
+  );
+};
+```
+
+#### Продвинутый пример: Синхронизация с императивными API браузера
+Хук идеально подходит для интеграции реактивного стейта со сторонними библиотеками, холстами (`<canvas>`), картами или нативными API браузера (например, тостами, медиа-плеерами или `localStorage`).
+
+```tsx
+// store.ts
+export const isMutedSignal = engine.signal(false, 'isMuted');
+```
+
+```tsx
+// AudioPlayer.tsx
+import React, { useRef } from 'react';
+import { useReactiveSubscription } from '@pravosleva/reactive-engine';
+import { isMutedSignal } from './store';
+
+export const AudioPlayer = () => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Синхронизируем реактивное состояние со свойством нативного DOM-узла
+  useReactiveSubscription(isMutedSignal, (isMuted) => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  });
+
+  return (
+    <div>
+      <video ref={videoRef} src="video.mp4" controls />
+      <button onClick={() => { isMutedSignal.value = !isMutedSignal.value; }}>
+        Переключить звук
+      </button>
+    </div>
+  );
+};
+```
+
 ---
 
 ## 🗂️ Лицензия
