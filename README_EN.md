@@ -9,6 +9,76 @@ A lightweight, ultra-performant, and framework-agnostic reactive engine powered 
 
 ---
 
+## 📦 Installation
+
+Install the package via your favorite package manager:
+
+```bash
+npm install @pravosleva/reactive-engine
+# or
+yarn add @pravosleva/reactive-engine
+# or
+pnpm add @pravosleva/reactive-engine
+```
+
+---
+
+## 🧱 Built-in Dependency Injection (DI Container)
+
+`ReactiveEngine` acts not only as a signal store but also as a full-fledged Dependency Injection container. It allows you to decouple and interconnect reactive services, eliminating the "global singleton" anti-pattern (which is critical for **Next.js / SSR** and isolated unit testing), and facilitates lazy module instantiation.
+
+### How it works
+
+Instead of tight coupling via hardcoded file `import` statements, services declare their parameters declaratively by requesting them directly from the engine.
+
+```ts
+// 1. Declare an authentication service with a reactive signal
+export class AuthService {
+  public isAuthorized = this.engine.signal(false);
+  constructor(private engine: ReactiveEngine) {}
+}
+
+// 2. Declare a shopping cart service that depends on the authentication service
+export class CartService {
+  // Inject the dependency lazily out of the box!
+  private authService = this.engine.inject(AuthService);
+
+  // The async resource automatically syncs with the external authorization state
+  public cartResource = this.engine.resource(
+    async (_, abortSignal) => {
+      if (!this.authService.isAuthorized.value) return [];
+      const res = await fetch('/api/cart', { signal: abortSignal });
+      return res.json();
+    },
+    this.authService.isAuthorized // Resource tracks a signal from another service
+  );
+
+  constructor(private engine: ReactiveEngine) {}
+}
+```
+
+### Registration and Resolution
+
+You can register dependencies as plain values, classes, or custom factory functions. The core container caches resolved instances automatically upon the very first resolution invocation.
+
+```ts
+import { ReactiveEngine } from '@pravosleva/reactive-engine';
+import { AuthService, CartService } from './services';
+
+const engine = new ReactiveEngine();
+
+// Register factories (they will be evaluated lazily on demand)
+engine.provide(AuthService, (eng) => new AuthService(eng));
+engine.provide(CartService, (eng) => new CartService(eng));
+
+// Anywhere in your application or React hook:
+const cartService = engine.inject(CartService);
+// The engine recognizes that CartService requires AuthService,
+// instantiates AuthService, provisions CartService, hooks them together, and returns the singleton.
+```
+
+---
+
 ## 🎯 What Problems This Library Solves
 
 When building large-scale React applications, developers constantly run into architectural bottlenecks imposed by built-in state tools. `@pravosleva/reactive-engine` is designed to elegantly solve the following pain points:
@@ -45,20 +115,6 @@ Unlike traditional State Management in React (via Context API or immutability-ba
 * **O(1) Computations:** `Computed` properties are lazy. They are never recalculated until their underlying dependency signals change.
 * **Automatic Batching:** The engine groups multiple signal modifications into "batches" using microtasks. Network resources or heavy effects won't re-trigger 10 times in a row when updating 10 signals within the same synchronous execution block.
 * **Smart Asynchrony:** The `resource` tool orchestrates a native `AbortController` out of the box, automatically cancelling stale pending network requests whenever dependencies change.
-
----
-
-## 📦 Installation
-
-Install the package via your favorite package manager:
-
-```bash
-npm install @pravosleva/reactive-engine
-# or
-yarn add @pravosleva/reactive-engine
-# or
-pnpm add @pravosleva/reactive-engine
-```
 
 ---
 

@@ -13,6 +13,75 @@ https://t.me/bash_exp_ru/3393
 
 ---
 
+## 📦 Установка
+
+Установите пакет через ваш любимый менеджер пакетов:
+
+```bash
+npm install @pravosleva/reactive-engine
+# или
+yarn add @pravosleva/reactive-engine
+# или
+pnpm add @pravosleva/reactive-engine
+```
+
+---
+
+## 🧱 Встроенный Dependency Injection (DI-контейнер)
+
+`ReactiveEngine` — это не просто хранилище сигналов, а полноценный DI-контейнер. Он позволяет связывать реактивные сервисы друг с другом, избегать антипаттерна «глобального синглтона» (что критично для **Next.js / SSR** и изолированного юнит-тестирования) и обеспечивает ленивую инициализацию модулей.
+
+### Принцип работы
+
+Вместо жесткого связывания через `import`, сервисы объявляют свои зависимости декларативно, запрашивая их у движка.
+
+```ts
+// 1. Объявляем сервис авторизации с реактивным сигналом
+export class AuthService {
+  public isAuthorized = this.engine.signal(false);
+  constructor(private engine: ReactiveEngine) {}
+}
+
+// 2. Объявляем сервис корзины, который зависит от сервиса авторизации
+export class CartService {
+  private authService = this.engine.inject(AuthService); // Внедряем зависимость лениво!
+
+  // Асинхронный ресурс автоматически подстраивается под состояние авторизации
+  public cartResource = this.engine.resource(
+    async (_, abortSignal) => {
+      if (!this.authService.isAuthorized.value) return [];
+      const res = await fetch('/api/cart', { signal: abortSignal });
+      return res.json();
+    },
+    this.authService.isAuthorized // Зависимость ресурса от сигнала из другого сервиса
+  );
+
+  constructor(private engine: ReactiveEngine) {}
+}
+```
+
+### Регистрация и использование в приложении
+
+Вы можете регистрировать зависимости как готовые инстансы, классы или фабричные функции. Движок сам создаст их и закеширует при первом обращении.
+
+```ts
+import { ReactiveEngine } from '@pravosleva/reactive-engine';
+import { AuthService, CartService } from './services';
+
+const engine = new ReactiveEngine();
+
+// Регистрируем сервисы (они будут созданы лениво только при первом вызове inject)
+engine.provide(AuthService, (eng) => new AuthService(eng));
+engine.provide(CartService, (eng) => new CartService(eng));
+
+// Где-то в коде приложения или компоненте:
+const cartService = engine.inject(CartService);
+// Движок увидит, что CartService нужен AuthService,
+// автоматически создаст AuthService, затем создаст CartService, свяжет их и вернет готовый результат.
+```
+
+---
+
 ## 🎯 Какие проблемы решает эта библиотека?
 
 При разработке крупных React-приложений разработчики часто сталкиваются с архитектурными ограничениями стандартных инструментов. `@pravosleva/reactive-engine` создана для элегантного решения следующих проблем:
@@ -49,20 +118,6 @@ https://t.me/bash_exp_ru/3393
 * **O(1) вычисления:** `Computed` свойства ленивы. Они не пересчитываются, пока не изменятся исходные сигналы.
 * **Автоматический Batching:** Движок умеет собирать множественные изменения сигналов в «пакеты» через микрозадачи. Сетевые ресурсы или тяжелые эффекты не будут перезапускаться 10 раз подряд при обновлении 10 сигналов в одном цикле.
 * **Умная асинхронность:** Инструмент `resource` из коробки оркеструет `AbortController`, автоматически отменяя предыдущие зависшие сетевые запросы при изменении зависимостей.
-
----
-
-## 📦 Установка
-
-Установите пакет через ваш любимый менеджер пакетов:
-
-```bash
-npm install @pravosleva/reactive-engine
-# или
-yarn add @pravosleva/reactive-engine
-# или
-pnpm add @pravosleva/reactive-engine
-```
 
 ---
 
