@@ -12,6 +12,8 @@ type ReactiveInput<T> = ObservableItem<T> | (() => ObservableItem<T>);
 /**
  * Хук для извлечения значения из Signal/Computed/Resource и авто-ререндера компонента.
  * Поддерживает React 18+ и ленивые фабрики без утечек памяти.
+ *
+ * @source
  */
 export const useReactiveValue = <T>(input: ReactiveInput<T>): T => {
   // 1. Всегда получаем чистый объект, даже если передали функцию-фабрику () => engine.computed(...)

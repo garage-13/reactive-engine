@@ -6,6 +6,7 @@ import { Signal, CleanupFn } from '../core';
  * @template T Тип данных внутри реактивного контейнера
  * @param {Signal<T> | { subscribe: (cb: (val: T) => void) => CleanupFn }} signal Объект подписки
  * @param {(val: T) => void} callback Функция обратного вызова, принимающая новое значение
+ * @source
  */
 export const useReactiveSubscription = <T>(
   signal: Pick<Signal<T>, 'subscribe'>,

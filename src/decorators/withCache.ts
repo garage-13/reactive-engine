@@ -14,6 +14,7 @@ interface CacheOptions {
  * Декоратор для создания кэширующего fetcher-а для engine.resource
  * @param fetcher Оригинальная асинхронная функция запроса
  * @param options Настройки кэширования
+ * @source
  */
 export const withCache = <S, T>(
   fetcher: (source: S, signal: AbortSignal) => Promise<T>,

@@ -544,6 +544,93 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 };
 ```
 
+### Прозрачная реактивность через `observer` (Аналог MobX)
+
+Если ваш компонент отображает множество сигналов или вы хотите избавиться от вызовов хуков в теле функций, используйте функцию высшего порядка `observer`. Она автоматически отслеживает, какие сигналы или вычисляемые свойства считываются внутри JSX во время рендера, и точечно подписывает компонент на их изменения.
+
+```tsx
+import React from 'react';
+import { observer } from '@pravosleva/reactive-engine';
+import { counterSignal, userSignal } from './store';
+
+// Оборачиваем компонент в observer.
+// Теперь можно просто читать `.value` прямо в JSX — никаких хуков не требуется!
+export const ProfileDashboard = observer(() => {
+  return (
+    <div style={{ padding: 20, border: '1px solid #aaa' }}>
+      <h3>Пользователь: {userSignal.value.name}</h3>
+      <p>Значение счетчика: {counterSignal.value}</p>
+
+      <button onClick={() => counterSignal.value++}>Увеличить</button>
+      <button onClick={() => { userSignal.value = { name: 'Пётр' }; }}>
+        Сменить имя
+      </button>
+    </div>
+  );
+});
+```
+
+### Еще один продвинутый способ оптимизации рендеринга
+```tsx
+import React, { useRef } from 'react';
+import { createObserverComponent, engine } from '@pravosleva/reactive-engine';
+
+// Инициализируем компонент-контейнер из нашей фабрики
+const Observer = createObserverComponent(engine);
+
+// Сигнал, который меняется очень часто (например, каждую секунду по веб-сокету)
+const livePriceSignal = engine.signal(100);
+
+export const MassiveDashboard = () => {
+  // Счетчик рендеров всего ОГРОМНОГО компонента
+  const totalDashboardRenders = useRef(0);
+  totalDashboardRenders.current++;
+
+  return (
+    <div style={{ padding: '20px', border: '1px solid #ccc' }}>
+      <h2>📊 Тяжелая панель аналитики</h2>
+      <p>Рендеров всей страницы: {totalDashboardRenders.current}</p>
+
+      {/*
+        Тяжелый статический контент, который генерируется долго.
+        Благодаря инлайн-контейнеру <Observer>, этот кусок НИКОГДА
+        не будет перерисовываться при изменении цены!
+      */}
+      <div className="heavy-charts-and-tables">
+        <p>...Тут рендерятся 10 тяжелых графиков и таблиц...</p>
+      </div>
+
+      <hr />
+
+      {/*
+        ТОЧЕЧНАЯ РЕАКТИВНОСТЬ:
+        Оборачиваем в <Observer> только ту микро-зону, которая зависит от сигнала.
+        При изменении livePriceSignal.value перерисовываться будет СТРОГО
+        анонимная функция внутри <Observer>, экономя 99% ресурсов процессора!
+      */}
+      <Observer>
+        {() => {
+          const innerCounter = useRef(0);
+          innerCounter.current++;
+          return (
+            <div style={{ background: '#f9f9f9', padding: '10px' }}>
+              <h3>📈 Живой график цены (Текущая: ${livePriceSignal.value})</h3>
+              <p style={{ color: 'green' }}>
+                Рендеров этой микро-зоны: {innerCounter.current}
+              </p>
+            </div>
+          );
+        }}
+      </Observer>
+
+      <button onClick={() => { livePriceSignal.value += 5; }}>
+        Симулировать изменение цены (+5$)
+      </button>
+    </div>
+  );
+};
+```
+
 ## ⚠️ Возможные проблемы и их решение (Troubleshooting)
 
 Поскольку `@pravosleva/reactive-engine` выполняет отслеживание зависимостей «на лету» (runtime dependency tracking) через Proxy и сигналы, важно знать несколько правил, чтобы избежать скрытых багов:

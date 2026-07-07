@@ -11,6 +11,8 @@ type ReactiveInput<T> = ObservableItem<T> | (() => ObservableItem<T>);
 
 /**
  * Fallback хук для извлечения значения из сигналов. Поддерживает React 16.8+.
+ *
+ * @source
  */
 export const useReactiveValue0 = <T>(input: ReactiveInput<T>): T => {
   const reactiveItem = useMemo(() => {

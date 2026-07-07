@@ -219,6 +219,7 @@ export class ReactiveEngine {
    * @param {Token<T>} token - Токен для зависимости.
    * @param {T | Factory<T>} valueOrFactory - Значение или фабрика для создания сервиса.
    * @returns {void}
+   * @source
    */
   public provide<T>(token: Token<T>, valueOrFactory: T | Factory<T>): void {
     if (typeof valueOrFactory === 'function' && !valueOrFactory.prototype) {
@@ -234,6 +235,7 @@ export class ReactiveEngine {
    * @function inject
    * @param {Token<T>} token - Токен для зависимости.
    * @returns {T} - Сервис.
+   * @source
    */
   public inject<T>(token: Token<T>): T {
     if (!token) {
@@ -272,6 +274,7 @@ export class ReactiveEngine {
    * @param {T} initialValue - Начальное значение сигнала.
    * @param {string | SignalOptions<T>} [optionsOrName] - Имя или опции сигнала.
    * @returns {Signal<T>} - Сигнал.
+   * @source
    */
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
     const engine = this;
@@ -342,6 +345,7 @@ export class ReactiveEngine {
    * @function effect
    * @param {EffectFn} fn - Функция эффекта.
    * @returns {CleanupFn} - Функция для очистки эффекта.
+   * @source
    */
   public effect(fn: EffectFn): CleanupFn {
     const engine = this;
@@ -387,6 +391,7 @@ export class ReactiveEngine {
    * @param {Function} fn - Функция для вычисления значения.
    * @param {string} [signalName] - Имя сигнала.
    * @returns {Computed<T>} - Вычисляемое значение с методом destroy.
+   * @source
    */
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
     // 1. Проверяем кэш. Если WeakRef существует и объект внутри него еще не удален GC:
@@ -441,6 +446,7 @@ export class ReactiveEngine {
    * @param {T} target - Целевой объект для проксирования.
    * @param {string} [name] - Имя проксируемого объекта.
    * @returns {T} - Реактивный объект.
+   * @source
    */
   public reactive<T extends object>(target: T, name: string = 'reactive'): T {
     if (this.proxyCache.has(target)) {
@@ -484,6 +490,7 @@ export class ReactiveEngine {
    * @function batch
    * @param {Function} fn - Функция для выполнения в группе.
    * @returns {void}
+   * @source
    */
   public batch(fn: () => void): void {
     // Наш асинхронный сеттер теперь сам выполняет всю работу в queueMicrotask,
@@ -499,6 +506,7 @@ export class ReactiveEngine {
    * @param {{ value: S }} [source] - Источник данных.
    * @param {string} [signalName] - Имя сигнала ресурса.
    * @returns {Resource<T>} - Асинхронный ресурс.
+   * @source
    */
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
@@ -559,6 +567,7 @@ export class ReactiveEngine {
    * @function untrack
    * @param {Function} fn - Функция для выполнения.
    * @returns {T} - Результат выполнения функции.
+   * @source
    */
   public untrack<T>(fn: () => T): T {
     const prev = this.activeEffect;
@@ -576,6 +585,7 @@ export class ReactiveEngine {
    * @param {Function} useState - Функция useState из React.
    * @param {Function} useEffect - Функция useEffect из React.
    * @returns {void}
+   * @source
    */
   // Импортируйте useState и useEffect на верхнем уровне файла из 'react'
   public setReactAdapters(
@@ -592,6 +602,7 @@ export class ReactiveEngine {
    * @function use
    * @param {{ value: T; subscribe: (cb: (v: T) => void) => CleanupFn }} item - Реактивный объект.
    * @returns {T} - Значение реактивного объекта.
+   * @source
    */
   public use<T>(item: { value: T; subscribe: (cb: (v: T) => void) => CleanupFn }): T {
     if (!this.reactAdapters) {
@@ -627,6 +638,7 @@ export class ReactiveEngine {
    * @param {IEffect} effect - Эффект.
    * @param {Function} fn - Функция для выполнения.
    * @returns {void}
+   * @source
    */
   private safeRun(effect: IEffect, fn: () => void) {
     try {

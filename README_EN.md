@@ -541,6 +541,93 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 };
 ```
 
+### Transparent Reactivity via `observer` (MobX Style)
+
+If your component renders multiple signals or you prefer to eliminate hook boilerplate from your function bodies, leverage the `observer` High-Order Component (HOC). It automatically tracks which signals or derived computed properties are accessed during the JSX rendering cycle and micro-subscribes the component to those specific state updates.
+
+```tsx
+import React from 'react';
+import { observer } from '@pravosleva/reactive-engine';
+import { counterSignal, userSignal } from './store';
+
+// Wrap your component with observer.
+// Now you can read `.value` directly inside your JSX—no hooks required!
+export const ProfileDashboard = observer(() => {
+  return (
+    <div style={{ padding: 20, border: '1px solid #aaa' }}>
+      <h3>User: {userSignal.value.name}</h3>
+      <p>Counter Value: {counterSignal.value}</p>
+
+      <button onClick={() => counterSignal.value++}>Increment</button>
+      <button onClick={() => { userSignal.value = { name: 'Peter' }; }}>
+        Change Name
+      </button>
+    </div>
+  );
+});
+```
+
+### Another way for render optimization
+```tsx
+import React, { useRef } from 'react';
+import { createObserverComponent, engine } from '@pravosleva/reactive-engine';
+
+// Instantiate the inline observer container component
+const Observer = createObserverComponent(engine);
+
+// A rapidly changing signal (e.g., streaming over WebSockets)
+const livePriceSignal = engine.signal(100);
+
+export const MassiveDashboard = () => {
+  // Counter to track the parent component rendering cycles
+  const totalDashboardRenders = useRef(0);
+  totalDashboardRenders.current++;
+
+  return (
+    <div style={{ padding: '20px', border: '1px solid #ccc' }}>
+      <h2>📊 Heavy Analytics Dashboard</h2>
+      <p>Total Dashboard Page Renders: {totalDashboardRenders.current}</p>
+
+      {/*
+        Expensive static layout or complex nested DOM architecture.
+        Thanks to the inline <Observer>, this whole block will NEVER
+        be re-evaluated when the price fluctuates!
+      */}
+      <div className="heavy-charts-and-tables">
+        <p>...10 heavy charting libraries and analytical tables render here...</p>
+      </div>
+
+      <hr />
+
+      {/*
+        FINE-GRAINED INLINE REACTIVITY:
+        We isolate the signal consumer within the <Observer> container.
+        When livePriceSignal.value updates, ONLY the anonymous function
+        inside <Observer> triggers a micro-render, saving 99% of CPU runtime!
+      */}
+      <Observer>
+        {() => {
+          const innerCounter = useRef(0);
+          innerCounter.current++;
+          return (
+            <div style={{ background: '#f9f9f9', padding: '10px' }}>
+              <h3>📈 Live Ticker Price: (Current: ${livePriceSignal.value})</h3>
+              <p style={{ color: 'green' }}>
+                Micro-zone Isolated Renders: {innerCounter.current}
+              </p>
+            </div>
+          );
+        }}
+      </Observer>
+
+      <button onClick={() => { livePriceSignal.value += 5; }}>
+        Simulate Price Tick (+5$)
+      </button>
+    </div>
+  );
+};
+```
+
 ## ⚠️ Troubleshooting & Gotchas
 
 Because `@pravosleva/reactive-engine` relies on runtime dependency tracking via JavaScript Proxy and Signals, there are a few architectural rules you should follow to avoid hidden bugs:
