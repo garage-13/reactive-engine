@@ -122,7 +122,13 @@ export interface Computed<T> {
    * @returns {CleanupFn} - Функция для очистки подписки.
    */
   subscribe: (cb: (val: T) => void) => CleanupFn;
+
+  /**
+   * Принудительное уничтожение вычисляемого значения и его эффекта для предотвращения утечек памяти.
+   */
+  destroy: () => void;
 }
+
 
 /**
  * Интерфейс для ресурса.
@@ -259,12 +265,9 @@ export class ReactiveEngine {
     const engine = this;
     let val = initialValue;
     const subscribers = new Set<IEffect>();
-
-    // Парсим аргументы для обратной совместимости
     const options = typeof optionsOrName === 'string'
       ? { name: optionsOrName }
       : optionsOrName || {};
-
     const name = options.name || 'unnamed_signal';
 
     return {
@@ -294,12 +297,30 @@ export class ReactiveEngine {
         const old = val;
         val = newValue;
         engine.onSignalChange?.(name, newValue, old);
-        subscribers.forEach(e =>
-          engine.isBatching ? engine.pendingEffects.add(e) : e.run()
-        );
+
+        // 1. Всегда добавляем подписчиков в очередь отложенных эффектов
+        subscribers.forEach(e => engine.pendingEffects.add(e));
+
+        // 2. Если очередь еще не запущена, планируем её автоматическое выполнение в микрозадачу
+        if (!engine.isBatching) {
+          engine.isBatching = true;
+
+          queueMicrotask(() => {
+            const effects = Array.from(engine.pendingEffects);
+            engine.pendingEffects.clear();
+            engine.isBatching = false;
+
+            // Запускаем все накопившиеся эффекты и ререндеры за один раз
+            effects.forEach(e => e.run());
+          });
+        }
       },
       subscribe(cb) {
-        return engine.effect(() => cb(this.value));
+        // Чистая и безопасная подписка для React:
+        // Мы вызываем cb, но НЕ передаем туда аргументы, чтобы не ломать useSyncExternalStore
+        return engine.effect(() => {
+          cb(this.value);
+        });
       }
     };
   }
@@ -326,13 +347,18 @@ export class ReactiveEngine {
         engine.activeEffect = prev;
       }
     };
-    this.allEffects.add(effectObj); // Регистрируем эффект в глобальном списке
+    this.allEffects.add(effectObj);
     effectObj.run();
+
     return () => {
       effectObj.cleanups.forEach(c => c());
       engine.pendingEffects.delete(effectObj);
+      engine.allEffects.delete(effectObj); // Всегда чистим за собой
     };
   }
+
+  // Добавляем кэш для вычисляемых свойств
+  private computedCache = new Map<Function, any>();
 
   /**
    * Создание вычисляемого значения.
@@ -340,21 +366,43 @@ export class ReactiveEngine {
    * @function computed
    * @param {Function} fn - Функция для вычисления значения.
    * @param {string} [signalName] - Имя сигнала.
-   * @returns {Computed<T>} - Вычисляемое значение.
+   * @returns {Computed<T>} - Вычисляемое значение с методом destroy.
    */
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
+    // Если для этой функции вычисление уже создано — просто возвращаем его!
+    if (this.computedCache.has(fn)) {
+      return this.computedCache.get(fn);
+    }
+
+    const engine = this;
     const sig = this.signal<T>(undefined as any, signalName || 'unnamed_computed');
-    this.effect(() => {
+
+    const unsubscribeEffect = this.effect(() => {
       const newValue = fn();
-      // Сигнал сам внутри себя проверит (sig.value === newValue)
-      // благодаря правке в пункте №1
       sig.value = newValue;
     });
-    return {
+
+    // Извлекаем ссылку на объект эффекта, который только что зарегистировался в конце Set
+    const effectObj = Array.from(this.allEffects)[this.allEffects.size - 1];
+
+    // Создаем инстанс computed
+    const computedInstance: Computed<T> = {
       get value() { return sig.value; },
-      // Подписываемся на внутренний сигнал
-      subscribe: (cb) => sig.subscribe(cb)
+      subscribe: (cb) => sig.subscribe(cb),
+      destroy() {
+        unsubscribeEffect();
+        if (effectObj) {
+          engine.allEffects.delete(effectObj);
+        }
+        // Не забываем удалить из кэша при принудительном уничтожении
+        engine.computedCache.delete(fn);
+      }
     };
+
+    // Сохраняем в кэш перед возвратом
+    this.computedCache.set(fn, computedInstance);
+
+    return computedInstance
   }
 
   /**
@@ -401,22 +449,17 @@ export class ReactiveEngine {
   }
 
   /**
-   * Группировка изменений.
+   * Группировка изменений. (Оставил для обратной совместимости)
    * @function batch
    * @param {Function} fn - Функция для выполнения в группе.
    * @returns {void}
    */
   public batch(fn: () => void): void {
-    this.isBatching = true;
-    try { fn(); } finally {
-      queueMicrotask(() => {
-        const effects = Array.from(this.pendingEffects);
-        this.pendingEffects.clear();
-        this.isBatching = false;
-        effects.forEach(e => e.run());
-      });
-    }
+    // Наш асинхронный сеттер теперь сам выполняет всю работу в queueMicrotask,
+    // поэтому здесь мы можем просто выполнить функцию
+    fn();
   }
+
 
   /**
    * Создание асинхронного ресурса.

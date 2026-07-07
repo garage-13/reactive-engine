@@ -83,7 +83,7 @@ describe('ReactiveEngine', () => {
       expect(sig.value).toBe(20);
     });
 
-    it('должен автоматически запускать эффект при изменении сигнала', () => {
+    it('должен автоматически запускать эффект при изменении сигнала', async () => {
       const sig = engine.signal('initial');
       const spy = vi.fn();
 
@@ -95,6 +95,10 @@ describe('ReactiveEngine', () => {
       expect(spy).toHaveBeenCalledWith('initial');
 
       sig.value = 'updated';
+
+      // Ждем выполнения отложенного микрозадачей эффекта
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+
       expect(spy).toHaveBeenCalledTimes(2);
       expect(spy).toHaveBeenCalledWith('updated');
     });
@@ -112,7 +116,7 @@ describe('ReactiveEngine', () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    it('должен вызывать функцию очистки (cleanup) перед следующим запуском эффекта', () => {
+    it('должен вызывать функцию очистки (cleanup) перед следующим запуском эффекта', async () => {
       const sig = engine.signal(1);
       const cleanupSpy = vi.fn();
 
@@ -123,14 +127,18 @@ describe('ReactiveEngine', () => {
 
       expect(cleanupSpy).not.toHaveBeenCalled();
 
-      sig.value = 2; // Перезапуск эффекта
+      sig.value = 2; // Перезапуск эффекта отложен
+
+      // Ждем выполнения микрозадачи
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
       expect(cleanupSpy).toHaveBeenCalledTimes(1);
       expect(cleanupSpy).toHaveBeenCalledWith(1);
 
-      unsubscribe(); // Ручная отписка
+      unsubscribe(); // Ручная отписка происходит синхронно
       expect(cleanupSpy).toHaveBeenCalledTimes(2);
       expect(cleanupSpy).toHaveBeenCalledWith(2);
     });
+
 
     it('должен поддерживать валидацию значений сигнала', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
@@ -149,7 +157,7 @@ describe('ReactiveEngine', () => {
   // 3. ТЕСТЫ COMPUTED PROPERTIES
   // ==========================================
   describe('Computed Properties', () => {
-    it('должен вычислять значение на основе зависимых сигналов', () => {
+    it('должен вычислять значение на основе зависимых сигналов', async () => {
       const firstName = engine.signal('John');
       const lastName = engine.signal('Doe');
       const fullName = engine.computed(() => `${firstName.value} ${lastName.value}`);
@@ -157,18 +165,44 @@ describe('ReactiveEngine', () => {
       expect(fullName.value).toBe('John Doe');
 
       firstName.value = 'Jane';
+
+      // Вычисление computed завязано на эффект, который теперь асинхронный
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+
       expect(fullName.value).toBe('Jane Doe');
     });
 
-    it('должен позволять подписываться на изменение вычисляемого значения', () => {
+    it('должен позволять подписываться на изменение вычисляемого значения', async () => {
       const count = engine.signal(1);
       const isEven = engine.computed(() => count.value % 2 === 0);
       const spy = vi.fn();
 
-      isEven.subscribe(spy); // Подписка автоматически вызывает эффект из-за реализации в ядре
+      isEven.subscribe(spy);
 
-      count.value = 2; // isEven меняется на true
-      expect(spy).toHaveBeenCalledWith(true);
+      count.value = 2;
+
+      // Ждем цепочку микрозадач сигналов и computed
+      await vi.waitFor(() => {
+        expect(spy).toHaveBeenCalledWith(true);
+      });
+    });
+
+    it('должен удалять внутренний эффект из памяти ядра при вызове метода destroy', async () => {
+      const count = engine.signal(1);
+      const getAllEffectsSize = () => (engine as any).allEffects.size;
+      const initialSize = getAllEffectsSize();
+
+      const isEven = engine.computed(() => count.value % 2 === 0);
+      expect(getAllEffectsSize()).toBe(initialSize + 1);
+
+      count.value = 2;
+
+      // Даем отработать обновлению до того, как уничтожим
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      expect(isEven.value).toBe(true);
+
+      isEven.destroy();
+      expect(getAllEffectsSize()).toBe(initialSize);
     });
   });
 
@@ -200,6 +234,33 @@ describe('ReactiveEngine', () => {
       // Эффект сработал ровно 1 раз для финальных значений вместо 2 раз
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith(2, 20);
+    });
+
+    it('должен объединять несколько синхронных обновлений в один ререндер (Автобатчинг)', async () => {
+      const sig1 = engine.signal(0);
+      const sig2 = engine.signal(0);
+      const effectSpy = vi.fn();
+
+      // Создаем эффект, зависящий от обоих сигналов
+      engine.effect(() => {
+        effectSpy(sig1.value, sig2.value);
+      });
+
+      // Очищаем первоначальный вызов при монтировании эффекта
+      effectSpy.mockClear();
+
+      // Имитируем два синхронных изменения подряд БЕЗ использования метода engine.batch
+      sig1.value = 10;
+      sig2.value = 20;
+
+      // Ждем окончания текущего цикла микрозадач (Event Loop)
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+
+      // ПРОВЕРКА:
+      // Если в вашей текущей версии ядра тест ПАДАЕТ (вызовов будет 2) — автобатчинга нет.
+      // Иначе тест станет ЗЕЛЕНЫМ (вызов будет ровно 1)!
+      expect(effectSpy).toHaveBeenCalledTimes(1);
+      expect(effectSpy).toHaveBeenCalledWith(10, 20);
     });
   });
 
@@ -284,21 +345,21 @@ describe('ReactiveEngine', () => {
       expect(() => engineWithoutAdapters.use(sig)).toThrow('this.reactAdapters.useState is not a function or its return value is not iterable');
     });
 
-    it('должен успешно синхронизировать сигнал с хуками React', () => {
+    it('должен успешно синхронизировать сигнал с хуками React', async () => {
       engine.setReactAdapters(useState, useEffect);
       const sig = engine.signal('hello');
 
-      // Используем @testing-library/react для эмуляции вызова внутри компонента
       const { result } = renderHook(() => engine.use(sig));
-
       expect(result.current).toBe('hello');
 
-      // Изменяем сигнал внутри act(), чтобы React зафиксировал ререндер
-      act(() => {
+      // Изменяем сигнал внутри act. Так как act в React умеет сам дожидаться асинхронных микрозадач,
+      // нам просто нужно использовать async/await версию act
+      await act(async () => {
         sig.value = 'world';
       });
 
       expect(result.current).toBe('world');
     });
+
   });
 });

@@ -1,22 +1,44 @@
-import { useSyncExternalStore } from "react";
-import { Signal } from '../core';
+import { useSyncExternalStore, useCallback, useMemo, useEffect } from "react";
+import { CleanupFn } from '../core';
+
+interface ObservableItem<T> {
+  readonly value: T;
+  subscribe: (cb: (val: T) => void) => CleanupFn;
+  destroy?: () => void;
+}
+
+type ReactiveInput<T> = ObservableItem<T> | (() => ObservableItem<T>);
 
 /**
- * NOTE: (v2) Современный (React 18+) через useSyncExternalStore
- * Это самый надежный, производительный и лаконичный способ подружить реактивные сигналы с React.
- *
  * Хук для извлечения значения из Signal/Computed/Resource и авто-ререндера компонента.
- *
- * @template T Тип данных в контейнере
- * @param {Signal<T> | Computed<T> | Resource<T>} reactiveItem Любой реактивный объект с .value и .subscribe
+ * Поддерживает React 18+ и ленивые фабрики без утечек памяти.
  */
-export const useReactiveValue = <T>(
-  reactiveItem: Pick<Signal<T>, 'value' | 'subscribe'>
-): T => {
-  return useSyncExternalStore(
-    // 1. Функция подписки (React сам вызывает её при монтировании и очищает при размонтировании)
-    reactiveItem.subscribe,
-    // 2. Функция получения текущего snapshot значения
-    () => reactiveItem.value
+export const useReactiveValue = <T>(input: ReactiveInput<T>): T => {
+  // 1. Всегда получаем чистый объект, даже если передали функцию-фабрику () => engine.computed(...)
+  const reactiveItem = useMemo(() => {
+    return typeof input === 'function' ? input() : input;
+  }, [input]);
+
+  // 2. Стабилизируем функции для useSyncExternalStore
+  const subscribe = useCallback(
+    (reactCallback: () => void) => {
+      return reactiveItem.subscribe(reactCallback);
+    },
+    [reactiveItem]
   );
+
+  const getSnapshot = useCallback(() => {
+    return reactiveItem.value;
+  }, [reactiveItem]);
+
+  // 3. Автоматически подчищаем динамические вычисления при размонтировании
+  useEffect(() => {
+    return () => {
+      if (reactiveItem && typeof reactiveItem.destroy === 'function') {
+        reactiveItem.destroy();
+      }
+    };
+  }, [reactiveItem]);
+
+  return useSyncExternalStore(subscribe, getSnapshot);
 };

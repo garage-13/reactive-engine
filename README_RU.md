@@ -153,19 +153,104 @@ export const UserProfile = () => {
 };
 ```
 
-### 2. Оптимизация через пакетные обновления (Batching)
+### 2. Автоматическое пакетное обновление (100% Автобатчинг)
+Вы можете создавать `computed`-свойства прямо внутри тела React-компонентов (например, когда формула зависит от динамических пропсов). **Вам не нужно использовать `useMemo` или вручную отписываться** — библиотека автоматически очистит память ядра при размонтировании компонента.
 
-Если вам нужно обновить сразу несколько связанных сигналов, оберните их в метод `batch`. Вместо двух сетевых запросов и двух цепочек ререндеров выполнится ровно **один**:
+В `@pravosleva/reactive-engine` встроен **нативный автоматический батчинг обновлений** на базе микрозадач. Это означает, что если вы изменяете несколько сигналов подряд (синхронно или асинхронно), библиотека объединит их и вызовет **ровно один ререндер** React-компонента в конце текущего тика. Вам больше не нужно оборачивать вызовы в ручные функции `batch()`.
 
-```ts
-import { engine, userIdSignal, tabSignal } from './apiStore';
+#### Простой кейс: Множественные синхронные обновления стейта
+В примере ниже при клике на кнопку изменяются сразу три независимых сигнала. Благодаря автобатчингу компонент перерисуется всего один раз.
 
-const resetUserToDefault = () => {
-  engine.batch(() => {
-    userIdSignal.value = 1;
-    tabSignal.value = 'posts';
-    // Наш ресурс userDataResource перезапустится всего 1 раз!
-  });
+```tsx
+import React, { useRef } from 'react';
+import { useReactiveValue, engine } from '@pravosleva/reactive-engine';
+
+// Создаем три сигнала
+const firstNameSignal = engine.signal('Иван');
+const lastNameSignal = engine.signal('Иванов');
+const ageSignal = engine.signal(25);
+
+export const SimpleBatchDemo = () => {
+  const firstName = useReactiveValue(firstNameSignal);
+  const lastName = useReactiveValue(lastNameSignal);
+  const age = useReactiveValue(ageSignal);
+
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+
+  const handleUpdate = () => {
+    // Три синхронных изменения подряд запустят ровно ОДИН ререндер компонента!
+    firstNameSignal.value = 'Пётр';
+    lastNameSignal.value = 'Петров';
+    ageSignal.value = 30;
+  };
+
+  return (
+    <div style={{ padding: '15px', border: '1px solid #ccc' }}>
+      <h4>Простой батчинг (Профайлер)</h4>
+      <p>Пользователь: {firstName} {lastName}, Возраст: {age}</p>
+      <p style={{ color: 'blue' }}>Количество рендеров компонента: {renderCountRef.current}</p>
+      <button onClick={handleUpdate}>Обновить профиль синхронно</button>
+    </div>
+  );
+};
+```
+
+#### Продвинутый кейс: Батчинг в асинхронных потоках (Race Condition & API)
+Автобатчинг работает «из коробки» даже внутри асинхронных функций, `setTimeout` или после `await fetch`. В этом примере после завершения сетевого запроса мы обновляем статус, данные и время, но React реагирует на это единым точечным обновлением интерфейса.
+
+```tsx
+// store.ts
+export const isProcessingSignal = engine.signal(false, 'isProcessing');
+export const apiDataSignal = engine.signal<string | null>(null, 'apiData');
+export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated');
+```
+
+```tsx
+// AdvancedBatchDemo.tsx
+import React, { useRef } from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from './store';
+
+export const AdvancedBatchDemo = () => {
+  const isProcessing = useReactiveValue(isProcessingSignal);
+  const apiData = useReactiveValue(apiDataSignal);
+  const lastUpdated = useReactiveValue(lastUpdatedSignal);
+
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+
+  const handleFetchData = async () => {
+    isProcessingSignal.value = true; // Сеттер 1 (Синхронный ререндер для индикатора загрузки)
+
+    try {
+      // Имитируем запрос к серверу
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const fakeResponse = "Успешный ответ от сервера #42";
+
+      // АСИНХРОННЫЙ АВТОБАТЧИНГ:
+      // Эти три обновления происходят внутри одной микрозадачи после await.
+      // Движок соберет их в одну пачку, и React выполнит ровно 1 финальный ререндер!
+      apiDataSignal.value = fakeResponse;
+      lastUpdatedSignal.value = new Date().toLocaleTimeString();
+      isProcessingSignal.value = false;
+    } catch (error) {
+      isProcessingSignal.value = false;
+    }
+  };
+
+  return (
+    <div style={{ padding: '15px', border: '1px solid #999', marginTop: '15px' }}>
+      <h4>Продвинутый асинхронный батчинг</h4>
+      <p>Статус: {isProcessing ? '⏳ Загрузка...' : '✅ Готов'}</p>
+      <p>Данные: {apiData || 'Нет данных'}</p>
+      <p>Последнее обновление: {lastUpdated || 'Никогда'}</p>
+      <p style={{ color: 'purple' }}>Количество рендеров компонента: {renderCountRef.current}</p>
+      <button onClick={handleFetchData} disabled={isProcessing}>
+        Запросить данные по сети
+      </button>
+    </div>
+  );
 };
 ```
 
@@ -318,11 +403,11 @@ export const AudioPlayer = () => {
 ### 3. Утечки памяти вне компонентов React
 Хуки `useReactiveValue` и `useReactiveSubscription` автоматически отписываются от сигналов при размонтировании компонентов. Однако, если вы вручную вызываете `engine.effect()` внутри долгоживущих сервисов или классов, движок будет хранить их в памяти вечно.
 * **Решение:** Всегда сохраняйте возвращаемую функцию очистки и вызывайте её, когда сервис или модуль уничтожается:
-  ```ts
-  const unsubscribe = engine.effect(() => { ... });
-  // При уничтожении модуля:
-  unsubscribe();
-  ```
+```ts
+const unsubscribe = engine.effect(() => { ... });
+// При уничтожении модуля:
+unsubscribe();
+```
 
 ### 4. Сложные объекты в зависимостях `withCache`
 Декоратор `withCache` сериализует аргументы `source` через `JSON.stringify()` для создания ключа кэша.

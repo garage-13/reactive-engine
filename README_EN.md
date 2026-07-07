@@ -149,19 +149,102 @@ export const UserProfile = () => {
 };
 ```
 
-### 2. Optimizing State Updates with Batching
+### 2. Optimizing State Updates with Batching: Automatic Batching (100% Out-of-the-Box Batching)
+`@pravosleva/reactive-engine` features **native, built-in automatic batching** powered by microtasks. This means that if you mutate multiple signals consecutively (either synchronously or asynchronously), the engine will automatically consolidate them and trigger **exactly one single re-render** of the React component at the end of the current execution tick. You no longer need to wrap your code in manual `batch()` wrappers.
 
-When you need to update multiple related signals at once, wrap them in the `batch` method. Instead of causing two independent network calls and two sequential component re-renders, it executes exactly **one**:
+#### Simple Case: Multiple Synchronous State Updates
+In the example below, clicking the button mutates three independent signals consecutively. Thanks to automatic batching, the component will re-render exactly once.
+
+```tsx
+import React, { useRef } from 'react';
+import { useReactiveValue, engine } from '@pravosleva/reactive-engine';
+
+// Define three distinct signals
+const firstNameSignal = engine.signal('John');
+const lastNameSignal = engine.signal('Doe');
+const ageSignal = engine.signal(25);
+
+export const SimpleBatchDemo = () => {
+  const firstName = useReactiveValue(firstNameSignal);
+  const lastName = useReactiveValue(lastNameSignal);
+  const age = useReactiveValue(ageSignal);
+
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+
+  const handleUpdate = () => {
+    // These three synchronous mutations will trigger exactly ONE re-render!
+    firstNameSignal.value = 'Peter';
+    lastNameSignal.value = 'Smith';
+    ageSignal.value = 30;
+  };
+
+  return (
+    <div style={{ padding: '15px', border: '1px solid #ccc' }}>
+      <h4>Simple Batching (Profiler)</h4>
+      <p>User: {firstName} {lastName}, Age: {age}</p>
+      <p style={{ color: 'blue' }}>Component Render Count: {renderCountRef.current}</p>
+      <button onClick={handleUpdate}>Update Profile Synchronously</button>
+    </div>
+  );
+};
+```
+
+#### Advanced Case: Batching in Asynchronous Flows (Race Condition & API)
+Automatic batching works seamlessly even inside asynchronous functions, `setTimeout` blocks, or after `await fetch` resolutions. In this example, once the network request resolves, we update the status, data, and timestamp sequentially, yet React reacts with a single, optimized UI update.
 
 ```ts
-import { engine, userIdSignal, tabSignal } from './apiStore';
+// store.ts
+export const isProcessingSignal = engine.signal(false, 'isProcessing');
+export const apiDataSignal = engine.signal<string | null>(null, 'apiData');
+export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated');
+```
 
-const resetUserToDefault = () => {
-  engine.batch(() => {
-    userIdSignal.value = 1;
-    tabSignal.value = 'posts';
-    // Our userDataResource triggers only once!
-  });
+```tsx
+// AdvancedBatchDemo.tsx
+import React, { useRef } from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from './store';
+
+export const AdvancedBatchDemo = () => {
+  const isProcessing = useReactiveValue(isProcessingSignal);
+  const apiData = useReactiveValue(apiDataSignal);
+  const lastUpdated = useReactiveValue(lastUpdatedSignal);
+
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+
+  const handleFetchData = async () => {
+    isProcessingSignal.value = true; // Mutation 1 (Synchronous re-render to display the loader)
+
+    try {
+      // Simulate an asynchronous API request
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const fakeResponse = "Successful server response #42";
+
+      // ASYNCHRONOUS AUTO-BATCHING:
+      // These three mutations occur within the same microtask right after the await keyword.
+      // The engine batches them together, resulting in exactly 1 final UI re-render!
+      apiDataSignal.value = fakeResponse;
+      lastUpdatedSignal.value = new Date().toLocaleTimeString();
+      isProcessingSignal.value = false;
+    } catch (error) {
+      isProcessingSignal.value = false;
+    }
+  };
+
+  return (
+    <div style={{ padding: '15px', border: '1px solid #999', marginTop: '15px' }}>
+      <h4>Advanced Asynchronous Batching</h4>
+      <p>Status: {isProcessing ? '⏳ Loading...' : '✅ Ready'}</p>
+      <p>Data: {apiData || 'No data available'}</p>
+      <p>Last Updated: {lastUpdated || 'Never'}</p>
+      <p style={{ color: 'purple' }}>Component Render Count: {renderCountRef.current}</p>
+      <button onClick={handleFetchData} disabled={isProcessing}>
+        Fetch Data via Network
+      </button>
+    </div>
+  );
 };
 ```
 

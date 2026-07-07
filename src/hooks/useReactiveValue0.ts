@@ -1,34 +1,42 @@
-import { useState, useEffect, useRef } from "react";
-import { Signal, CleanupFn } from '../core';
+import { useState, useEffect, useRef, useMemo } from "react";
+import { CleanupFn } from '../core';
+
+interface ObservableItem<T> {
+  readonly value: T;
+  subscribe: (cb: (val: T) => void) => CleanupFn;
+  destroy?: () => void;
+}
+
+type ReactiveInput<T> = ObservableItem<T> | (() => ObservableItem<T>);
 
 /**
- * NOTE: (v1) Хук для извлечения значения из Signal/Computed/Resource и авто-ререндера компонента.
- *
- * Классический (React 16.8+) через useState + useEffect
- * Если вам нужна обратная совместимость со старыми версиями React, где нет useSyncExternalStore, используем классическую связку.
+ * Fallback хук для извлечения значения из сигналов. Поддерживает React 16.8+.
  */
-export const useReactiveValue0 = <T>(
-  reactiveItem: Pick<Signal<T>, 'value' | 'subscribe'>
-): T => {
-  // Инициализируем стейт текущим значением сигнала
-  const [state, setState] = useState<T>(reactiveItem.value);
+export const useReactiveValue0 = <T>(input: ReactiveInput<T>): T => {
+  const reactiveItem = useMemo(() => {
+    return typeof input === 'function' ? input() : input;
+  }, [input]);
 
-  // Храним ссылку на актуальный setter стейта
+  const [state, setState] = useState<T>(reactiveItem.value);
   const setStateRef = useRef(setState);
+
   useEffect(() => {
     setStateRef.current = setState;
   }, [setState]);
 
   useEffect(() => {
-    // При изменении реактивного элемента синхронизируем локальный стейт
     setStateRef.current(reactiveItem.value);
 
-    // Подписываемся на будущие изменения
-    const unsubscribe: CleanupFn = reactiveItem.subscribe((newValue) => {
+    const unsubscribe = reactiveItem.subscribe((newValue) => {
       setStateRef.current(newValue);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (reactiveItem && typeof reactiveItem.destroy === 'function') {
+        reactiveItem.destroy();
+      }
+    };
   }, [reactiveItem]);
 
   return state;
