@@ -1,25 +1,30 @@
+import { defineConfig, UserConfig } from "vite";
+import react from "@vitejs/plugin-react";
 import dts from "vite-plugin-dts";
 import path from "path";
-import react from "@vitejs/plugin-react";
-import { defineConfig, UserConfig } from "vite";
 
 export default defineConfig({
   base: "./",
-  plugins: [dts({ rollupTypes: true, insertTypesEntry: true }), react()],
+  plugins: [
+    // rollupTypes: true сохраняем — он собирает все типы в один красивый файл index.d.ts
+    dts({ bundleTypes: true, insertTypesEntry: true }),
+    react()
+  ],
   resolve: {
-    dedupe: ["react", "react-dom"], // Prevents multiple React instances
+    dedupe: ["react", "react-dom"],
   },
   build: {
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: true, // Карты кода для удобной отладки пользователями
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
-      name: "MyLib", // Global variable name for IIFE
-      formats: ["es", "cjs", "iife"], // ES/CJS for npm, IIFE for CDN
-      fileName: (format) =>
+      name: "ReactiveEngineLib", // Имя глобальной переменной для IIFE (window.ReactiveEngineLib)
+      formats: ["es", "cjs", "iife"],
+      fileName: (format: string) =>
         `index.${format === "es" ? "mjs" : format === "cjs" ? "cjs" : "iife.js"}`,
     },
     rollupOptions: {
+      // Исключаем react из финального бандла, чтобы не дублировать код
       external: ["react", "react-dom"],
       output: {
         globals: {

@@ -59,7 +59,7 @@ export interface IEffect {
 
 /**
  * Интерфейс для состояния ресурса.
- * @template T
+ * @template T Data format
  * @interface ResourceState<T>
  */
 export interface ResourceState<T> {

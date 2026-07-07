@@ -2,109 +2,10 @@
 Этот документ содержит практические примеры использования библиотеки ReactiveEngine в React-компонентах, охватывающие различные сценарии от базового до продвинутого.
 
 ## Базовые примеры (Basic Usage)
-### Использование хука useReactiveSubscription для управления подписками
-Если часто встречается подобный шаблон с подпиской на реактивные значения, можно создать собственный хук для облегчения работы и избежания повторения кода.
-```js
-import { useEffect, useRef } from 'react';
-
-const useReactiveSubscription = (signal, callback) => {
-  const subscriptionRef = useRef(null);
-
-  useEffect(() => {
-    if (subscriptionRef.current) {
-      subscriptionRef.current();
-    }
-
-    subscriptionRef.current = signal.subscribe(callback);
-
-    return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current();
-      }
-    };
-  }, [signal, callback]);
-};
-
-// Использование в компоненте
-const FullName = () => {
-  const engine = new ReactiveEngine();
-  const firstName = engine.signal('John');
-  const lastName = engine.signal('Doe');
-  const fullName = engine.computed(() => `${firstName.value} ${lastName.value}`);
-
-  useReactiveSubscription(fullName, (newFullName) => {
-    console.log(newFullName);
-  });
-
-  return (
-    <div>
-      <p>{fullName.value}</p>
-      <input type="text" value={firstName.value} onChange={(e) => firstName.value = e.target.value} />
-      <input type="text" value={lastName.value} onChange={(e) => lastName.value = e.target.value} />
-    </div>
-  );
-};
-```
-Этот подход делает код более чистым и устойчивым к ошибкам, связанным с управлением подписками.
-
-### 1. Пример создания и использования сигнала
+### Пример создания реактивного объекта
 ```js
 import React from 'react';
-import { useReactiveSubscription } from './path/to/useReactiveSubscription';
-import { ReactiveEngine } from './src/ReactiveEngine';
-
-const Counter = () => {
-  const engine = new ReactiveEngine();
-  const counter = engine.signal(0);
-
-  // Подписываемся на изменения сигнала
-  useReactiveSubscription(counter, (newValue) => {
-    console.log('Новое значение счетчика:', newValue);
-  });
-
-  return (
-    <div>
-      <p>Значение счетчика: {counter.value}</p>
-      <button onClick={() => counter.value += 1}>Увеличить</button>
-      <button onClick={() => counter.value -= 1}>Уменьшить</button>
-    </div>
-  );
-};
-
-export default Counter;
-```
-
-### 2. Пример создания и использования эффекта
-```js
-import React from 'react';
-import { useReactiveSubscription } from './path/to/useReactiveSubscription';
-import { ReactiveEngine } from './src/ReactiveEngine';
-
-const Greeting = () => {
-  const engine = new ReactiveEngine();
-  const name = engine.signal('John');
-  const greeting = engine.computed(() => `Привет, ${name.value}!`);
-
-  // Подписываемся на изменения вычисляемого значения
-  useReactiveSubscription(greeting, (newGreeting) => {
-    console.log(newGreeting);
-  });
-
-  return (
-    <div>
-      <p>{greeting.value}</p>
-      <input type="text" value={name.value} onChange={(e) => name.value = e.target.value} />
-    </div>
-  );
-};
-
-export default Greeting;
-```
-
-### 3. Пример создания реактивного объекта
-```js
-import React from 'react';
-import { useReactiveSubscription } from './path/to/useReactiveSubscription';
+import { useReactiveSubscription } from '@pravosleva/reactive-engine';
 import { ReactiveEngine } from './src/ReactiveEngine';
 
 const PersonInfo = () => {
@@ -131,8 +32,171 @@ const PersonInfo = () => {
 export default PersonInfo;
 ```
 
+### Использование хука `useReactiveSubscription` для управления подписками
+Этот хук используется, когда вам нужно отреагировать на изменение сигнала (например, вызвать уведомление или отправить метрику), но не нужно перерисовывать сам компонент.
+```tsx
+import React from 'react';
+import { counterSignal, doubleComputed } from './your-engine-example';
+import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+
+export const LoggerComponent = () => {
+  // Подписываемся на обычный Signal
+  useReactiveSubscription(counterSignal, (value) => {
+    console.log(`Сигнал изменился! Новое значение: ${value}`);
+  });
+
+  // Хук универсален — он так же легко принимает Computed
+  useReactiveSubscription(doubleComputed, (value) => {
+    console.warn(`Вычисляемое значение теперь: ${value}`);
+  });
+
+  return (
+    <div style={{ border: '1px solid gray', padding: '10px' }}>
+      <h3>Компонент-логгер (не перерисовывается при клике)</h3>
+      <button onClick={() => counterSignal.value++}>
+        Увеличить счетчик
+      </button>
+    </div>
+  );
+};
+
+```
+
+### Использование встроенного `engine.use` (Для чтения и реактивного UI)
+Если вам нужно выводить значение сигнала на экран и автоматически перерисовывать компонент при его изменении, используйте встроенный метод вашего ядра. Под капотом он как раз использует подписку и `useState`.
+```tsx
+import React from 'react';
+import { engine, counterSignal, doubleComputed } from './engine';
+
+export const CounterComponent = () => {
+  // engine.use автоматически подпишется и вызовет ререндер при изменениях
+  const count = engine.use(counterSignal);
+  const doubleCount = engine.use(doubleComputed);
+
+  return (
+    <div style={{ padding: '20px', background: '#f5f5f5' }}>
+      <h2>Счетчик: {count}</h2>
+      <h3>Удвоенный счетчик: {doubleCount}</h3>
+
+      <button onClick={() => counterSignal.value++}>➕ Добавить</button>
+      <button onClick={() => counterSignal.value--}>➖ Отнять</button>
+    </div>
+  );
+};
+```
+
+### Resource
+#### Использование с `engine.resource` (Асинхронные данные)
+Поскольку метод `resource` возвращает объект, у которого есть `subscribe` (через внутренний сигнал состояния), вы можете передавать его значение в `engine.use`:
+```tsx
+// 1. Создаем ресурс (например, в сервисе или файле данных)
+export const userResource = engine.resource(
+  async (userId: number, abortSignal) => {
+    const res = await fetch(`https://typicode.com{userId}`, { signal: abortSignal });
+    return res.json();
+  },
+  { get value() { return counterSignal.value; } } // Зависимость от нашего счетчика
+);
+
+// 2. Используем в компоненте
+export const UserProfile = () => {
+  // Подписываемся на объект value ресурса (который содержит { data, loading, error })
+  const { data, loading, error } = engine.use(userResource);
+
+  if (loading) return <div>Загрузка пользователя...</div>;
+  if (error) return <div>Ошибка: {error.message}</div>;
+
+  return (
+    <div>
+      <h3>Данные пользователя:</h3>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
+      <button onClick={() => userResource.refetch()}>Обновить вручную</button>
+    </div>
+  );
+};
+```
+
+#### Передача зависимостей через Массив (Кортеж)
+Этот способ наиболее привычен для тех, кто часто работает с массивом зависимостей в useEffect.
+```ts
+import { engine } from './yourEngineInstance';
+
+// 1. Создаем два независимых сигнала
+const userIdSignal = engine.signal(1, 'userId');
+const tabSignal = engine.signal<'profile' | 'settings'>('profile', 'tab');
+
+// 2. Объединяем их в единую "пачку" через computed
+const resourceDepsComputed = engine.computed(() => {
+  // Движок автоматически подпишется на оба сигнала, так как мы читаем их .value
+  return [userIdSignal.value, tabSignal.value] as const;
+}, 'deps_computed');
+
+// 3. Передаем computed в качестве source для ресурса
+export const userDataResource = engine.resource(
+  // В fetcher первым аргументом (source) придет наш массив с актуальными значениями
+  async ([userId, tab], abortSignal) => {
+    const res = await fetch(`https://example.com{userId}/${tab}`, {
+      signal: abortSignal,
+    });
+    if (!res.ok) throw new Error('Ошибка сети');
+    return res.json();
+  },
+  resourceDepsComputed, // Передаем вычисляемый массив зависимостей
+  'userData'
+);
+```
+
+#### Передача зависимостей через Объект (Более читаемый)
+```ts
+import { engine } from './yourEngineInstance';
+
+// 1. Создаем сигналы для фильтрации и пагинации каталога товаров
+const categorySignal = engine.signal('electronics', 'category');
+const pageSignal = engine.signal(1, 'page');
+
+// 2. Объединяем их в объект зависимостей
+const catalogParamsComputed = engine.computed(() => ({
+  category: categorySignal.value,
+  page: pageSignal.value
+}), 'catalog_params');
+
+// 3. Создаем ресурс
+export const catalogResource = engine.resource(
+  // В fetcher приходит объект params с деструктуризацией
+  async ({ category, page }, abortSignal) => {
+    const query = new URLSearchParams({ category, page: String(page) });
+    const res = await fetch(`https://example.com{query}`, {
+      signal: abortSignal,
+    });
+    return res.json();
+  },
+  catalogParamsComputed, // Передаем вычисляемый объект зависимостей
+  'catalogData'
+);
+```
+
+### Как этим управлять из кода или React-компонента
+Благодаря реактивной связи, вам достаточно просто менять значения исходных сигналов. Архитектура ядра сама сделает всю работу по инвалидации кэша и перезапросу данных:
+```ts
+// Пример изменения стейта (где угодно в приложении):
+const nextPage = () => {
+  // Изменение этого сигнала автоматически обновит computed,
+  // который прервет текущий fetch-запрос и запустит новый для страницы 2!
+  pageSignal.value += 1;
+};
+
+const changeCategory = (newCat: string) => {
+  engine.batch(() => {
+    // Если нужно обновить оба сигнала сразу, используем batch,
+    // чтобы ресурс выполнил ровно один сетевой запрос вместо двух.
+    categorySignal.value = newCat;
+    pageSignal.value = 1;
+  });
+};
+```
+
 ## Продвинутые сценарии (Advanced Scenarios)
-### 4. Пример асинхронного ресурса
+### Пример асинхронного ресурса
 ```js
 import React from 'react';
 import { useReactiveSubscription } from './path/to/useReactiveSubscription';
