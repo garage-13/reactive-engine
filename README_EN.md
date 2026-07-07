@@ -248,6 +248,70 @@ export const AdvancedBatchDemo = () => {
 };
 ```
 
+#### Advanced Case: Resetting Multi-Filter State (Heavy Computed Analytics)
+This example demonstrates a common frontend task: a `Computed` property executing a heavy filter operation over a large array. When clicking "Reset All", 4 separate signals are mutated sequentially (search, category, price boundary, and sorting). Automatic batching ensures the expensive calculation executes **exactly once** for the final consolidated state.
+
+```ts
+// store.ts
+export interface Product { id: number; title: string; category: string; price: number; }
+
+export const searchSignal = engine.signal('', 'search');
+export const categorySignal = engine.signal('all', 'category');
+export const maxPriceSignal = engine.signal(10000, 'maxPrice');
+export const sortBySignal = engine.signal<'price' | 'name'>('name', 'sortBy');
+export const rawProductsSignal = engine.signal<Product[]>([], 'rawProducts');
+
+// Expensive computation dependent on 5 signals simultaneously
+export const filteredProductsComputed = engine.computed(() => {
+  console.log('🔮 Executing heavy filtering over 10,000 items...');
+  let result = [...rawProductsSignal.value];
+
+  if (searchSignal.value) {
+    result = result.filter(p => p.title.toLowerCase().includes(searchSignal.value.toLowerCase()));
+  }
+  if (categorySignal.value !== 'all') {
+    result = result.filter(p => p.category === categorySignal.value);
+  }
+  result = result.filter(p => p.price <= maxPriceSignal.value);
+
+  return result.sort((a, b) => sortBySignal.value === 'price' ? a.price - b.price : a.title.localeCompare(b.title));
+}, 'filteredProducts');
+```
+
+```tsx
+// CatalogDemo.tsx
+import React, { useRef } from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from './store';
+
+export const CatalogDemo = () => {
+  const products = useReactiveValue(filteredProductsComputed);
+
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+
+  const handleResetAllFilters = () => {
+    // Mutating 4 signals in a row.
+    // Without auto-batching, the heavy filter logic would execute 4 separate times,
+    // and the component would re-render at every incomplete intermediate step.
+    // With auto-batching: exactly 1 computation and 1 React re-render will occur!
+    searchSignal.value = '';
+    categorySignal.value = 'all';
+    maxPriceSignal.value = 10000;
+    sortBySignal.value = 'name';
+  };
+
+  return (
+    <div style={{ padding: '15px', border: '1px solid #777' }}>
+      <h4>Catalog Filtering (Heavy Analytics)</h4>
+      <p>Products found: <b>{products.length}</b></p>
+      <p style={{ color: 'green' }}>Component Renders: {renderCountRef.current}</p>
+      <button onClick={handleResetAllFilters}>Reset All Filters</button>
+    </div>
+  );
+};
+```
+
 ### 3. Caching Requests with Time-To-Live (TTL)
 
 You can apply higher-order utility decorators to cache server responses, preventing unnecessary network spam when users toggle frequently between identical tabs or filters.

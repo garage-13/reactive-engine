@@ -254,6 +254,70 @@ export const AdvancedBatchDemo = () => {
 };
 ```
 
+#### Продвинутый кейс: Сброс множественных фильтров (Heavy Computed Analytics)
+В данном примере `Computed`-свойство выполняет тяжелую фильтрацию массива из 10 000 элементов. Когда пользователь нажимает кнопку «Сбросить всё», мы синхронно меняем сразу 4 сигнала (поиск, категорию, диапазон цен и сортировку). Автобатчинг гарантирует, что тяжелая функция фильтрации выполнится ровно **один раз** для финального состояния.
+
+```ts
+// store.ts
+export interface Product { id: number; title: string; category: string; price: number; }
+
+export const searchSignal = engine.signal('', 'search');
+export const categorySignal = engine.signal('all', 'category');
+export const maxPriceSignal = engine.signal(10000, 'maxPrice');
+export const sortBySignal = engine.signal<'price' | 'name'>('name', 'sortBy');
+export const rawProductsSignal = engine.signal<Product[]>([], 'rawProducts');
+
+// Тяжелое вычисление, зависящее от пяти сигналов сразу
+export const filteredProductsComputed = engine.computed(() => {
+  console.log('🔮 Выполняется тяжелая фильтрация 10,000 элементов...');
+  let result = [...rawProductsSignal.value];
+
+  if (searchSignal.value) {
+    result = result.filter(p => p.title.toLowerCase().includes(searchSignal.value.toLowerCase()));
+  }
+  if (categorySignal.value !== 'all') {
+    result = result.filter(p => p.category === categorySignal.value);
+  }
+  result = result.filter(p => p.price <= maxPriceSignal.value);
+
+  return result.sort((a, b) => sortBySignal.value === 'price' ? a.price - b.price : a.title.localeCompare(b.title));
+}, 'filteredProducts');
+```
+
+```tsx
+// CatalogDemo.tsx
+import React, { useRef } from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from './store';
+
+export const CatalogDemo = () => {
+  const products = useReactiveValue(filteredProductsComputed);
+
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+
+  const handleResetAllFilters = () => {
+    // Изменяем 4 сигнала подряд.
+    // Без автобатчинга тяжелая функция фильтрации запустилась бы 4 раза,
+    // а компонент перерисовывался бы на каждом промежуточном шаге.
+    // С автобатчингом: произойдет строго 1 вычисление и 1 ререндер React!
+    searchSignal.value = '';
+    categorySignal.value = 'all';
+    maxPriceSignal.value = 10000;
+    sortBySignal.value = 'name';
+  };
+
+  return (
+    <div style={{ padding: '15px', border: '1px solid #777' }}>
+      <h4>Фильтрация каталога (Heavy Analytics)</h4>
+      <p>Найдено товаров: <b>{products.length}</b></p>
+      <p style={{ color: 'green' }}>Рендеров компонента: {renderCountRef.current}</p>
+      <button onClick={handleResetAllFilters}>Сбросить все фильтры</button>
+    </div>
+  );
+};
+```
+
 ### 3. Кэширование запросов с поддержкой времени жизни (TTL)
 
 Вы можете использовать утилиты-декораторы для кэширования ответов сервера, чтобы при частом переключении вкладок не спамить сеть повторными запросами.
