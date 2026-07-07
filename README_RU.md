@@ -288,6 +288,8 @@ export const AudioPlayer = () => {
 };
 ```
 
+Таким образом, библиотека предоставляет полный цикл управления потоком данных: `State (Signal) -> Derivatives (Computed) -> UI (useReactiveValue) -> Reactions (useReactiveSubscription)`
+
 ---
 
 ## 🗂️ Лицензия
