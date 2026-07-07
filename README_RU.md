@@ -7,227 +7,233 @@ yarn add @pravosleva/reactive-engine
 
 https://t.me/bash_exp_ru/3393
 
-## 📦 Основные компоненты
+# @pravosleva/reactive-engine 🚀
 
-### 1. ReactiveEngine
-Центральный узел системы. Управляет состоянием, эффектами, DI и связью с React.
-- `signal<T>(value, options)` — создание атомарного состояния.
-- `computed<T>(fn)` — производные данные с кэшированием.
-- `reactive<T>(obj)` — глубокая реактивность через Proxy.
-- `resource<T>(fetcher, source?)` — асинхронные запросы с авто-отменой.
-- `inject<T>(Class)` — получение или создание синглтон-сервиса.
-- `use(signal)` — React-хук для подписки на изменения.
+Легковесный, ультра-производительный и независимый реактивный движок на базе сигналов (Signals) и прозрачного отслеживания зависимостей для React и TypeScript приложений.
 
-### 2. BaseREService
-Абстрактный класс для бизнес-логики.
-- Правило: Всегда инициализируйте сигналы напрямую в полях класса для корректной работы типов и DI.
+---
 
-## 🛠 Руководство пользователя
-### Шаг 1: Настройка (Entry Point)
-Создайте и экспортируйте единственный инстанс движка в локальном проекте `~/utils/engine.ts`:
+## ⚡ Почему этот подход производительный?
+
+В отличие от классического State Management в React (через Context API или глобальные сторы на иммутабельности), `@pravosleva/reactive-engine` работает по принципу **мелкогранулярных обновлений (Fine-grained reactivity)**:
+
+* **Минимум ререндеров:** Компоненты подписываются не на «весь объект состояния», а строго на конкретные примитивные сигналы (`Signal`) или вычисляемые свойства (`Computed`), которые они выводят на экран. Изменение одного сигнала обновляет *только* тот компонент, который его читает.
+* **O(1) вычисления:** `Computed` свойства ленивы. Они не пересчитываются, пока не изменятся исходные сигналы.
+* **Автоматический Batching:** Движок умеет собирать множественные изменения сигналов в «пакеты» через микрозадачи. Сетевые ресурсы или тяжелые эффекты не будут перезапускаться 10 раз подряд при обновлении 10 сигналов в одном цикле.
+* **Умная асинхронность:** Инструмент `resource` из коробки оркеструет `AbortController`, автоматически отменяя предыдущие зависшие сетевые запросы при изменении зависимостей.
+
+---
+
+## 📦 Установка
+
+Установите пакет через ваш любимый менеджер пакетов:
+
+```bash
+npm install @pravosleva/reactive-engine
+# или
+yarn add @pravosleva/reactive-engine
+# или
+pnpm add @pravosleva/reactive-engine
+```
+
+---
+
+## 🛠️ Базовые примеры
+
+### 1. Создание инстанса движка и сигналов
+
+Вы можете объявлять реактивное состояние в чистых TypeScript/JavaScript файлах вне иерархии React-компонентов.
+
 ```ts
-import { useState, useEffect } from 'react';
+// store.ts
 import { ReactiveEngine } from '@pravosleva/reactive-engine';
 
 export const engine = new ReactiveEngine();
-engine.setReactAdapters(useState, useEffect); // Связываем с React
-```
 
-### Шаг 2: Создание логики (Service)
-Опишите данные и методы их изменения.
-```ts
-import { BaseREService } from '@pravosleva/reactive-engine';
+// Простой сигнал (State)
+export const counterSignal = engine.signal(0, 'counter');
 
-export class CounterService extends BaseREService {
-  // Сигналы с runtime-валидацией
-  public count = this.engine.signal(0, {
-    name: 'CounterService:count',
-    validate: (v) => v >= 0 || "Значение не может быть отрицательным"
-  });
-
-  // Вычисляемое значение (авто-обновление)
-  public double = this.engine.computed(() => this.count.value * 2);
-
-  increment = () => this.count.value++;
-}
-```
-
-### Шаг 3: Использование в React
-Подключайте логику к компонентам без лишнего бойлерплейта.
-```ts
-import { engine } from '~/utils/engine';
-import { CounterService } from './CounterService';
-
-export const Counter = () => {
-  const store = engine.inject(CounterService); // Получаем сервис (синглтон)
-  const count = engine.use(store.count);       // Подписываемся на изменения
-
-  return <button onClick={store.increment}>{count}</button>;
-};
-```
-
-## ⚡️ Продвинутые возможности
-### Асинхронные данные (Resource)
-Автоматически перезагружает данные при изменении зависимости (source).
-```ts
-this.user = this.engine.resource(
-  async (id, signal) => {
-    const res = await fetch(`/api/user/${id}`, { signal });
-    return res.json();
-  },
-  this.userId // Зависимость
+// Вычисляемое свойство (Derivatives)
+export const doubleComputed = engine.computed(
+  () => counterSignal.value * 2,
+  'double_counter'
 );
 ```
 
-### Отладка (Logger)
-Включите логирование всех изменений в консоль:
-```ts
-engine.onSignalChange = (name, next, prev) => {
-  console.log(`[${name}] changed from`, prev, 'to', next);
+### 2. Использование в React-компонентах
+
+Для интеграции с React 18+ используйте производительный хук `useReactiveValue` (на базе `useSyncExternalStore`), а для версий React 16.8+ — хук `useReactiveValue0`.
+
+```tsx
+// Counter.tsx
+import React from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { counterSignal, doubleComputed } from './store';
+
+export const Counter = () => {
+  // Хук автоматически подпишется на изменения и вызовет ререндер
+  const count = useReactiveValue(counterSignal);
+  const doubleCount = useReactiveValue(doubleComputed);
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h3>Счетчик: {count}</h3>
+      <p>Удвоенное значение: {doubleCount}</p>
+
+      <button onClick={() => counterSignal.value++}>Увеличить</button>
+      <button onClick={() => counterSignal.value--}>Уменьшить</button>
+    </div>
+  );
 };
 ```
 
-## ⚠️ Важные правила
-- Никакого undefined: Всегда инициализируйте сигналы в полях класса сразу при объявлении.
-- Имена сигналов: Всегда давайте имена сигналам (this.engine.signal(0, 'my_name')) для удобной отладки в логах.
-- Untrack: Если нужно прочитать значение сигнала внутри эффекта, не создавая зависимости, используйте engine.untrack(() => signal.value).
+---
 
-## Вариант (один из примеров) стандарта структуры папок
-```
-src/
-├── utils/
-│   └── engine.ts                 # Экземпляр движка
-│
-├── services/                     # Бизнес-логика (Store)
-│   ├── index.ts                  # Экспорт всех инъекций (?)
-│   ├── User/
-│   │   ├── UserService.ts        # Логика пользователя
-│   │   └── types.ts              # DTO и интерфейсы данных
-│   └── Counter/
-│       └── CounterService.ts
-│
-├── components/                   # UI-слой (React)
-│   ├── Shared/                   # Общие компоненты
-│   └── Features/                 # Компоненты с логикой
-│       └── UserProfile/
-│           ├── UserProfile.tsx   # Использует engine.use(store.user)
-│           └── styles.module.css
-│
-├── hooks/                        # Глобальные React-хуки
-│   └── useStore.ts               # Хелперы типа useUserStore()
-│
-└── main.tsx                      # Точка входа (настройка engine.setReactAdapters)
-```
+## 🔥 Продвинутые примеры
 
-### Ключевые файлы для организации:
-1. src/services/index.ts (Конфигурация)
-Здесь создается единственный экземпляр и происходит его настройка.
+### 1. Асинхронные ресурсы с зависимостями от нескольких сигналов
+
+Если ваш сетевой запрос зависит от фильтров, пагинации или ID пользователя, объедините их в `computed`, чтобы `resource` автоматически перезапускал fetch-логику и отменял прошлые запросы.
+
 ```ts
-import { useState, useEffect } from 'react';
-import { ReactiveEngine } from '@pravosleva/reactive-engine';
+// apiStore.ts
+import { engine } from './store';
 
-export const engine = new ReactiveEngine();
-engine.setReactAdapters(useState, useEffect);
+export const userIdSignal = engine.signal(1, 'userId');
+export const tabSignal = engine.signal<'posts' | 'todos'>('posts', 'tab');
 
-// Включаем логгер в dev-режиме
-if (import.meta.env.DEV) {
-  engine.onSignalChange = (name, next, prev) => console.log(`[${name}]`, { prev, next });
-}
+// Объединяем сигналы в единый вычисляемый массив зависимостей
+const requestDeps = engine.computed(() => {
+  return [userIdSignal.value, tabSignal.value] as const;
+});
+
+// Создаем реактивный асинхронный ресурс
+export const userDataResource = engine.resource(
+  async ([userId, tab], abortSignal) => {
+    const res = await fetch(`https://typicode.com{userId}/${tab}`, {
+      signal: abortSignal, // Передаем нативный токен отмены
+    });
+    if (!res.ok) throw new Error('Ошибка при загрузке данных');
+    return res.json();
+  },
+  requestDeps, // Передаем зависимости
+  'userData'
+);
 ```
 
-### 2. src/hooks/useStore.ts (Удобство)
-Чтобы не импортировать engine и Class каждый раз:
-```ts
-import { engine } from '~/utils/engine';
-import { UserService } from '~/services/User/UserService';
+В компоненте это выглядит максимально декларативно:
 
-export const useUserStore = () => engine.inject(UserService);
-```
-
-#### Простейший пример
-Этот файл становится единственной точкой инициализации.
-
-`~/utils/engine.ts`
-```ts
-import { useState, useEffect } from 'react';
-import { ReactiveEngine } from '@pravosleva/reactive-engine';
-
-// 1. Инициализация экземпляра
-const engine = new ReactiveEngine();
-engine.setReactAdapters(useState, useEffect);
-
-export { engine }
-```
-
-`~/services/Counter/CounterService.ts`
-```ts
-import { BaseREService } from '@pravosleva/reactive-engine'
-
-// 2. Инициализация сервиса
-export class Logic extends BaseREService {
-  public counter = this.engine.signal(
-    0,
-    {
-      name: 'CounterService:signal:counter', // NOTE: Это для отладки
-      validate: (v) => typeof v === 'number' && v >= 0 || 'Должно быть положительным числом',
-    }
-  )
-
-  public counterDoubled = this.engine.computed(
-    () => this.counter.value * 2,
-    'CounterService:computed:doubled',
-  )
-
-  increment = () => this.counter.value++;
-}
-```
-
-`~/services/index.ts`
-```ts
-import { Logic as CounterService } from './Counter/CounterService';
-
-export { CounterService }
-```
-
-`~/hooks/useCounterLogic.ts`
-```ts
-import { engine } from '~/utils/engine'
-import { CounterService } from '~/services'
-
-export const useCounterLogic = () => engine.inject(CounterService)
-```
-
-`~/components/Counter`
 ```tsx
-import { engine } from '~/utils/engine'
-import { useCounterLogic } from '~/hooks'
-import { Button } from '~/components/Button'
+// UserProfile.tsx
+import React from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { userIdSignal, tabSignal, userDataResource } from './apiStore';
 
-export const Counter = () => {
-  const counterStore = useCounterLogic()
-  // -- NOTE: Кстати, engine.use возвращает стабильную ссылку
-  const counterValue = engine.use(counterStore.counter)
-  // --
-  const counterDoubled = engine.use(counterStore.counterDoubled)
+export const UserProfile = () => {
+  // Читаем объект состояния ресурса: { data, loading, error }
+  const { data, loading, error } = useReactiveValue(userDataResource);
+  const tab = useReactiveValue(tabSignal);
 
   return (
-    <div
-      style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-    >
-      <b>Counter | value: {counterValue} | doubled: {counterDoubled}</b>
-      <Button
-        size='large'
-        variant='outlined'
-        color='default'
-        onClick={counterStore.increment}
-      >
-        + INC
-      </Button>
+    <div>
+      <div>
+        <button onClick={() => { tabSignal.value = 'posts'; }}>Вкладка Посты</button>
+        <button onClick={() => { tabSignal.value = 'todos'; }}>Вкладка Задачи</button>
+        <button onClick={() => { userIdSignal.value += 1; }}>Следующий пользователь</button>
+      </div>
+
+      <hr />
+      <h4>Текущая вкладка: {tab}</h4>
+
+      {loading && <p>Загрузка данных по сети...</p>}
+      {error && <p style={{ color: 'red' }}>Произошла ошибка: {error.message}</p>}
+      {data && <pre>{JSON.stringify(data.slice(0, 3), null, 2)}</pre>}
     </div>
-  )
-}
+  );
+};
 ```
 
+### 2. Оптимизация через пакетные обновления (Batching)
+
+Если вам нужно обновить сразу несколько связанных сигналов, оберните их в метод `batch`. Вместо двух сетевых запросов и двух цепочек ререндеров выполнится ровно **один**:
+
+```ts
+import { engine, userIdSignal, tabSignal } from './apiStore';
+
+const resetUserToDefault = () => {
+  engine.batch(() => {
+    userIdSignal.value = 1;
+    tabSignal.value = 'posts';
+    // Наш ресурс userDataResource перезапустится всего 1 раз!
+  });
+};
+```
+
+### 3. Кэширование запросов с поддержкой времени жизни (TTL)
+
+Вы можете использовать утилиты-декораторы для кэширования ответов сервера, чтобы при частом переключении вкладок не спамить сеть повторными запросами.
+
+```ts
+import { engine } from './store';
+import { withCache } from './decorators/withCache'; // Ваша утилита сache
+
+const searchSignal = engine.signal('', 'search');
+
+export const cachedSearchResource = engine.resource(
+  withCache(
+    async (query, abortSignal) => {
+      const res = await fetch(`https://example.com{query}`, { signal: abortSignal });
+      return res.json();
+    },
+    { ttl: 30 * 1000 } // Кэш будет валиден 30 секунд для каждого уникального query
+  ),
+  searchSignal
+);
+```
+
+## 📂 Рекомендуемая структура папок
+
+Так как `@pravosleva/reactive-engine` позволяет объявлять состояние в чистых `.ts` файлах независимо от React, архитектура вашего приложения становится гибкой. Вот два проверенных варианта организации реактивного стейта:
+
+### Вариант 1. Традиционный (Централизованный стейт)
+Подходит для небольших и средних приложений. Все сигналы и ресурсы группируются по бизнес-логике в единой папке `store/` на верхнем уровне.
+
+```text
+src/
+├── decorators/          # Кастомные обертки (например, withCache.ts)
+├── store/               # Глобальное реактивное состояние приложения
+│   ├── index.ts         # Инициализация движка (new ReactiveEngine())
+│   ├── auth.store.ts    # Сигналы авторизации, токенов и прав
+│   └── products.store.ts# Сигналы каталога, корзины и ресурсов API
+├── components/          # Общие UI компоненты (вызывают useReactiveValue)
+└── App.tsx
+```
+
+### Вариант 2. Feature-Driven Development / FSD (Децентрализованный стейт)
+Идеально для крупных проектов и монорепозиториев. Реактивное состояние делится на слои и изолируется внутри конкретных фич (Features) или сущностей (Entities) в их собственных модулях `model`.
+
+```text
+src/
+├── app/                 # Инициализация приложения и глобальный ReactiveEngine
+│   └── store.ts         # Экспорт единого инстанса engine
+├── features/            # Интерактивные фичи приложения
+│   ├── auth-by-username/
+│   │   ├── model/       # Изолированный стейт конкретной фичи
+│   │   │   └── login.store.ts # Сигналы полей ввода, ошибок валидации
+│   │   └── ui/          # Компоненты формы авторизации
+│   └── product-catalog/
+│       ├── model/       # Ресурсы пагинации, фильтров и сортировки
+│       │   └── catalog.store.ts
+│       └── ui/          # Сетка товаров и фильтры
+```
+
+---
+
+## 🗂️ Лицензия
+
+MIT © Pravosleva
+
+# OLD Doc (WIP)
 ## PERF
 Для сравнения ReactiveEngine с Redux нужно оценивать их в двух плоскостях: алгоритмическая сложность (как работает код) и производительность в браузере (как часто обновляется UI).
 Движок ReactiveEngine по своей природе ближе к MobX или Vue, поэтому он архитектурно отличается от Redux.
@@ -472,6 +478,7 @@ NOTE: Про комнаты.
 Благодаря тому, что currentRoom — это сигнал,
 переключение комнат превращается в одну строку кода,
 а всё «тяжелое» переподключение сокета происходит под капотом в движке.
+*/
 ```
 
 `~/services/SimpleChat/index.ts`

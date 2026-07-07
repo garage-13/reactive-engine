@@ -3,142 +3,228 @@ A lightweight, type-safe reactive engine built with TypeScript, featuring Depend
 
 https://t.me/bash_exp_ru/3393
 
-## 📦 Core Components
-### 1. ReactiveEngine
-The central hub of the system. It manages state, effects, DI, and the bridge to React.
-- `signal<T>(value, options)` — Creates an atomic state unit.
-- `computed<T>(fn)` — Derives data with automatic caching.
-- `reactive<T>(obj)` — Provides deep reactivity for objects and arrays via Proxy.
-- `resource<T>(fetcher, source?)` — Handles async requests with auto-abort (Race Condition protection).
-- `inject<T>(Class)` — Retrieves or instantiates a singleton service.
-- `use(signal)` — A React hook to subscribe to reactive updates.
-- `untrack(fn)` — Executes a function without creating reactive dependencies.
+# @pravosleva/reactive-engine 🚀
 
-### 2. BaseREService
-An abstract class for encapsulating business logic.
-- **Rule:** Always initialize signals and resources directly in class fields to ensure correct DI instantiation and type inference.
+A lightweight, ultra-performant, and framework-agnostic reactive engine powered by Signals and transparent dependency tracking, tailored for React and TypeScript applications.
 
-## 🛠 Quick Start
-### Step 1: Initialization (Entry Point)
-Create and export a single instance of the engine to be used throughout your app.
+---
 
-Your instance in your local `~/utils/engine.ts`:
+## ⚡ Why is this approach performant?
+
+Unlike traditional State Management in React (via Context API or immutability-based global stores), `@pravosleva/reactive-engine` works on the principle of **fine-grained reactivity**:
+
+* **Minimal Re-renders:** Components subscribe directly to specific primitive signals (`Signal`) or derived values (`Computed`) they render on the screen, rather than the entire state object. Changing a single signal updates *only* the component that actually reads it.
+* **O(1) Computations:** `Computed` properties are lazy. They are never recalculated until their underlying dependency signals change.
+* **Automatic Batching:** The engine groups multiple signal modifications into "batches" using microtasks. Network resources or heavy effects won't re-trigger 10 times in a row when updating 10 signals within the same synchronous execution block.
+* **Smart Asynchrony:** The `resource` tool orchestrates a native `AbortController` out of the box, automatically cancelling stale pending network requests whenever dependencies change.
+
+---
+
+## 📦 Installation
+
+Install the package via your favorite package manager:
+
+```bash
+npm install @pravosleva/reactive-engine
+# or
+yarn add @pravosleva/reactive-engine
+# or
+pnpm add @pravosleva/reactive-engine
+```
+
+---
+
+## 🛠️ Basic Examples
+
+### 1. Initializing the Engine and Signals
+
+You can declare your reactive state in pure TypeScript/JavaScript files completely outside the React component tree.
+
 ```ts
-import { useState, useEffect } from 'react';
+// store.ts
 import { ReactiveEngine } from '@pravosleva/reactive-engine';
 
 export const engine = new ReactiveEngine();
-// Bridge the engine with React hooks
-engine.setReactAdapters(useState, useEffect);
+
+// Simple observable state (Signal)
+export const counterSignal = engine.signal(0, 'counter');
+
+// Derived state (Computed)
+export const doubleComputed = engine.computed(
+  () => counterSignal.value * 2,
+  'double_counter'
+);
 ```
 
-### Step 2: Define Business Logic (Service)
-Inherit from BaseREService to create a reactive store.
-`~/services/Counter/CounterService.ts`
-```ts
-import { BaseREService, Signal, Computed } from '@pravosleva/reactive-engine';
+### 2. Consuming State in React Components
 
-export class CounterService extends BaseREService {
-  // Initialize signals with runtime validation
-  public count = this.engine.signal(0, {
-    name: 'counter',
-    validate: (v) => v >= 0 || "Value cannot be negative"
-  });
+For React 18+, use the high-performance `useReactiveValue` hook (backed by `useSyncExternalStore`). For older React versions (16.8+), use the fallback `useReactiveValue0` hook.
 
-  // Derived state (auto-updates when count changes)
-  public double = this.engine.computed(() => this.count.value * 2);
-
-  increment = () => this.count.value++;
-  decrement = () => this.count.value--;
-}
-```
-
-`~/services/Counter/index.ts`
-```ts
-export * from './CounterService';
-```
-
-`~/services/index.ts`
-```ts
-export * from './Counter';
-```
-
-### Step 3: Use in React Components
-Connect your logic to the UI with minimal boilerplate.
-
-```ts
-import { engine } from '~/utils/engine';
-import { CounterService } from '~/services';
+```tsx
+// Counter.tsx
+import React from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { counterSignal, doubleComputed } from './store';
 
 export const Counter = () => {
-  // Get the service singleton via DI
-  const store = engine.inject(CounterService);
-
-  // Subscribe to reactive updates
-  const count = engine.use(store.count);
-  const double = engine.use(store.double);
+  // The hook automatically subscribes to changes and triggers a re-render
+  const count = useReactiveValue(counterSignal);
+  const doubleCount = useReactiveValue(doubleComputed);
 
   return (
-    <div>
-      <h1>Count: {count} (Double: {double})</h1>
-      <button onClick={store.increment}>+</button>
-      <button onClick={store.decrement}>-</button>
+    <div style={{ padding: 20 }}>
+      <h3>Counter: {count}</h3>
+      <p>Double Value: {doubleCount}</p>
+
+      <button onClick={() => counterSignal.value++}>Increment</button>
+      <button onClick={() => counterSignal.value--}>Decrement</button>
     </div>
   );
 };
 ```
 
-## ⚡️ Advanced Features
-Async Resources
-The resource method automatically re-fetches data whenever its source dependency changes.
+---
+
+## 🔥 Advanced Examples
+
+### 1. Async Resources Dependent on Multiple Signals
+
+If your network request depends on filters, pagination, or a user ID, combine them using a `computed` property. The `resource` utility will automatically track them, trigger fresh fetch logic, and cancel previous requests.
+
 ```ts
-this.userProfile = this.engine.resource(
-  async (id, signal) => {
-    const res = await fetch(`https://example.com/{id}`, { signal });
-    if (!res.ok) throw new Error('Not found');
+// apiStore.ts
+import { engine } from './store';
+
+export const userIdSignal = engine.signal(1, 'userId');
+export const tabSignal = engine.signal<'posts' | 'todos'>('posts', 'tab');
+
+// Combine multiple signals into a single derived dependency array
+const requestDeps = engine.computed(() => {
+  return [userIdSignal.value, tabSignal.value] as const;
+});
+
+// Create a reactive asynchronous resource
+export const userDataResource = engine.resource(
+  async ([userId, tab], abortSignal) => {
+    const res = await fetch(`https://typicode.com{userId}/${tab}`, {
+      signal: abortSignal, // Pass the native cancellation token
+    });
+    if (!res.ok) throw new Error('Failed to fetch data');
     return res.json();
   },
-  this.userId // Re-runs when this signal changes
+  requestDeps, // Pass dependencies here
+  'userData'
 );
 ```
 
-### Debugging & Logging
-Enable global logging to track every state change in your application:
-```ts
-engine.onSignalChange = (name, next, prev) => {
-  console.log(`%c[${name}]`, 'color: #2196F3; font-weight: bold;', prev, '→', next);
+Consuming this in a component remains clean and fully declarative:
+
+```tsx
+// UserProfile.tsx
+import React from 'react';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { userIdSignal, tabSignal, userDataResource } from './apiStore';
+
+export const UserProfile = () => {
+  // Read the resource state object: { data, loading, error }
+  const { data, loading, error } = useReactiveValue(userDataResource);
+  const tab = useReactiveValue(tabSignal);
+
+  return (
+    <div>
+      <div>
+        <button onClick={() => { tabSignal.value = 'posts'; }}>Posts Tab</button>
+        <button onClick={() => { tabSignal.value = 'todos'; }}>Todos Tab</button>
+        <button onClick={() => { userIdSignal.value += 1; }}>Next User</button>
+      </div>
+
+      <hr />
+      <h4>Current Tab: {tab}</h4>
+
+      {loading && <p>Fetching network data...</p>}
+      {error && <p style={{ color: 'red' }}>An error occurred: {error.message}</p>}
+      {data && <pre>{JSON.stringify(data.slice(0, 3), null, 2)}</pre>}
+    </div>
+  );
 };
 ```
 
-## ⚠️ Best Practices
-- Always Initialize in Fields: Define reactive properties as class fields. Avoid initializing them inside methods to prevent undefined errors during rendering.
-- Naming Convention: Provide clear names for signals (e.g., this.engine.signal(0, 'my_signal_name')) for better debugging logs.
-- Batching: Use engine.batch(() => { ... }) when updating multiple signals to prevent unnecessary re-renders.
-- Untrack: Use engine.untrack(() => signal.value) inside effects if you need to read a value without subscribing to it.
+### 2. Optimizing State Updates with Batching
 
-## Possible project structure (for example)
+When you need to update multiple related signals at once, wrap them in the `batch` method. Instead of causing two independent network calls and two sequential component re-renders, it executes exactly **one**:
+
+```ts
+import { engine, userIdSignal, tabSignal } from './apiStore';
+
+const resetUserToDefault = () => {
+  engine.batch(() => {
+    userIdSignal.value = 1;
+    tabSignal.value = 'posts';
+    // Our userDataResource triggers only once!
+  });
+};
 ```
+
+### 3. Caching Requests with Time-To-Live (TTL)
+
+You can apply higher-order utility decorators to cache server responses, preventing unnecessary network spam when users toggle frequently between identical tabs or filters.
+
+```ts
+import { engine } from './store';
+import { withCache } from './decorators/withCache'; // Your cache utility decorator
+
+const searchSignal = engine.signal('', 'search');
+
+export const cachedSearchResource = engine.resource(
+  withCache(
+    async (query, abortSignal) => {
+      const res = await fetch(`https://example.com{query}`, { signal: abortSignal });
+      return res.json();
+    },
+    { ttl: 30 * 1000 } // Cache is valid for 30 seconds for each unique query
+  ),
+  searchSignal
+);
+```
+
+## 📂 Recommended Directory Structure
+
+Since `@pravosleva/reactive-engine` allows you to declare state in pure `.ts` files completely decoupled from React, it gives you maximum architectural flexibility. Here are two proven ways to organize your reactive state:
+
+### Option 1. Traditional (Centralized Store)
+Best suited for small-to-medium applications. All signals, computed properties, and resources are grouped by business logic in a central `store/` directory.
+
+```text
 src/
-├── utils/
-│   └── engine.ts                 # ReactiveEngine instance
-│
-├── services/                     # Business-logic (Store)
-│   ├── index.ts                  # DI exports (?)
-│   ├── User/
-│   │   ├── UserService.ts        # User logic
-│   │   └── types.ts              # DTO & data interfaces
-│   └── Counter/
-│       └── CounterService.ts
-│
-├── components/                   # UI-layer (React)
-│   ├── Shared/                   # Common components
-│   └── Features/                 # Components with logic
-│       └── UserProfile/
-│           ├── UserProfile.tsx   # Usage of engine.use(store.user)
-│           └── styles.module.css
-│
-├── hooks/                        # Global React-hooks
-│   └── useStore.ts               # Helpers like useUserStore()
-│
-└── main.tsx                      # Entry point (settings like engine.setReactAdapters)
+├── decorators/          # Custom decorators (e.g., withCache.ts)
+├── store/               # Global reactive application state
+│   ├── index.ts         # Engine initialization (new ReactiveEngine())
+│   ├── auth.store.ts    # Authentication, tokens, and permissions state
+│   └── products.store.ts# Catalog, shopping cart, and API resource states
+├── components/          # Shared UI components (consuming useReactiveValue)
+└── App.tsx
 ```
+
+### Option 2. Feature-Driven Development / FSD (Decentralized State)
+Ideal for large-scale applications and monorepos. The reactive state is sliced by domain layers and isolated within specific Features or Entities inside their own `model` modules.
+
+```text
+src/
+├── app/                 # Application initialization & global ReactiveEngine
+│   └── store.ts         # Exports the single shared engine instance
+├── features/            # Interactive user features
+│   ├── auth-by-username/
+│   │   ├── model/       # Isolated feature-specific state
+│   │   │   └── login.store.ts # Input signals, validation errors
+│   │   └── ui/          # Auth form components
+│   └── product-catalog/
+│       ├── model/       # Pagination, filtering, and sorting resources
+│       │   └── catalog.store.ts
+│       └── ui/          # Product grid and filters
+```
+
+---
+
+## 🗂️ License
+
+MIT © Pravosleva
