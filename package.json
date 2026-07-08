@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "0.3.4-beta",
+  "version": "0.3.5-beta",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -45,8 +45,8 @@
     "postversion": "git push && git push --tags"
   },
   "peerDependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react": "^18.0.0 || ^19.2.0",
+    "react-dom": "^18.0.0 || ^19.2.0"
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.58.9",

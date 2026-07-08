@@ -6,7 +6,6 @@ import path from "path";
 export default defineConfig({
   base: "./",
   plugins: [
-    // rollupTypes: true сохраняем — он собирает все типы в один красивый файл index.d.ts
     dts({ bundleTypes: true, insertTypesEntry: true }),
     react()
   ],
@@ -15,10 +14,10 @@ export default defineConfig({
   },
   build: {
     emptyOutDir: true,
-    sourcemap: true, // Карты кода для удобной отладки пользователями
+    sourcemap: true,
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
-      name: "ReactiveEngineLib", // Имя глобальной переменной для IIFE (window.ReactiveEngineLib)
+      name: "ReactiveEngineLib",
       formats: ["es", "cjs", "iife"],
       fileName: (format: string) =>
         `index.${format === "es" ? "mjs" : format === "cjs" ? "cjs" : "iife.js"}`,
@@ -27,11 +26,16 @@ export default defineConfig({
       // Исключаем react из финального бандла, чтобы не дублировать код
       external: ["react", "react-dom"],
       output: {
+        // Принудительно генерируем чистый ESM/CJS без лишних оберток
+        interop: "auto",
+        // Обеспечивает корректную работу дефолтных экспортов в гибридных бандлах
+        exports: "named",
         globals: {
           react: "React",
           "react-dom": "ReactDOM",
         },
-      },
+      } as any, // Приведение к any убирает ошибку overload на объединении типов
     },
+
   },
 } satisfies UserConfig);
