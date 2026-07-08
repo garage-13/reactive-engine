@@ -1,8 +1,8 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "0.3.3-beta",
+  "version": "0.3.4-beta",
   "engines": {
-    "node": "22.20.0"
+    "node": ">=22.20.0"
   },
   "description": "JS Reactive Engine",
   "author": "Den Pol <selection4test@gmail.com> (https://pravosleva.pro)",
