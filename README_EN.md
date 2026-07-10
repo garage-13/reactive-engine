@@ -142,7 +142,7 @@ For React 18+, use the high-performance `useReactiveValue` hook (backed by `useS
 // Counter.tsx
 import React from 'react'
 import { useReactiveValue } from '@pravosleva/reactive-engine'
-import { counterSignal, doubleComputed } from './store'
+import { counterSignal, doubleComputed } from '~/store'
 
 export const Counter = () => {
   // The hook automatically subscribes to changes and triggers a re-render
@@ -171,7 +171,7 @@ If your network request depends on filters, pagination, or a user ID, combine th
 
 ```ts
 // apiStore.ts
-import { engine } from './store'
+import { engine } from '~/store'
 
 export const userIdSignal = engine.signal(1, 'userId')
 export const tabSignal = engine.signal<'posts' | 'todos'>('posts', 'tab')
@@ -281,7 +281,7 @@ export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated')
 // AdvancedBatchDemo.tsx
 import React, { useRef } from 'react'
 import { useReactiveValue } from '@pravosleva/reactive-engine'
-import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from './store'
+import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from '~/store'
 
 export const AdvancedBatchDemo = () => {
   const isProcessing = useReactiveValue(isProcessingSignal)
@@ -365,7 +365,7 @@ export const filteredProductsComputed = engine.computed(
 // CatalogDemo.tsx
 import React, { useRef } from 'react'
 import { useReactiveValue } from '@pravosleva/reactive-engine'
-import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from './store'
+import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from '~/store'
 
 export const CatalogDemo = () => {
   const products = useReactiveValue(filteredProductsComputed);
@@ -400,7 +400,7 @@ export const CatalogDemo = () => {
 You can apply higher-order utility decorators to cache server responses, preventing unnecessary network spam when users toggle frequently between identical tabs or filters.
 
 ```ts
-import { engine } from './store'
+import { engine } from '~/store'
 import { withCache } from './decorators/withCache' // Your cache utility decorator
 
 const searchSignal = engine.signal('', 'search');
@@ -463,7 +463,7 @@ The component below will not trigger any React re-renders when clicked, yet the 
 ```tsx
 import React from 'react'
 import { useReactiveSubscription } from '@pravosleva/reactive-engine'
-import { counterSignal } from './store'
+import { counterSignal } from '~/store'
 
 export const LoggerButton = () => {
   // Decoupled from the React render loop. It just runs the callback when the signal updates.
@@ -491,7 +491,7 @@ export const isMutedSignal = engine.signal(false, 'isMuted')
 // AudioPlayer.tsx
 import React, { useRef } from 'react'
 import { useReactiveSubscription } from '@pravosleva/reactive-engine'
-import { isMutedSignal } from './store'
+import { isMutedSignal } from '~/store'
 
 export const AudioPlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -525,7 +525,7 @@ Under the hood, the engine leverages modern JavaScript **`FinalizationRegistry`*
 ```tsx
 import React, { useMemo } from 'react'
 import { useReactiveValue } from '@pravosleva/reactive-engine'
-import { engine, globalProductsSignal } from './store'
+import { engine, globalProductsSignal } from '~/store'
 
 export const FilteredCatalog = ({ category }: { category: string }) => {
   // Completely safe to consume inside standard useMemo.
@@ -553,7 +553,7 @@ If your component renders multiple signals or you prefer to eliminate hook boile
 ```tsx
 import React from 'react'
 import { observer } from '@pravosleva/reactive-engine'
-import { counterSignal, userSignal } from './store'
+import { counterSignal, userSignal } from '~/store'
 
 // Wrap your component with observer.
 // Now you can read `.value` directly inside your JSX—no hooks required!
@@ -576,7 +576,7 @@ export const ProfileDashboard = observer(() => {
 ```tsx
 import React, { useRef } from 'react'
 import { createObserverComponent } from '@pravosleva/reactive-engine'
-import { engine } from './store'
+import { engine } from '~/store'
 
 // Instantiate the inline observer container component
 const Observer = createObserverComponent(engine)

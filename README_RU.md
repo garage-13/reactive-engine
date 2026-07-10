@@ -141,7 +141,7 @@ export const doubleComputed = engine.computed(
 // Counter.tsx
 import React from 'react';
 import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { counterSignal, doubleComputed } from './store';
+import { counterSignal, doubleComputed } from '~/store';
 
 export const Counter = () => {
   // Хук автоматически подпишется на изменения и вызовет ререндер
@@ -170,7 +170,7 @@ export const Counter = () => {
 
 ```ts
 // apiStore.ts
-import { engine } from './store';
+import { engine } from '~/store';
 
 export const userIdSignal = engine.signal(1, 'userId');
 export const tabSignal = engine.signal<'posts' | 'todos'>('posts', 'tab');
@@ -282,7 +282,7 @@ export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated')
 // AdvancedBatchDemo.tsx
 import React, { useRef } from 'react'
 import { useReactiveValue } from '@pravosleva/reactive-engine'
-import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from './store'
+import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from '~/store'
 
 export const AdvancedBatchDemo = () => {
   const isProcessing = useReactiveValue(isProcessingSignal)
@@ -367,7 +367,7 @@ export const filteredProductsComputed = engine.computed(
 // CatalogDemo.tsx
 import React, { useRef } from 'react'
 import { useReactiveValue } from '@pravosleva/reactive-engine'
-import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from './store'
+import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from '~/store'
 
 export const CatalogDemo = () => {
   const products = useReactiveValue(filteredProductsComputed)
@@ -402,7 +402,7 @@ export const CatalogDemo = () => {
 Вы можете использовать утилиты-декораторы для кэширования ответов сервера, чтобы при частом переключении вкладок не спамить сеть повторными запросами.
 
 ```ts
-import { engine } from './store'
+import { engine } from '~/store'
 import { withCache } from './decorators/withCache' // Ваша утилита сache
 
 const searchSignal = engine.signal('', 'search')
@@ -465,7 +465,7 @@ src/
 ```tsx
 import React from 'react'
 import { useReactiveSubscription } from '@pravosleva/reactive-engine'
-import { counterSignal } from './store'
+import { counterSignal } from '~/store'
 
 export const LoggerButton = () => {
   // Хук изолирован от рендеров. Он просто выполнит коллбек при изменении сигнала
@@ -493,7 +493,7 @@ export const isMutedSignal = engine.signal(false, 'isMuted')
 // AudioPlayer.tsx
 import React, { useRef } from 'react'
 import { useReactiveSubscription } from '@pravosleva/reactive-engine'
-import { isMutedSignal } from './store'
+import { isMutedSignal } from '~/store'
 
 export const AudioPlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -525,14 +525,13 @@ export const AudioPlayer = () => {
 Движок под капотом использует современное JavaScript API — `FinalizationRegistry`. Как только React удаляет компонент или меняет зависимости в `useMemo`, старая ссылка на вычисление уничтожается, а ядро автоматически удаляет брошенные реактивные эффекты и очищает внутренний кэш.
 
 #### Пример: Безопасное инлайн-вычисление без утечек памяти
-
 ```tsx
 import React, { useMemo } from 'react'
 import { useReactiveValue } from '@pravosleva/reactive-engine'
-import { engine, globalProductsSignal } from './store'
+import { engine, globalProductsSignal } from '~/store'
 
 export const FilteredCatalog = ({ category }: { category: string }) => {
-  // Вы можете безбоязненно использовать стандартныйuseMemo.
+  // Вы можете безбоязненно использовать стандартный useMemo.
   // При смене категории старая ссылка сотрется, а движок сам зачистит allEffects ядра!
   const dynamicComputed = useMemo(() => {
     return engine.computed(() =>
@@ -557,7 +556,7 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 ```tsx
 import React from 'react'
 import { observer } from '@pravosleva/reactive-engine'
-import { counterSignal, userSignal } from './store'
+import { counterSignal, userSignal } from '~/store'
 
 // Оборачиваем компонент в observer.
 // Теперь можно просто читать `.value` прямо в JSX — никаких хуков не требуется!
@@ -580,7 +579,7 @@ export const ProfileDashboard = observer(() => {
 ```tsx
 import React, { useRef } from 'react'
 import { createObserverComponent } from '@pravosleva/reactive-engine'
-import { engine } from './store'
+import { engine } from '~/store'
 
 // Инициализируем компонент-контейнер из нашей фабрики
 const Observer = createObserverComponent(engine)
