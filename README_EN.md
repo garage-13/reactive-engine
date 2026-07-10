@@ -605,8 +605,6 @@ export const MassiveDashboard = () => {
         <p>...10 heavy charting libraries and analytical tables render here...</p>
       </div>
 
-      <hr />
-
       {/*
         FINE-GRAINED INLINE REACTIVITY:
         We isolate the signal consumer within the <Observer> container.
@@ -656,7 +654,6 @@ The `withCache` utility decorator serializes the `source` arguments using `JSON.
 ### 💡 How to enforce it so that you CANNOT FORGET to call `inject`? (Ideal DX)
 
 To save developers from the friction of manually writing two lines of boilerplate (`inject` + `useReactiveValue`) inside every single component, it is highly recommended to design custom hooks on top of your services. You can encapsulate this repetitive routine into a single concise hook right inside the service or store file. This makes forgetting `inject` physically impossible:
-
 ```ts
 // Inside your feature or store file (e.g., auth.store.ts):
 export const useAuthUsername = () => {
@@ -670,7 +667,6 @@ export const useAuthUsername = () => {
 ```
 
 Consuming this inside a component shrinks down to a single perfect line:
-
 ```tsx
 export const UserHeader = () => {
   const name = useAuthUsername() // Clean, declarative, and entirely bulletproof!
