@@ -28,7 +28,7 @@ Instead of tight coupling via hardcoded file `import` statements, services decla
 ```ts
 // 1. Declare an authentication service with a reactive signal
 export class AuthService {
-  public isAuthorized = this.engine.signal(false);
+  public isAuthorized = this.engine.signal(false)
   constructor(private engine: ReactiveEngine) {}
 }
 
@@ -56,17 +56,17 @@ export class CartService {
 You can register dependencies as plain values, classes, or custom factory functions. The core container caches resolved instances automatically upon the very first resolution invocation.
 
 ```ts
-import { ReactiveEngine } from '@pravosleva/reactive-engine';
-import { AuthService, CartService } from './services';
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { AuthService, CartService } from './services'
 
-const engine = new ReactiveEngine();
+const engine = new ReactiveEngine()
 
 // Register factories (they will be evaluated lazily on demand)
-engine.provide(AuthService, (eng) => new AuthService(eng));
-engine.provide(CartService, (eng) => new CartService(eng));
+engine.provide(AuthService, (eng) => new AuthService(eng))
+engine.provide(CartService, (eng) => new CartService(eng))
 
 // Anywhere in your application or React hook:
-const cartService = engine.inject(CartService);
+const cartService = engine.inject(CartService)
 // The engine recognizes that CartService requires AuthService,
 // instantiates AuthService, provisions CartService, hooks them together, and returns the singleton.
 ```
@@ -120,18 +120,18 @@ You can declare your reactive state in pure TypeScript/JavaScript files complete
 
 ```ts
 // store.ts
-import { ReactiveEngine } from '@pravosleva/reactive-engine';
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
 
-export const engine = new ReactiveEngine();
+export const engine = new ReactiveEngine()
 
 // Simple observable state (Signal)
-export const counterSignal = engine.signal(0, 'counter');
+export const counterSignal = engine.signal(0, 'counter')
 
 // Derived state (Computed)
 export const doubleComputed = engine.computed(
   () => counterSignal.value * 2,
   'double_counter'
-);
+)
 ```
 
 ### 2. Consuming State in React Components
@@ -140,14 +140,14 @@ For React 18+, use the high-performance `useReactiveValue` hook (backed by `useS
 
 ```tsx
 // Counter.tsx
-import React from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { counterSignal, doubleComputed } from './store';
+import React from 'react'
+import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { counterSignal, doubleComputed } from './store'
 
 export const Counter = () => {
   // The hook automatically subscribes to changes and triggers a re-render
-  const count = useReactiveValue(counterSignal);
-  const doubleCount = useReactiveValue(doubleComputed);
+  const count = useReactiveValue(counterSignal)
+  const doubleCount = useReactiveValue(doubleComputed)
 
   return (
     <div style={{ padding: 20 }}>
@@ -157,8 +157,8 @@ export const Counter = () => {
       <button onClick={() => counterSignal.value++}>Increment</button>
       <button onClick={() => counterSignal.value--}>Decrement</button>
     </div>
-  );
-};
+  )
+}
 ```
 
 ---
@@ -171,14 +171,14 @@ If your network request depends on filters, pagination, or a user ID, combine th
 
 ```ts
 // apiStore.ts
-import { engine } from './store';
+import { engine } from './store'
 
-export const userIdSignal = engine.signal(1, 'userId');
-export const tabSignal = engine.signal<'posts' | 'todos'>('posts', 'tab');
+export const userIdSignal = engine.signal(1, 'userId')
+export const tabSignal = engine.signal<'posts' | 'todos'>('posts', 'tab')
 
 // Combine multiple signals into a single derived dependency array
 const requestDeps = engine.computed(() => {
-  return [userIdSignal.value, tabSignal.value] as const;
+  return [userIdSignal.value, tabSignal.value] as const
 });
 
 // Create a reactive asynchronous resource
@@ -186,45 +186,42 @@ export const userDataResource = engine.resource(
   async ([userId, tab], abortSignal) => {
     const res = await fetch(`https://typicode.com{userId}/${tab}`, {
       signal: abortSignal, // Pass the native cancellation token
-    });
-    if (!res.ok) throw new Error('Failed to fetch data');
-    return res.json();
+    })
+    if (!res.ok) throw new Error('Failed to fetch data')
+    return res.json()
   },
   requestDeps, // Pass dependencies here
   'userData'
-);
+)
 ```
 
 Consuming this in a component remains clean and fully declarative:
 
 ```tsx
 // UserProfile.tsx
-import React from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { userIdSignal, tabSignal, userDataResource } from './apiStore';
+import React from 'react'
+import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { userIdSignal, tabSignal, userDataResource } from './apiStore'
 
 export const UserProfile = () => {
   // Read the resource state object: { data, loading, error }
-  const { data, loading, error } = useReactiveValue(userDataResource);
-  const tab = useReactiveValue(tabSignal);
+  const { data, loading, error } = useReactiveValue(userDataResource)
+  const tab = useReactiveValue(tabSignal)
 
   return (
-    <div>
-      <div>
-        <button onClick={() => { tabSignal.value = 'posts'; }}>Posts Tab</button>
-        <button onClick={() => { tabSignal.value = 'todos'; }}>Todos Tab</button>
-        <button onClick={() => { userIdSignal.value += 1; }}>Next User</button>
-      </div>
+    <div style={{ display: 'flex', flexDirecyion: 'column', gap: '8px' }}>
+      <button onClick={() => { tabSignal.value = 'posts'; }}>Posts Tab</button>
+      <button onClick={() => { tabSignal.value = 'todos'; }}>Todos Tab</button>
+      <button onClick={() => { userIdSignal.value += 1; }}>Next User</button>
 
-      <hr />
       <h4>Current Tab: {tab}</h4>
 
       {loading && <p>Fetching network data...</p>}
       {error && <p style={{ color: 'red' }}>An error occurred: {error.message}</p>}
       {data && <pre>{JSON.stringify(data.slice(0, 3), null, 2)}</pre>}
     </div>
-  );
-};
+  )
+}
 ```
 
 ### 2. Optimizing State Updates with Batching: Automatic Batching (100% Out-of-the-Box Batching)
@@ -234,38 +231,40 @@ export const UserProfile = () => {
 In the example below, clicking the button mutates three independent signals consecutively. Thanks to automatic batching, the component will re-render exactly once.
 
 ```tsx
-import React, { useRef } from 'react';
-import { useReactiveValue, engine } from '@pravosleva/reactive-engine';
+import React, { useRef } from 'react'
+import { useReactiveValue, ReactiveEngine } from '@pravosleva/reactive-engine'
+
+const engine = new ReactiveEngine()
 
 // Define three distinct signals
-const firstNameSignal = engine.signal('John');
-const lastNameSignal = engine.signal('Doe');
-const ageSignal = engine.signal(25);
+const firstNameSignal = engine.signal('John')
+const lastNameSignal = engine.signal('Doe')
+const ageSignal = engine.signal(25)
 
 export const SimpleBatchDemo = () => {
-  const firstName = useReactiveValue(firstNameSignal);
-  const lastName = useReactiveValue(lastNameSignal);
-  const age = useReactiveValue(ageSignal);
+  const firstName = useReactiveValue(firstNameSignal)
+  const lastName = useReactiveValue(lastNameSignal)
+  const age = useReactiveValue(ageSignal)
 
-  const renderCountRef = useRef(0);
+  const renderCountRef = useRef(0)
   renderCountRef.current++;
 
   const handleUpdate = () => {
     // These three synchronous mutations will trigger exactly ONE re-render!
-    firstNameSignal.value = 'Peter';
-    lastNameSignal.value = 'Smith';
-    ageSignal.value = 30;
+    firstNameSignal.value = 'Peter'
+    lastNameSignal.value = 'Smith'
+    ageSignal.value = 30
   };
 
   return (
-    <div style={{ padding: '15px', border: '1px solid #ccc' }}>
+    <div style={{ display: 'flex', flexDirecyion: 'column', gap: '8px' }}>
       <h4>Simple Batching (Profiler)</h4>
       <p>User: {firstName} {lastName}, Age: {age}</p>
       <p style={{ color: 'blue' }}>Component Render Count: {renderCountRef.current}</p>
       <button onClick={handleUpdate}>Update Profile Synchronously</button>
     </div>
-  );
-};
+  )
+}
 ```
 
 #### Advanced Case: Batching in Asynchronous Flows (Race Condition & API)
@@ -273,46 +272,46 @@ Automatic batching works seamlessly even inside asynchronous functions, `setTime
 
 ```ts
 // store.ts
-export const isProcessingSignal = engine.signal(false, 'isProcessing');
-export const apiDataSignal = engine.signal<string | null>(null, 'apiData');
-export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated');
+export const isProcessingSignal = engine.signal(false, 'isProcessing')
+export const apiDataSignal = engine.signal<string | null>(null, 'apiData')
+export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated')
 ```
 
 ```tsx
 // AdvancedBatchDemo.tsx
-import React, { useRef } from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from './store';
+import React, { useRef } from 'react'
+import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from './store'
 
 export const AdvancedBatchDemo = () => {
-  const isProcessing = useReactiveValue(isProcessingSignal);
-  const apiData = useReactiveValue(apiDataSignal);
-  const lastUpdated = useReactiveValue(lastUpdatedSignal);
+  const isProcessing = useReactiveValue(isProcessingSignal)
+  const apiData = useReactiveValue(apiDataSignal)
+  const lastUpdated = useReactiveValue(lastUpdatedSignal)
 
-  const renderCountRef = useRef(0);
-  renderCountRef.current++;
+  const renderCountRef = useRef(0)
+  renderCountRef.current++
 
   const handleFetchData = async () => {
     isProcessingSignal.value = true; // Mutation 1 (Synchronous re-render to display the loader)
 
     try {
       // Simulate an asynchronous API request
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const fakeResponse = "Successful server response #42";
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const fakeResponse = "Successful server response #42"
 
       // ASYNCHRONOUS AUTO-BATCHING:
       // These three mutations occur within the same microtask right after the await keyword.
       // The engine batches them together, resulting in exactly 1 final UI re-render!
-      apiDataSignal.value = fakeResponse;
-      lastUpdatedSignal.value = new Date().toLocaleTimeString();
-      isProcessingSignal.value = false;
+      apiDataSignal.value = fakeResponse
+      lastUpdatedSignal.value = new Date().toLocaleTimeString()
+      isProcessingSignal.value = false
     } catch (error) {
-      isProcessingSignal.value = false;
+      isProcessingSignal.value = false
     }
   };
 
   return (
-    <div style={{ padding: '15px', border: '1px solid #999', marginTop: '15px' }}>
+    <div style={{ display: 'flex', flexDirecyion: 'column', gap: '8px' }}>
       <h4>Advanced Asynchronous Batching</h4>
       <p>Status: {isProcessing ? '⏳ Loading...' : '✅ Ready'}</p>
       <p>Data: {apiData || 'No data available'}</p>
@@ -322,8 +321,8 @@ export const AdvancedBatchDemo = () => {
         Fetch Data via Network
       </button>
     </div>
-  );
-};
+  )
+}
 ```
 
 #### Advanced Case: Resetting Multi-Filter State (Heavy Computed Analytics)
@@ -333,34 +332,40 @@ This example demonstrates a common frontend task: a `Computed` property executin
 // store.ts
 export interface Product { id: number; title: string; category: string; price: number; }
 
-export const searchSignal = engine.signal('', 'search');
-export const categorySignal = engine.signal('all', 'category');
-export const maxPriceSignal = engine.signal(10000, 'maxPrice');
-export const sortBySignal = engine.signal<'price' | 'name'>('name', 'sortBy');
-export const rawProductsSignal = engine.signal<Product[]>([], 'rawProducts');
+export const searchSignal = engine.signal('', 'search')
+export const categorySignal = engine.signal('all', 'category')
+export const maxPriceSignal = engine.signal(10000, 'maxPrice')
+export const sortBySignal = engine.signal<'price' | 'name'>('name', 'sortBy')
+export const rawProductsSignal = engine.signal<Product[]>([], 'rawProducts')
 
 // Expensive computation dependent on 5 signals simultaneously
-export const filteredProductsComputed = engine.computed(() => {
-  console.log('🔮 Executing heavy filtering over 10,000 items...');
-  let result = [...rawProductsSignal.value];
+export const filteredProductsComputed = engine.computed(
+  () => {
+    console.log('🔮 Executing heavy filtering over 10,000 items...')
+    let result = [...rawProductsSignal.value]
 
-  if (searchSignal.value) {
-    result = result.filter(p => p.title.toLowerCase().includes(searchSignal.value.toLowerCase()));
-  }
-  if (categorySignal.value !== 'all') {
-    result = result.filter(p => p.category === categorySignal.value);
-  }
-  result = result.filter(p => p.price <= maxPriceSignal.value);
+    if (searchSignal.value) {
+      result = result.filter(p => p.title.toLowerCase().includes(searchSignal.value.toLowerCase()))
+    }
+    if (categorySignal.value !== 'all') {
+      result = result.filter(p => p.category === categorySignal.value)
+    }
+    result = result.filter(p => p.price <= maxPriceSignal.value)
 
-  return result.sort((a, b) => sortBySignal.value === 'price' ? a.price - b.price : a.title.localeCompare(b.title));
-}, 'filteredProducts');
+    return result
+      .sort((a, b) => sortBySignal.value === 'price'
+        ? a.price - b.price
+        : a.title.localeCompare(b.title))
+  },
+  'filteredProducts'
+)
 ```
 
 ```tsx
 // CatalogDemo.tsx
-import React, { useRef } from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from './store';
+import React, { useRef } from 'react'
+import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from './store'
 
 export const CatalogDemo = () => {
   const products = useReactiveValue(filteredProductsComputed);
@@ -373,21 +378,21 @@ export const CatalogDemo = () => {
     // Without auto-batching, the heavy filter logic would execute 4 separate times,
     // and the component would re-render at every incomplete intermediate step.
     // With auto-batching: exactly 1 computation and 1 React re-render will occur!
-    searchSignal.value = '';
-    categorySignal.value = 'all';
-    maxPriceSignal.value = 10000;
-    sortBySignal.value = 'name';
+    searchSignal.value = ''
+    categorySignal.value = 'all'
+    maxPriceSignal.value = 10000
+    sortBySignal.value = 'name'
   };
 
   return (
-    <div style={{ padding: '15px', border: '1px solid #777' }}>
+    <div style={{ display: 'flex', flexDirecyion: 'column', gap: '8px' }}>
       <h4>Catalog Filtering (Heavy Analytics)</h4>
       <p>Products found: <b>{products.length}</b></p>
       <p style={{ color: 'green' }}>Component Renders: {renderCountRef.current}</p>
       <button onClick={handleResetAllFilters}>Reset All Filters</button>
     </div>
-  );
-};
+  )
+}
 ```
 
 ### 3. Caching Requests with Time-To-Live (TTL)
@@ -395,21 +400,21 @@ export const CatalogDemo = () => {
 You can apply higher-order utility decorators to cache server responses, preventing unnecessary network spam when users toggle frequently between identical tabs or filters.
 
 ```ts
-import { engine } from './store';
-import { withCache } from './decorators/withCache'; // Your cache utility decorator
+import { engine } from './store'
+import { withCache } from './decorators/withCache' // Your cache utility decorator
 
 const searchSignal = engine.signal('', 'search');
 
 export const cachedSearchResource = engine.resource(
   withCache(
     async (query, abortSignal) => {
-      const res = await fetch(`https://example.com{query}`, { signal: abortSignal });
-      return res.json();
+      const res = await fetch(`https://example.com{query}`, { signal: abortSignal })
+      return res.json()
     },
     { ttl: 30 * 1000 } // Cache is valid for 30 seconds for each unique query
   ),
   searchSignal
-);
+)
 ```
 
 ## 📂 Recommended Directory Structure
@@ -456,22 +461,22 @@ Sometimes you need to simply **react** to a signal change (e.g., trigger an anim
 The component below will not trigger any React re-renders when clicked, yet the subscription callback runs perfectly on every signal update.
 
 ```tsx
-import React from 'react';
-import { useReactiveSubscription } from '@pravosleva/reactive-engine';
-import { counterSignal } from './store';
+import React from 'react'
+import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+import { counterSignal } from './store'
 
 export const LoggerButton = () => {
   // Decoupled from the React render loop. It just runs the callback when the signal updates.
   useReactiveSubscription(counterSignal, (newValue) => {
-    console.log(`[Feedback] Counter mutated to: ${newValue}`);
+    console.log(`[Feedback] Counter mutated to: ${newValue}`)
   });
 
   return (
     <button onClick={() => counterSignal.value++}>
       Click Me (No re-renders, but check your console!)
     </button>
-  );
-};
+  )
+}
 ```
 
 #### Advanced Example: Synchronizing with Imperative Browser APIs
@@ -479,14 +484,14 @@ This hook is perfect for gluing your reactive state to third-party libraries, HT
 
 ```ts
 // store.ts
-export const isMutedSignal = engine.signal(false, 'isMuted');
+export const isMutedSignal = engine.signal(false, 'isMuted')
 ```
 
 ```tsx
 // AudioPlayer.tsx
-import React, { useRef } from 'react';
-import { useReactiveSubscription } from '@pravosleva/reactive-engine';
-import { isMutedSignal } from './store';
+import React, { useRef } from 'react'
+import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+import { isMutedSignal } from './store'
 
 export const AudioPlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -499,14 +504,14 @@ export const AudioPlayer = () => {
   });
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirecyion: 'column', gap: '8px' }}>
       <video ref={videoRef} src="video.mp4" controls />
       <button onClick={() => { isMutedSignal.value = !isMutedSignal.value; }}>
         Toggle Mute State
       </button>
     </div>
-  );
-};
+  )
+}
 ```
 
 ### 6. Smart Automated Memory Cleanup (Zero-Config Garbage Collection)
@@ -518,9 +523,9 @@ Under the hood, the engine leverages modern JavaScript **`FinalizationRegistry`*
 #### Example: Bulletproof Inline Computations Without Leaks
 
 ```tsx
-import React, { useMemo } from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { engine, globalProductsSignal } from './store';
+import React, { useMemo } from 'react'
+import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { engine, globalProductsSignal } from './store'
 
 export const FilteredCatalog = ({ category }: { category: string }) => {
   // Completely safe to consume inside standard useMemo.
@@ -528,7 +533,7 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
   const dynamicComputed = useMemo(() => {
     return engine.computed(() =>
       globalProductsSignal.value.filter(p => p.category === category)
-    );
+    )
   }, [category]);
 
   const filteredList = useReactiveValue(dynamicComputed);
@@ -537,8 +542,8 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
     <ul>
       {filteredList.map(p => <li key={p.id}>{p.name}</li>)}
     </ul>
-  );
-};
+  )
+}
 ```
 
 ### Transparent Reactivity via `observer` (MobX Style)
@@ -546,15 +551,15 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 If your component renders multiple signals or you prefer to eliminate hook boilerplate from your function bodies, leverage the `observer` High-Order Component (HOC). It automatically tracks which signals or derived computed properties are accessed during the JSX rendering cycle and micro-subscribes the component to those specific state updates.
 
 ```tsx
-import React from 'react';
-import { observer } from '@pravosleva/reactive-engine';
-import { counterSignal, userSignal } from './store';
+import React from 'react'
+import { observer } from '@pravosleva/reactive-engine'
+import { counterSignal, userSignal } from './store'
 
 // Wrap your component with observer.
 // Now you can read `.value` directly inside your JSX—no hooks required!
 export const ProfileDashboard = observer(() => {
   return (
-    <div style={{ padding: 20, border: '1px solid #aaa' }}>
+    <div style={{ display: 'flex', flexDirecyion: 'column', gap: '8px' }}>
       <h3>User: {userSignal.value.name}</h3>
       <p>Counter Value: {counterSignal.value}</p>
 
@@ -563,25 +568,28 @@ export const ProfileDashboard = observer(() => {
         Change Name
       </button>
     </div>
-  );
-});
+  )
+})
 ```
 
 ### Another way for render optimization
 ```tsx
-import React, { useRef } from 'react';
-import { createObserverComponent, engine } from '@pravosleva/reactive-engine';
+import React, { useRef } from 'react'
+import { createObserverComponent } from '@pravosleva/reactive-engine'
+import { engine } from './store'
+
+const
 
 // Instantiate the inline observer container component
-const Observer = createObserverComponent(engine);
+const Observer = createObserverComponent(engine)
 
 // A rapidly changing signal (e.g., streaming over WebSockets)
-const livePriceSignal = engine.signal(100);
+const livePriceSignal = engine.signal(100)
 
 export const MassiveDashboard = () => {
   // Counter to track the parent component rendering cycles
-  const totalDashboardRenders = useRef(0);
-  totalDashboardRenders.current++;
+  const totalDashboardRenders = useRef(0)
+  totalDashboardRenders.current++
 
   return (
     <div style={{ padding: '20px', border: '1px solid #ccc' }}>
@@ -624,8 +632,8 @@ export const MassiveDashboard = () => {
         Simulate Price Tick (+5$)
       </button>
     </div>
-  );
-};
+  )
+}
 ```
 
 ## ⚠️ Troubleshooting & Gotchas
@@ -641,28 +649,7 @@ Objects created via `engine.reactive()` are native JavaScript Proxies. The engin
   ```
 * **What to do instead:** Access properties directly where they are evaluated (e.g., inside your JSX or effect block): `user.name`.
 
-### 2. Infinite Update Loops
-Reading and mutating the exact same signal inside an `engine.effect` or `engine.computed` simultaneously will trigger an endless update loop, causing a "Maximum call stack size exceeded" crash.
-* **Solution:** Wrap the mutational update inside the built-in `engine.untrack()` helper to isolate the dependency tracking tracker:
-  ```ts
-  engine.effect(() => {
-    const current = counterSignal.value; // Read and subscribe safely
-    engine.untrack(() => {
-      counterSignal.value = current + 1; // ✅ Safe mutation without infinite loops
-    });
-  });
-  ```
-
-### 3. Memory Leaks Outside the React Tree
-While React hooks like `useReactiveValue` clean up after themselves automatically, manually invoking `engine.effect()` inside long-lived standalone vanilla services or singletons registers a strong reference in the engine's memory.
-* **Solution:** Always capture the returned destructor and call it when the parent service gets destroyed:
-  ```ts
-  const unsubscribe = engine.effect(() => { ... });
-  // Call this when cleaning up the module:
-  unsubscribe();
-  ```
-
-### 4. Complex Objects as `withCache` Dependencies
+### 2. Complex Objects as `withCache` Dependencies
 The `withCache` utility decorator serializes the `source` arguments using `JSON.stringify()` to form unique cache keys.
 * **Limitation:** Avoid passing objects with circular references, functions, or complex class instances (like `Map`, `Set`, or `Date`) as resource dependencies. Stick to flat objects, arrays, and primitives.
 
@@ -678,19 +665,18 @@ export const useAuthUsername = () => {
   return useSyncExternalStore(
     (cb) => authService.username.subscribe(cb),
     () => authService.username.value
-  );
-};
+  )
+}
 ```
 
 Consuming this inside a component shrinks down to a single perfect line:
 
 ```tsx
 export const UserHeader = () => {
-  const name = useAuthUsername(); // Clean, declarative, and entirely bulletproof!
-  return <h1>Hello, {name}!</h1>;
-};
+  const name = useAuthUsername() // Clean, declarative, and entirely bulletproof!
+  return <h1>Hello, {name}!</h1>
+}
 ```
-
 
 ---
 

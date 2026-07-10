@@ -149,7 +149,7 @@ export const Counter = () => {
   const doubleCount = useReactiveValue(doubleComputed);
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <h3>Счетчик: {count}</h3>
       <p>Удвоенное значение: {doubleCount}</p>
 
@@ -208,12 +208,10 @@ export const UserProfile = () => {
   const tab = useReactiveValue(tabSignal);
 
   return (
-    <div>
-      <div>
-        <button onClick={() => { tabSignal.value = 'posts'; }}>Вкладка Посты</button>
-        <button onClick={() => { tabSignal.value = 'todos'; }}>Вкладка Задачи</button>
-        <button onClick={() => { userIdSignal.value += 1; }}>Следующий пользователь</button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <button onClick={() => { tabSignal.value = 'posts'; }}>Вкладка Посты</button>
+      <button onClick={() => { tabSignal.value = 'todos'; }}>Вкладка Задачи</button>
+      <button onClick={() => { userIdSignal.value += 1; }}>Следующий пользователь</button>
 
       <hr />
       <h4>Текущая вкладка: {tab}</h4>
@@ -236,37 +234,38 @@ export const UserProfile = () => {
 
 ```tsx
 import React, { useRef } from 'react';
-import { useReactiveValue, engine } from '@pravosleva/reactive-engine';
+import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { engine } from '~/store'
 
 // Создаем три сигнала
-const firstNameSignal = engine.signal('Иван');
-const lastNameSignal = engine.signal('Иванов');
-const ageSignal = engine.signal(25);
+const firstNameSignal = engine.signal('Иван')
+const lastNameSignal = engine.signal('Иванов')
+const ageSignal = engine.signal(25)
 
 export const SimpleBatchDemo = () => {
-  const firstName = useReactiveValue(firstNameSignal);
-  const lastName = useReactiveValue(lastNameSignal);
-  const age = useReactiveValue(ageSignal);
+  const firstName = useReactiveValue(firstNameSignal)
+  const lastName = useReactiveValue(lastNameSignal)
+  const age = useReactiveValue(ageSignal)
 
-  const renderCountRef = useRef(0);
-  renderCountRef.current++;
+  const renderCountRef = useRef(0)
+  renderCountRef.current++
 
   const handleUpdate = () => {
     // Три синхронных изменения подряд запустят ровно ОДИН ререндер компонента!
-    firstNameSignal.value = 'Пётр';
-    lastNameSignal.value = 'Петров';
-    ageSignal.value = 30;
+    firstNameSignal.value = 'Пётр'
+    lastNameSignal.value = 'Петров'
+    ageSignal.value = 30
   };
 
   return (
-    <div style={{ padding: '15px', border: '1px solid #ccc' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <h4>Простой батчинг (Профайлер)</h4>
       <p>Пользователь: {firstName} {lastName}, Возраст: {age}</p>
       <p style={{ color: 'blue' }}>Количество рендеров компонента: {renderCountRef.current}</p>
       <button onClick={handleUpdate}>Обновить профиль синхронно</button>
     </div>
-  );
-};
+  )
+}
 ```
 
 #### Продвинутый кейс: Батчинг в асинхронных потоках (Race Condition & API)
@@ -274,46 +273,46 @@ export const SimpleBatchDemo = () => {
 
 ```tsx
 // store.ts
-export const isProcessingSignal = engine.signal(false, 'isProcessing');
-export const apiDataSignal = engine.signal<string | null>(null, 'apiData');
-export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated');
+export const isProcessingSignal = engine.signal(false, 'isProcessing')
+export const apiDataSignal = engine.signal<string | null>(null, 'apiData')
+export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated')
 ```
 
 ```tsx
 // AdvancedBatchDemo.tsx
-import React, { useRef } from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from './store';
+import React, { useRef } from 'react'
+import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from './store'
 
 export const AdvancedBatchDemo = () => {
-  const isProcessing = useReactiveValue(isProcessingSignal);
-  const apiData = useReactiveValue(apiDataSignal);
-  const lastUpdated = useReactiveValue(lastUpdatedSignal);
+  const isProcessing = useReactiveValue(isProcessingSignal)
+  const apiData = useReactiveValue(apiDataSignal)
+  const lastUpdated = useReactiveValue(lastUpdatedSignal)
 
-  const renderCountRef = useRef(0);
-  renderCountRef.current++;
+  const renderCountRef = useRef(0)
+  renderCountRef.current++
 
   const handleFetchData = async () => {
-    isProcessingSignal.value = true; // Сеттер 1 (Синхронный ререндер для индикатора загрузки)
+    isProcessingSignal.value = true // Сеттер 1 (Синхронный ререндер для индикатора загрузки)
 
     try {
       // Имитируем запрос к серверу
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const fakeResponse = "Успешный ответ от сервера #42";
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const fakeResponse = "Успешный ответ от сервера #42"
 
       // АСИНХРОННЫЙ АВТОБАТЧИНГ:
       // Эти три обновления происходят внутри одной микрозадачи после await.
       // Движок соберет их в одну пачку, и React выполнит ровно 1 финальный ререндер!
-      apiDataSignal.value = fakeResponse;
-      lastUpdatedSignal.value = new Date().toLocaleTimeString();
-      isProcessingSignal.value = false;
+      apiDataSignal.value = fakeResponse
+      lastUpdatedSignal.value = new Date().toLocaleTimeString()
+      isProcessingSignal.value = false
     } catch (error) {
-      isProcessingSignal.value = false;
+      isProcessingSignal.value = false
     }
   };
 
   return (
-    <div style={{ padding: '15px', border: '1px solid #999', marginTop: '15px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <h4>Продвинутый асинхронный батчинг</h4>
       <p>Статус: {isProcessing ? '⏳ Загрузка...' : '✅ Готов'}</p>
       <p>Данные: {apiData || 'Нет данных'}</p>
@@ -323,8 +322,8 @@ export const AdvancedBatchDemo = () => {
         Запросить данные по сети
       </button>
     </div>
-  );
-};
+  )
+}
 ```
 
 #### Продвинутый кейс: Сброс множественных фильтров (Heavy Computed Analytics)
@@ -332,63 +331,70 @@ export const AdvancedBatchDemo = () => {
 
 ```ts
 // store.ts
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
+
+export const engine = new ReactiveEngine()
+
 export interface Product { id: number; title: string; category: string; price: number; }
 
-export const searchSignal = engine.signal('', 'search');
-export const categorySignal = engine.signal('all', 'category');
-export const maxPriceSignal = engine.signal(10000, 'maxPrice');
-export const sortBySignal = engine.signal<'price' | 'name'>('name', 'sortBy');
-export const rawProductsSignal = engine.signal<Product[]>([], 'rawProducts');
+export const searchSignal = engine.signal('', 'search')
+export const categorySignal = engine.signal('all', 'category')
+export const maxPriceSignal = engine.signal(10000, 'maxPrice')
+export const sortBySignal = engine.signal<'price' | 'name'>('name', 'sortBy')
+export const rawProductsSignal = engine.signal<Product[]>([], 'rawProducts')
 
 // Тяжелое вычисление, зависящее от пяти сигналов сразу
-export const filteredProductsComputed = engine.computed(() => {
-  console.log('🔮 Выполняется тяжелая фильтрация 10,000 элементов...');
-  let result = [...rawProductsSignal.value];
+export const filteredProductsComputed = engine.computed(
+  () => {
+    console.log('🔮 Выполняется тяжелая фильтрация 10,000 элементов...')
+    let result = [...rawProductsSignal.value]
 
-  if (searchSignal.value) {
-    result = result.filter(p => p.title.toLowerCase().includes(searchSignal.value.toLowerCase()));
-  }
-  if (categorySignal.value !== 'all') {
-    result = result.filter(p => p.category === categorySignal.value);
-  }
-  result = result.filter(p => p.price <= maxPriceSignal.value);
+    if (searchSignal.value) {
+      result = result.filter(p => p.title.toLowerCase().includes(searchSignal.value.toLowerCase()))
+    }
+    if (categorySignal.value !== 'all') {
+      result = result.filter(p => p.category === categorySignal.value)
+    }
+    result = result.filter(p => p.price <= maxPriceSignal.value)
 
-  return result.sort((a, b) => sortBySignal.value === 'price' ? a.price - b.price : a.title.localeCompare(b.title));
-}, 'filteredProducts');
+    return result.sort((a, b) => sortBySignal.value === 'price' ? a.price - b.price : a.title.localeCompare(b.title))
+  },
+  'filteredProducts'
+);
 ```
 
 ```tsx
 // CatalogDemo.tsx
-import React, { useRef } from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from './store';
+import React, { useRef } from 'react'
+import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from './store'
 
 export const CatalogDemo = () => {
-  const products = useReactiveValue(filteredProductsComputed);
+  const products = useReactiveValue(filteredProductsComputed)
 
-  const renderCountRef = useRef(0);
-  renderCountRef.current++;
+  const renderCountRef = useRef(0)
+  renderCountRef.current++
 
   const handleResetAllFilters = () => {
     // Изменяем 4 сигнала подряд.
     // Без автобатчинга тяжелая функция фильтрации запустилась бы 4 раза,
     // а компонент перерисовывался бы на каждом промежуточном шаге.
     // С автобатчингом: произойдет строго 1 вычисление и 1 ререндер React!
-    searchSignal.value = '';
-    categorySignal.value = 'all';
-    maxPriceSignal.value = 10000;
-    sortBySignal.value = 'name';
+    searchSignal.value = ''
+    categorySignal.value = 'all'
+    maxPriceSignal.value = 10000
+    sortBySignal.value = 'name'
   };
 
   return (
-    <div style={{ padding: '15px', border: '1px solid #777' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <h4>Фильтрация каталога (Heavy Analytics)</h4>
       <p>Найдено товаров: <b>{products.length}</b></p>
       <p style={{ color: 'green' }}>Рендеров компонента: {renderCountRef.current}</p>
       <button onClick={handleResetAllFilters}>Сбросить все фильтры</button>
     </div>
-  );
-};
+  )
+}
 ```
 
 ### 3. Кэширование запросов с поддержкой времени жизни (TTL)
@@ -396,16 +402,16 @@ export const CatalogDemo = () => {
 Вы можете использовать утилиты-декораторы для кэширования ответов сервера, чтобы при частом переключении вкладок не спамить сеть повторными запросами.
 
 ```ts
-import { engine } from './store';
-import { withCache } from './decorators/withCache'; // Ваша утилита сache
+import { engine } from './store'
+import { withCache } from './decorators/withCache' // Ваша утилита сache
 
-const searchSignal = engine.signal('', 'search');
+const searchSignal = engine.signal('', 'search')
 
 export const cachedSearchResource = engine.resource(
   withCache(
     async (query, abortSignal) => {
-      const res = await fetch(`https://example.com{query}`, { signal: abortSignal });
-      return res.json();
+      const res = await fetch(`https://example.com{query}`, { signal: abortSignal })
+      return res.json()
     },
     { ttl: 30 * 1000 } // Кэш будет валиден 30 секунд для каждого уникального query
   ),
@@ -457,22 +463,22 @@ src/
 Компонент ниже вообще не будет делать ререндер при кликах, но эффект внутри хука отработает на каждое изменение сигнала.
 
 ```tsx
-import React from 'react';
-import { useReactiveSubscription } from '@pravosleva/reactive-engine';
-import { counterSignal } from './store';
+import React from 'react'
+import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+import { counterSignal } from './store'
 
 export const LoggerButton = () => {
   // Хук изолирован от рендеров. Он просто выполнит коллбек при изменении сигнала
   useReactiveSubscription(counterSignal, (newValue) => {
-    console.log(`[Фидбек] Счетчик изменился на: ${newValue}`);
-  });
+    console.log(`[Фидбек] Счетчик изменился на: ${newValue}`)
+  })
 
   return (
     <button onClick={() => counterSignal.value++}>
       Кликни меня (Компонент не рендерится, но лог идет)
     </button>
-  );
-};
+  )
+}
 ```
 
 #### Продвинутый пример: Синхронизация с императивными API браузера
@@ -480,24 +486,24 @@ export const LoggerButton = () => {
 
 ```tsx
 // store.ts
-export const isMutedSignal = engine.signal(false, 'isMuted');
+export const isMutedSignal = engine.signal(false, 'isMuted')
 ```
 
 ```tsx
 // AudioPlayer.tsx
-import React, { useRef } from 'react';
-import { useReactiveSubscription } from '@pravosleva/reactive-engine';
-import { isMutedSignal } from './store';
+import React, { useRef } from 'react'
+import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+import { isMutedSignal } from './store'
 
 export const AudioPlayer = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Синхронизируем реактивное состояние со свойством нативного DOM-узла
   useReactiveSubscription(isMutedSignal, (isMuted) => {
     if (videoRef.current) {
       videoRef.current.muted = isMuted;
     }
-  });
+  })
 
   return (
     <div>
@@ -506,8 +512,8 @@ export const AudioPlayer = () => {
         Переключить звук
       </button>
     </div>
-  );
-};
+  )
+}
 ```
 
 Таким образом, библиотека предоставляет полный цикл управления потоком данных: `State (Signal) -> Derivatives (Computed) -> UI (useReactiveValue) -> Reactions (useReactiveSubscription)`
@@ -521,9 +527,9 @@ export const AudioPlayer = () => {
 #### Пример: Безопасное инлайн-вычисление без утечек памяти
 
 ```tsx
-import React, { useMemo } from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { engine, globalProductsSignal } from './store';
+import React, { useMemo } from 'react'
+import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { engine, globalProductsSignal } from './store'
 
 export const FilteredCatalog = ({ category }: { category: string }) => {
   // Вы можете безбоязненно использовать стандартныйuseMemo.
@@ -540,8 +546,8 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
     <ul>
       {filteredList.map(p => <li key={p.id}>{p.name}</li>)}
     </ul>
-  );
-};
+  )
+}
 ```
 
 ### Прозрачная реактивность через `observer` (Аналог MobX)
@@ -549,9 +555,9 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 Если ваш компонент отображает множество сигналов или вы хотите избавиться от вызовов хуков в теле функций, используйте функцию высшего порядка `observer`. Она автоматически отслеживает, какие сигналы или вычисляемые свойства считываются внутри JSX во время рендера, и точечно подписывает компонент на их изменения.
 
 ```tsx
-import React from 'react';
-import { observer } from '@pravosleva/reactive-engine';
-import { counterSignal, userSignal } from './store';
+import React from 'react'
+import { observer } from '@pravosleva/reactive-engine'
+import { counterSignal, userSignal } from './store'
 
 // Оборачиваем компонент в observer.
 // Теперь можно просто читать `.value` прямо в JSX — никаких хуков не требуется!
@@ -566,28 +572,28 @@ export const ProfileDashboard = observer(() => {
         Сменить имя
       </button>
     </div>
-  );
-});
+  )
+})
 ```
 
 ### Еще один продвинутый способ оптимизации рендеринга
 ```tsx
-import React, { useRef } from 'react';
-import { createObserverComponent, engine } from '@pravosleva/reactive-engine';
+import React, { useRef } from 'react'
+import { createObserverComponent, engine } from '@pravosleva/reactive-engine'
 
 // Инициализируем компонент-контейнер из нашей фабрики
-const Observer = createObserverComponent(engine);
+const Observer = createObserverComponent(engine)
 
 // Сигнал, который меняется очень часто (например, каждую секунду по веб-сокету)
-const livePriceSignal = engine.signal(100);
+const livePriceSignal = engine.signal(100)
 
 export const MassiveDashboard = () => {
   // Счетчик рендеров всего ОГРОМНОГО компонента
-  const totalDashboardRenders = useRef(0);
-  totalDashboardRenders.current++;
+  const totalDashboardRenders = useRef(0)
+  totalDashboardRenders.current++
 
   return (
-    <div style={{ padding: '20px', border: '1px solid #ccc' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <h2>📊 Тяжелая панель аналитики</h2>
       <p>Рендеров всей страницы: {totalDashboardRenders.current}</p>
 
@@ -600,8 +606,6 @@ export const MassiveDashboard = () => {
         <p>...Тут рендерятся 10 тяжелых графиков и таблиц...</p>
       </div>
 
-      <hr />
-
       {/*
         ТОЧЕЧНАЯ РЕАКТИВНОСТЬ:
         Оборачиваем в <Observer> только ту микро-зону, которая зависит от сигнала.
@@ -613,7 +617,7 @@ export const MassiveDashboard = () => {
           const innerCounter = useRef(0);
           innerCounter.current++;
           return (
-            <div style={{ background: '#f9f9f9', padding: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <h3>📈 Живой график цены (Текущая: ${livePriceSignal.value})</h3>
               <p style={{ color: 'green' }}>
                 Рендеров этой микро-зоны: {innerCounter.current}
@@ -627,8 +631,8 @@ export const MassiveDashboard = () => {
         Симулировать изменение цены (+5$)
       </button>
     </div>
-  );
-};
+  )
+}
 ```
 
 ## ⚠️ Возможные проблемы и их решение (Troubleshooting)
@@ -644,28 +648,7 @@ export const MassiveDashboard = () => {
   ```
 * **Как надо:** Обращаться к свойствам объекта напрямую в месте их использования (в JSX или эффекте): `user.name`.
 
-### 2. Бесконечные циклы в эффектах (Infinite Loops)
-Если внутри `engine.effect` или `engine.computed` вы одновременно читаете сигнал и записываете в него новое значение, это вызовет бесконечный цикл обновлений и перегрузку вызовов (Maximum call stack size exceeded).
-* **Решение:** Используйте встроенный метод `engine.untrack()`, чтобы временно отключить сборщик зависимостей на время записи данных:
-  ```ts
-  engine.effect(() => {
-    const current = counterSignal.value; // Читаем и подписываемся
-    engine.untrack(() => {
-      counterSignal.value = current + 1; // ✅ Безопасная запись без циклов
-    });
-  });
-  ```
-
-### 3. Утечки памяти вне компонентов React
-Хуки `useReactiveValue` и `useReactiveSubscription` автоматически отписываются от сигналов при размонтировании компонентов. Однако, если вы вручную вызываете `engine.effect()` внутри долгоживущих сервисов или классов, движок будет хранить их в памяти вечно.
-* **Решение:** Всегда сохраняйте возвращаемую функцию очистки и вызывайте её, когда сервис или модуль уничтожается:
-```ts
-const unsubscribe = engine.effect(() => { ... });
-// При уничтожении модуля:
-unsubscribe();
-```
-
-### 4. Сложные объекты в зависимостях `withCache`
+### 2. Сложные объекты в зависимостях `withCache`
 Декоратор `withCache` сериализует аргументы `source` через `JSON.stringify()` для создания ключа кэша.
 * **Ограничение:** Не передавайте в качестве зависимостей ресурса объекты с циклическими ссылками, функции или сложные экземпляры классов (например, `Map`, `Set`, `Date`). Используйте только плоские объекты, массивы или примитивы.
 
