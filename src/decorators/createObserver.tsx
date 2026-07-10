@@ -115,6 +115,59 @@ export const createObserverComponent = (engine: ReactiveEngine) => {
   };
 };
 
+interface TriggerProps {
+  engine: ReactiveEngine;
+  Component: React.ComponentType<any>;
+  props: any;
+  onTrigger: () => void;
+}
+
+/**
+ * Вспомогательный компонент, изолирующий выполнение пользовательского компонента
+ * от функции safeRun движка во время сбора реактивных зависимостей.
+ */
+const ReactiveRenderTrigger = ({ engine, Component, props, onTrigger }: TriggerProps) => {
+  let renderedElement: React.ReactNode = null;
+
+  // 1. Создаем эффект движка. Он инициализируется пустым, чтобы не оборачивать
+  // вызов компонента в safeRun и не ломать правила хуков React.
+  const unsub = engine.effect(() => {
+    // Этот коллбек сработает, когда изменятся сигналы, считанные в JSX ниже
+    onTrigger();
+  });
+
+  // Преобразуем инстанс движка в any, чтобы достучаться до внутренних (private/protected) свойств
+  const enginePrivate = engine as any;
+
+  // 2. Извлекаем объект созданного эффекта из внутренней коллекции движка.
+  // Если у вас свойство называется иначе, проверьте имя в коде: this.allEffects.add(effectObj);
+  const allEffectsArray = Array.from(enginePrivate.allEffects || []);
+  const currentEffectObj = allEffectsArray[allEffectsArray.length - 1];
+
+  // Определяем точное имя свойства активного эффекта.
+  // Если в коде класса оно написано как activeEffect, то используем его через any.
+  const activeEffectKey = 'activeEffect' in enginePrivate ? 'activeEffect' : '_activeEffect';
+
+  const prevActive = enginePrivate[activeEffectKey];
+  enginePrivate[activeEffectKey] = currentEffectObj;
+
+  try {
+    // 3. Вызываем компонент напрямую в экосистеме React.
+    // Все внутренние хуки (useEffect, useRef) теперь работают штатно.
+    if (typeof Component === 'function' && !Component.prototype?.isReactComponent) {
+      renderedElement = (Component as Function)(props);
+    } else {
+      renderedElement = React.createElement(Component, props);
+    }
+  } finally {
+    // 4. Возвращаем движок в исходное состояние и подчищаем временный эффект
+    enginePrivate[activeEffectKey] = prevActive;
+    unsub();
+  }
+
+  return renderedElement;
+};
+
 /**
  * Функция высшего порядка (HOC) для автоматического отслеживания сигналов внутри React-компонента.
  * Полный аналог `observer` из MobX.
@@ -125,7 +178,8 @@ export const createObserverComponent = (engine: ReactiveEngine) => {
  *
  * @example
  * ```tsx
- * import { createObserver, engine } from '@pravosleva/reactive-engine';
+ * import { createObserver } from '@pravosleva/reactive-engine';
+ * import { engine } from '~/utils/ReactiveEngine'; // Ваш локальный экземпляр движка
  *
  * const observer = createObserver(engine);
  * const counterSignal = engine.signal(0);
@@ -144,22 +198,73 @@ export const createObserverComponent = (engine: ReactiveEngine) => {
  * @source
  */
 export const createObserver = (engine: ReactiveEngine) => {
-  const Observer = createObserverComponent(engine);
-
   return <P extends object>(Component: React.ComponentType<P>): React.ComponentType<P> => {
-    const ObserverComponent = (props: P) => {
-      const TargetComponent = Component;
 
-      return (
-        <Observer>
-          {() => {
-            if (typeof TargetComponent === 'function' && !TargetComponent.prototype?.isReactComponent) {
-              return (TargetComponent as Function)(props);
-            }
-            return React.createElement(TargetComponent, props);
-          }}
-        </Observer>
-      );
+    const ObserverComponent = (props: P) => {
+      const versionRef = useRef(0);
+      const enginePrivate = engine as any;
+
+      // Опеределяем внутреннее имя свойства активного эффекта в вашем движке
+      const activeEffectKey = 'activeEffect' in enginePrivate ? 'activeEffect' : '_activeEffect';
+
+      // Хранилище для инстанса долгоживущего эффекта движка
+      const effectObjRef = useRef<any>(null);
+
+      // Интеграция с подписками React 18+ через useSyncExternalStore
+      const { subscribe, getSnapshot } = useMemo(() => {
+        return {
+          subscribe: (onStoreChange: () => void) => {
+            // Создаем ОДИН долгоживущий эффект на весь жизненный цикл компонента.
+            // Он уничтожится только тогда, когда React размонтирует компонент.
+            const unsub = engine.effect(() => {
+              // При изменении сигналов инкрементируем версию и уведомляем React
+              versionRef.current++;
+              onStoreChange();
+            });
+
+            // Нам нужно получить объект этого эффекта.
+            // Из вашего кода метода `effect`: эффект добавляется в `this.allEffects.add(effectObj)`.
+            const allEffectsArray = Array.from(enginePrivate.allEffects || []);
+            effectObjRef.current = allEffectsArray[allEffectsArray.length - 1];
+
+            return () => {
+              unsub(); // Чистим эффект при размонтировании
+              effectObjRef.current = null;
+            };
+          },
+          getSnapshot: () => versionRef.current
+        };
+      }, []);
+
+      // Подписываем компонент. React сам управляет вызовами subscribe/unsubscribe в StrictMode.
+      useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+
+      // --- ФАЗА СБОРА ЗАВИСИМОСТЕЙ ---
+      // Если эффект уже создан (компонент смонтирован), мы временно подставляем его в движок.
+      // Если это самый первый рендер (эффекта еще нет в subscribe), мы берем временный "заглушечный"
+      // объект эффекта, чтобы движок не упал, а сигналы зарегистрировали чтение.
+      const fallbackEffect = { cleanups: new Set(), run: () => { } };
+      const currentEffect = effectObjRef.current || fallbackEffect;
+
+      // Перед рендером подменяем активный эффект
+      const prevActive = enginePrivate[activeEffectKey];
+      enginePrivate[activeEffectKey] = currentEffect;
+
+      let renderedElement: React.ReactNode = null;
+      try {
+        // Вызываем компонент напрямую. Хуки типа useEffect работают идеально,
+        // так как они не обернуты в safeRun движка.
+        if (typeof Component === 'function' && !Component.prototype?.isReactComponent) {
+          renderedElement = (Component as Function)(props);
+        } else {
+          renderedElement = React.createElement(Component, props);
+        }
+      } finally {
+        // После рендера возвращаем исходное состояние движка
+        enginePrivate[activeEffectKey] = prevActive;
+      }
+
+      return renderedElement;
     };
 
     ObserverComponent.displayName = `Observer(${Component.displayName || Component.name || 'Component'})`;
