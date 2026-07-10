@@ -649,8 +649,7 @@ Objects created via `engine.reactive()` are native JavaScript Proxies. The engin
 The `withCache` utility decorator serializes the `source` arguments using `JSON.stringify()` to form unique cache keys.
 * **Limitation:** Avoid passing objects with circular references, functions, or complex class instances (like `Map`, `Set`, or `Date`) as resource dependencies. Stick to flat objects, arrays, and primitives.
 
-### 💡 How to enforce it so that you CANNOT FORGET to call `inject`? (Ideal DX)
-
+### 3. How to enforce it so that you CANNOT FORGET to call `inject`? (Ideal DX)
 To save developers from the friction of manually writing two lines of boilerplate (`inject` + `useReactiveValue`) inside every single component, it is highly recommended to design custom hooks on top of your services. You can encapsulate this repetitive routine into a single concise hook right inside the service or store file. This makes forgetting `inject` physically impossible:
 ```ts
 // Inside your feature or store file (e.g., auth.store.ts):
