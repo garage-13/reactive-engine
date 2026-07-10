@@ -213,7 +213,6 @@ export const UserProfile = () => {
       <button onClick={() => { tabSignal.value = 'todos'; }}>Вкладка Задачи</button>
       <button onClick={() => { userIdSignal.value += 1; }}>Следующий пользователь</button>
 
-      <hr />
       <h4>Текущая вкладка: {tab}</h4>
 
       {loading && <p>Загрузка данных по сети...</p>}
