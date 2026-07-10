@@ -579,7 +579,8 @@ export const ProfileDashboard = observer(() => {
 ### Еще один продвинутый способ оптимизации рендеринга
 ```tsx
 import React, { useRef } from 'react'
-import { createObserverComponent, engine } from '@pravosleva/reactive-engine'
+import { createObserverComponent } from '@pravosleva/reactive-engine'
+import { engine } from './store'
 
 // Инициализируем компонент-контейнер из нашей фабрики
 const Observer = createObserverComponent(engine)

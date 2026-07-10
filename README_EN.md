@@ -578,8 +578,6 @@ import React, { useRef } from 'react'
 import { createObserverComponent } from '@pravosleva/reactive-engine'
 import { engine } from './store'
 
-const
-
 // Instantiate the inline observer container component
 const Observer = createObserverComponent(engine)
 
