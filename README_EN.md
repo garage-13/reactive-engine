@@ -552,8 +552,10 @@ If your component renders multiple signals or you prefer to eliminate hook boile
 
 ```tsx
 import React from 'react'
-import { observer } from '@pravosleva/reactive-engine'
-import { counterSignal, userSignal } from '~/store'
+import { createObserver } from '@pravosleva/reactive-engine'
+import { counterSignal, userSignal, engine } from '~/store'
+
+const observer = createObserver(engine)
 
 // Wrap your component with observer.
 // Now you can read `.value` directly inside your JSX—no hooks required!

@@ -554,8 +554,10 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 
 ```tsx
 import React from 'react'
-import { observer } from '@pravosleva/reactive-engine'
-import { counterSignal, userSignal } from '~/store'
+import { createObserver } from '@pravosleva/reactive-engine'
+import { counterSignal, userSignal, engine } from '~/store'
+
+const observer = createObserver(engine)
 
 // Оборачиваем компонент в observer.
 // Теперь можно просто читать `.value` прямо в JSX — никаких хуков не требуется!
