@@ -28,26 +28,32 @@ Instead of tight coupling via hardcoded file `import` statements, services decla
 ```ts
 // 1. Declare an authentication service with a reactive signal
 export class AuthService {
-  public isAuthorized = this.engine.signal(false)
-  constructor(private engine: ReactiveEngine) {}
+  public isAuthorized: Computed<boolean>
+
+  constructor(private engine: ReactiveEngine) {
+    this.isAuthorized = this.engine.signal(false)
+  }
 }
 
 // 2. Declare a shopping cart service that depends on the authentication service
 export class CartService {
-  // Inject the dependency lazily out of the box!
-  private authService = this.engine.inject(AuthService);
+  private authService: AuthService
+  public cartResource: Resource<unknown> // Типизируйте
 
-  // The async resource automatically syncs with the external authorization state
-  public cartResource = this.engine.resource(
-    async (_, abortSignal) => {
-      if (!this.authService.isAuthorized.value) return [];
-      const res = await fetch('/api/cart', { signal: abortSignal });
-      return res.json();
-    },
-    this.authService.isAuthorized // Resource tracks a signal from another service
-  );
+  constructor(private engine: ReactiveEngine) {
+    // Inject the dependency lazily out of the box!
+    this.authService = this.engine.inject(AuthService);
 
-  constructor(private engine: ReactiveEngine) {}
+    // The async resource automatically syncs with the external authorization state
+    this.cartResource = this.engine.resource(
+      async (_, abortSignal) => {
+        if (!this.authService.isAuthorized.value) return [];
+        const res = await fetch('/api/cart', { signal: abortSignal });
+        return res.json();
+      },
+      this.authService.isAuthorized // Resource tracks a signal from another service
+    );
+  }
 }
 ```
 

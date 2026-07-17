@@ -26,27 +26,35 @@ pnpm add @pravosleva/reactive-engine
 Вместо жесткого связывания через `import`, сервисы объявляют свои зависимости декларативно, запрашивая их у движка.
 
 ```ts
+import { Computed, Resource } from '@pravosleva/reactive-engine'
+
 // 1. Объявляем сервис авторизации с реактивным сигналом
 export class AuthService {
-  public isAuthorized = this.engine.signal(false);
-  constructor(private engine: ReactiveEngine) {}
+  public isAuthorized: Computed<boolean>
+
+  constructor(private engine: ReactiveEngine) {
+    this.isAuthorized = this.engine.signal(false)
+  }
 }
 
 // 2. Объявляем сервис корзины, который зависит от сервиса авторизации
 export class CartService {
-  private authService = this.engine.inject(AuthService); // Внедряем зависимость лениво!
+  private authService: AuthService
+  public cartResource: Resource<unknown> // Типизируйте
 
-  // Асинхронный ресурс автоматически подстраивается под состояние авторизации
-  public cartResource = this.engine.resource(
-    async (_, abortSignal) => {
-      if (!this.authService.isAuthorized.value) return [];
-      const res = await fetch('/api/cart', { signal: abortSignal });
-      return res.json();
-    },
-    this.authService.isAuthorized // Зависимость ресурса от сигнала из другого сервиса
-  );
+  constructor(private engine: ReactiveEngine) {
+    this.authService = this.engine.inject(AuthService); // Внедряем зависимость лениво!
 
-  constructor(private engine: ReactiveEngine) {}
+    // Асинхронный ресурс автоматически подстраивается под состояние авторизации
+    this.cartResource = this.engine.resource(
+      async (_, abortSignal) => {
+        if (!this.authService.isAuthorized.value) return [];
+        const res = await fetch('/api/cart', { signal: abortSignal });
+        return res.json();
+      },
+      this.authService.isAuthorized // Зависимость ресурса от сигнала из другого сервиса
+    );
+  }
 }
 ```
 
