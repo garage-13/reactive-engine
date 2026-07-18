@@ -1,5 +1,6 @@
 # envs
 .env*
+!.env.example
 
 # dependencies
 node_modules
