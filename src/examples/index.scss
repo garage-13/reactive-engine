@@ -1,0 +1,12 @@
+// 1. Сначала системные переменные и миксины
+@use './var-colors.scss';
+@use './var-monitor-breakpoints.scss';
+
+// 2. Затем жесткий сброс стилей (Reset)
+@import './reset-styles.css';
+
+// 3. Затем ваши базовые стили (Заголовки, код, шрифты боди)
+@import './base.scss';
+
+// 4. И только в самом конце компоненты интерфейса (компонентные стили)
+// @import './app-wrapper.scss'; // Сетка, .unit, .absoluteUnitLabel и т.д.

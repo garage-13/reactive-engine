@@ -1,18 +1,37 @@
-import './reset-styles.css'
 import baseClasses from './baseClasses.common.module.scss'
 import clsx from 'clsx'
-import { Example01 } from './01-signal/Example01'
-import { Example10 } from './10-computed/Example10'
-import { Example20 } from './20-resource/Example20'
+import { Example01 } from './01-signal'
+import { Example10, Example11 } from './10-computed'
+import { Example20 } from './20-resource'
 import { Example21 } from './21-multi-resource'
 
 export const App = () => {
   return (
-    <div className={clsx(baseClasses.appWrapper)}>
-      <Example01 />
-      <Example10 />
-      <Example20 />
-      <Example21 />
+    <div className={clsx(baseClasses.stack4, baseClasses.appWrapper)}>
+
+      <div className={baseClasses.stack0}>
+        <h2>0. Signal</h2>
+        <div className={clsx(baseClasses.unitsWrapper)}>
+          <Example01 />
+        </div>
+      </div>
+
+      <div className={baseClasses.stack0}>
+        <h2>1. Computed</h2>
+        <div className={clsx(baseClasses.unitsWrapper)}>
+          <Example10 />
+          <Example11 />
+        </div>
+      </div>
+
+      <div className={baseClasses.stack0}>
+        <h2>2. Resource</h2>
+        <div className={clsx(baseClasses.unitsWrapper)}>
+          <Example20 />
+          <Example21 />
+        </div>
+      </div>
+
     </div>
   )
 }

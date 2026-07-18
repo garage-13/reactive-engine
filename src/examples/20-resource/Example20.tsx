@@ -46,7 +46,7 @@ export const Example20 = () => {
       <div className={baseClasses.absoluteUnitLabel}>example 20 | Resource</div>
       <code>{BASE_API_URL}</code>
       <div>
-        <button onClick={() => logic.inc()} className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>({counter}) INC</button>
+        <button onClick={() => logic.inc()} className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>({counter}) Refresh account data</button>
       </div>
       <div className={baseClasses.unitInternalWrapper}>
         <div>{loading ? '🟡 loading...' : !!data ? '🟢 ok' : !!error ? '🔴 err' : '⚪'}</div>

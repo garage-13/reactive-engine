@@ -10,26 +10,37 @@ $border-radius-2: 16px;
 $border-radius-4: 32px;
 
 .appWrapper {
+  padding: 16px;
+
+  @include device('tablet') {
+    padding: 16px;
+  }
+
+  @include device('desktop') {
+    padding: 32px;
+  }
+}
+
+.unitsWrapper {
   display: grid;
   width: 100%;
 
   // 1. Мобильные устройства (по умолчанию) — 1 колонка
   grid-template-columns: 1fr;
-  padding: 16px;
   gap: $grid-gap-2;
 
   // 2. Планшеты — 2 колонки
   @include device('tablet') {
-    padding: 16px;
     gap: $grid-gap-2;
     grid-template-columns: repeat(2, 1fr);
   }
 
-  // 3. Десктопы — 3 колонки
+  // 3. Десктопы — Поведение Masonry через CSS Grid
   @include device('desktop') {
-    padding: 32px;
+    display: grid; // Возвращаем Grid для управления span-классами
     gap: $grid-gap-4;
     grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: masonry; // Активируем нативный режим masonry
   }
 }
 
@@ -38,6 +49,21 @@ $border-radius-4: 32px;
   border: 2px solid lightgray;
   border-radius: $border-radius-2;
   position: relative;
+  box-sizing: border-box;
+
+  // Обычное поведение для десктопа в Grid Masonry
+  @include device('desktop') {
+    display: block; // inline-block больше не требуется
+    width: 100%;
+    margin-bottom: 0; // Отступы теперь контролирует gap контейнера
+  }
+
+  // Новый класс-модификатор для растягивания на 2 колонки
+  &--wide {
+    @include device('desktop') {
+      grid-column: span 2; // Занимает ровно 2 колонки из 3
+    }
+  }
 }
 
 .preNormalizedMin {
@@ -84,6 +110,12 @@ $border-radius-4: 32px;
   padding: 3px 12px;
   font-family: 'Courier New', Courier, monospace;
   font-size: small;
+
+  max-width: calc(100% - 30px);
+  // Стили для принудительного сворачивания в одну строку с многоточием
+  white-space: nowrap; // Запрещает тексту переноситься на новую строку
+  overflow: hidden; // Скрывает все, что не поместилось в границы
+  text-overflow: ellipsis; // Добавляет "..." в конце обрезанной строки
 }
 
 .stack0 {
@@ -102,6 +134,12 @@ $border-radius-4: 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.stack4 {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
 }
 
 .catSection {

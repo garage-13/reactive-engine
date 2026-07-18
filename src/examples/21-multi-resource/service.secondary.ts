@@ -27,8 +27,8 @@ export class SecondaryService extends BaseREService {
             `personId=${deps[0].value}`,
             '_responseDelay=2000',
             `_addData=${encodeURIComponent(JSON.stringify({
-              for_id: deps[1].value,
-            } as { for_id: string }))}`
+              for_person_id: deps[1].value,
+            } as { for_person_id: string }))}`
           ].join('&')
         ].join(''),
         { signal: abortSignal }

@@ -12,7 +12,7 @@ $breakpoint-xxl: 1400px; // Сверхбольшие мониторы (Ultra-wid
   @if $type =='mobile' {
 
     // Стили для мобильных (от 0 до границы планшета)
-    @media (max-width: ($breakpoint-sm - 1px)) {
+    @media (max-width: ($breakpoint-md - 1px)) {
       @content;
     }
   }
@@ -20,7 +20,7 @@ $breakpoint-xxl: 1400px; // Сверхбольшие мониторы (Ultra-wid
   @else if $type =='tablet' {
 
     // Стили только для планшетов (диапазон между мобилкой и десктопом)
-    @media (min-width: $breakpoint-sm) and (max-width: ($breakpoint-lg - 1px)) {
+    @media (min-width: $breakpoint-md) and (max-width: ($breakpoint-lg - 1px)) {
       @content;
     }
   }

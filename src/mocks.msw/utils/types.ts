@@ -1,6 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { IBaseResponse, IUserData } from '@rgs-core/types';
-
 /* eslint-disable @typescript-eslint/no-namespace */
 export type PathValue<T, P extends string> = P extends `${infer Key}.${infer Rest}`
   ? Key extends keyof T
@@ -39,7 +36,7 @@ export namespace NSDMS {
   export type TAbstractData = {
     [key: string]: unknown;
   }
-  export type TBaseResponseData = IBaseResponse<TAccessPoliciesData | TAbstractData> & {
+  export type TBaseResponseData = {
     status?: 'Success' | 'Fail';
     message?: string;
   }
