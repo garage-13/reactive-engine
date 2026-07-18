@@ -1,0 +1,35 @@
+// Минимальные ширины экранов (Mobile-first подход)
+$breakpoint-xs: 0; // Смартфоны (вертикальные)
+$breakpoint-sm: 576px; // Смартфоны (горизонтальные)
+$breakpoint-md: 768px; // Планшеты
+$breakpoint-lg: 992px; // Ноутбуки / Маленькие мониторы
+$breakpoint-xl: 1200px; // ПК / Большие мониторы
+$breakpoint-xxl: 1400px; // Сверхбольшие мониторы (Ultra-wide)
+
+// 2. Миксин, который использует эти переменные
+// 2. Создаем миксин для трех типов устройств
+@mixin device($type) {
+  @if $type =='mobile' {
+
+    // Стили для мобильных (от 0 до границы планшета)
+    @media (max-width: ($breakpoint-sm - 1px)) {
+      @content;
+    }
+  }
+
+  @else if $type =='tablet' {
+
+    // Стили только для планшетов (диапазон между мобилкой и десктопом)
+    @media (min-width: $breakpoint-sm) and (max-width: ($breakpoint-lg - 1px)) {
+      @content;
+    }
+  }
+
+  @else if $type =='desktop' {
+
+    // Стили для десктопов (все, что больше или равно экрану ноутбука)
+    @media (min-width: $breakpoint-lg) {
+      @content;
+    }
+  }
+}

@@ -1,0 +1,109 @@
+@use './var-colors.scss' as *;
+@use './var-monitor-breakpoints.scss' as *;
+
+$grid-gap-1: 8px;
+$grid-gap-2: 16px;
+$grid-gap-4: 32px;
+
+$border-radius-1: 8px;
+$border-radius-2: 16px;
+$border-radius-4: 32px;
+
+.appWrapper {
+  display: grid;
+  width: 100%;
+
+  // 1. Мобильные устройства (по умолчанию) — 1 колонка
+  grid-template-columns: 1fr;
+  padding: 16px;
+  gap: $grid-gap-2;
+
+  // 2. Планшеты — 2 колонки
+  @include device('tablet') {
+    padding: 16px;
+    gap: $grid-gap-2;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  // 3. Десктопы — 3 колонки
+  @include device('desktop') {
+    padding: 32px;
+    gap: $grid-gap-4;
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.unit {
+  padding: 24px 16px 16px 16px;
+  border: 2px solid lightgray;
+  border-radius: $border-radius-2;
+  position: relative;
+}
+
+.preNormalizedMin {
+  font-size: x-small;
+  // Включает автоматический перенос длинных строк и слов
+  white-space: pre-wrap; // Сохраняет пробелы и переносы, но переносит строки при достижении края
+  word-wrap: break-word; // Устаревшее, но нужно для старых браузеров
+  overflow-wrap: break-word; // Разрывает слишком длинные слова (например, URL), если они не помещаются
+
+  // Дополнительно для удобства (по желанию):
+  max-width: 100%; // Гарантирует, что блок не выйдет за пределы родителя
+  overflow-x: auto; // Включает локальную прокрутку только в экстренных случаях
+}
+
+.unitInternalWrapper {
+  display: grid;
+  width: 100%;
+  padding: 0px;
+
+  @include device('mobile') {
+    grid-template-columns: 1fr;
+    gap: $grid-gap-2;
+  }
+
+  @include device('tablet') {
+    gap: $grid-gap-1;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @include device('desktop') {
+    gap: $grid-gap-1;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.absoluteUnitLabel {
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  background-color: lightgray;
+  color: gray;
+  border-top-right-radius: calc($border-radius-2 - 2px);
+  border-bottom-left-radius: inherit;
+  padding: 3px 12px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: small;
+}
+
+.stack0 {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+}
+
+.stack1 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stack2 {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.catSection {
+  margin-top: auto;
+}

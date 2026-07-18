@@ -1,0 +1,103 @@
+@use './var-colors.scss' as *;
+@use './var-monitor-breakpoints.scss' as *;
+
+// 1. БАЗОВАЯ СТРУКТУРА (все общие размеры, шрифты и поведение при тапе)
+.neonBtn {
+  font-weight: bold;
+  font-family: 'Courier New', Courier, monospace;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: all 0.3s ease;
+
+  // Кросс-браузерный сброс тапа для мобилок/планшетов пишем один раз глобально
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+
+  // Адаптив по размерам (чистый, без дублирования цвета)
+  @include device('mobile') {
+    font-size: 0.8rem;
+    padding: 6px 14px;
+  }
+
+  @include device('tablet') {
+    font-size: 1rem;
+    padding: 8px 16px;
+  }
+
+  @include device('desktop') {
+    font-size: 1rem;
+    padding: 8px 16px;
+  }
+
+  // ==========================================
+  // 2. ЦВЕТОВЫЕ МОДИФИКАТОРЫ (Задают только переменные)
+  // ==========================================
+
+  // ЦВЕТ: Primary (Основной неон)
+  &--primary {
+    --btn-color: #{$neon-color}; // Записываем в локальную CSS-переменную для удобства
+  }
+
+  // ЦВЕТ: Secondary (Второй неон, например, фиолетовый/розовый)
+  &--secondary {
+    --btn-color: #{$neon-secondary-color}; // Сюда подставьте вашу переменную secondary цвета
+  }
+
+  // ==========================================
+  // 3. ТИПЫ ОТОБРАЖЕНИЯ (Используют цвет из модификатора выше)
+  // ==========================================
+
+  // ТИП: Outlined (Прозрачная с обводкой)
+  &--outlined {
+    color: var(--btn-color);
+    border: 2px solid var(--btn-color);
+
+    @include device('desktop') {
+      text-shadow: 0 0 4px rgba($neon-color, 0.4); // Вместо $neon-color можно использовать интерполяцию, если цвета сильно разные
+      box-shadow: 0 4px 12px rgba($neon-color, 0.2);
+
+      &:hover {
+        color: $bg-light;
+        background: var(--btn-color);
+        box-shadow: 0 0 12px rgba($neon-color, 0.4),
+          0 0 24px rgba($neon-color, 0.2);
+      }
+    }
+
+    // Поведение фокуса и тапа для outlined
+    &:active,
+    &:focus-visible {
+      outline: 3px solid var(--btn-color);
+      outline-offset: 4px;
+    }
+  }
+
+  // ТИП: Contained (Полностью залитая кнопка)
+  &--contained {
+    color: $bg-light;
+    background: var(--btn-color);
+    border: 2px solid var(--btn-color);
+
+    @include device('desktop') {
+      // Изначально имеет мягкое свечение всей плашки
+      box-shadow: 0 4px 14px rgba($neon-color, 0.3);
+
+      &:hover {
+        // При наведении становится ярче (взрывается свечением)
+        box-shadow: 0 0 15px var(--btn-color),
+          0 0 30px rgba($neon-color, 0.4);
+        transform: translateY(-1px); // Небольшой интерактивный подъем
+      }
+    }
+
+    // Поведение фокуса и тапа для contained (делаем отступ чуть больше, чтобы смотрелось аккуратно)
+    &:active,
+    &:focus-visible {
+      outline: 3px solid var(--btn-color);
+      outline-offset: 4px;
+    }
+  }
+}
