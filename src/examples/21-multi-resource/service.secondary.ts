@@ -5,21 +5,19 @@ const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 export class SecondaryService extends BaseREService {
   private userInfoService = this.engine.inject(UserInfoService)
-  public counter = this.engine.signal<number>(0, 'example-21:SecondaryService:signal:counter');
   private isUserDataReceived = this.engine.computed<boolean>(() => !this.userInfoService.apiState.loading && !!this.userInfoService.apiState.data, 'example-21:computed:counter');
 
   private apiDeps = this.engine.computed(() => [
-    this.userInfoService.activePersonId,
-    this.counter,
     this.isUserDataReceived,
+    this.userInfoService.activePersonId,
   ])
   public apiState = this.engine.resource(
     async (deps, abortSignal) => {
-      if (!deps[2].value) {
-        throw new Error('Waiting for user data...')
-      }
       if (!deps[0].value) {
-        throw new Error('Person wasnt detected')
+        throw new Error('Waiting for user data response...')
+      }
+      if (!deps[1].value) {
+        throw new Error('Person id wasnt selected...')
       }
       const res = await fetch(
         [
@@ -28,6 +26,9 @@ export class SecondaryService extends BaseREService {
           [
             `personId=${deps[0].value}`,
             '_responseDelay=2000',
+            `_addData=${encodeURIComponent(JSON.stringify({
+              for_id: deps[1].value,
+            } as { for_id: string }))}`
           ].join('&')
         ].join(''),
         { signal: abortSignal }
@@ -36,8 +37,4 @@ export class SecondaryService extends BaseREService {
     },
     this.apiDeps
   )
-
-  public inc() {
-    this.counter.value += 1
-  }
 }

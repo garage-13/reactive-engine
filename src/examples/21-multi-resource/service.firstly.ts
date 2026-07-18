@@ -25,7 +25,7 @@ export class UserInfoService extends BaseREService {
           '?',
           [
             `counter=${source}`,
-            '_responseDelay=2000',
+            '_responseDelay=3000',
             `_addData=${encodeURIComponent(JSON.stringify({
               items: [
                 {
