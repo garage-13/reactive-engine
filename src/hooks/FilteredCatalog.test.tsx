@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
-import { ReactiveEngine } from '../core';
 import { useReactiveValue } from './useReactiveValue';
-import { Signal } from '../core';
+import { ReactiveEngine, Signal } from '../core';
 
 interface Product {
   id: number;

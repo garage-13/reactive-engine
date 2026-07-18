@@ -28,7 +28,7 @@ Instead of tight coupling via hardcoded file `import` statements, services decla
 ```ts
 // 1. Declare an authentication service with a reactive signal
 export class AuthService {
-  public isAuthorized: Computed<boolean>
+  public isAuthorized: Signal<boolean>
 
   constructor(private engine: ReactiveEngine) {
     this.isAuthorized = this.engine.signal(false)
@@ -38,7 +38,7 @@ export class AuthService {
 // 2. Declare a shopping cart service that depends on the authentication service
 export class CartService {
   private authService: AuthService
-  public cartResource: Resource<unknown> // Типизируйте
+  public cartResource: Resource<unknown, unknown> // Типизируйте
 
   constructor(private engine: ReactiveEngine) {
     // Inject the dependency lazily out of the box!

@@ -1,5 +1,3 @@
-import { CleanupFn } from '../core'; // импорт типа отписки, если нужен
-
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
