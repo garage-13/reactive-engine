@@ -8,6 +8,7 @@ export type Factory<T> = (engine: ReactiveEngine) => T;
 
 export interface IEffect {
   run: () => void;
+  label?: string;
   cleanups: Set<CleanupFn>;
 }
 
@@ -129,6 +130,19 @@ export interface Computed<T> {
   destroy: () => void;
 }
 
+export interface ResourceOptions<T> {
+  name: string;
+  /** Автоматически сбрасывать data в null при изменении source. По умолчанию: true */
+  resetDataOnSourceChange?: boolean;
+  /** Функция для валидации успешного ответа сервера перед его сохранением в стейт.
+   *
+   * Варианты возвращаемого значения:
+   * - true 👉 все ок
+   * - false 👉 в error попадет стандартный текст ошибки
+   * - string 👉 попадет в поле error
+   * */
+  responseValidate?: (responseData: T) => boolean | string;
+}
 
 /**
  * Интерфейс для ресурса.
@@ -344,12 +358,14 @@ export class ReactiveEngine {
    * Создание эффекта.
    * @function effect
    * @param {EffectFn} fn - Функция эффекта.
+   * @param {string} [label] - Необязательная метка для логирования и отладки.
    * @returns {CleanupFn} - Функция для очистки эффекта.
    * @source
    */
-  public effect(fn: EffectFn): CleanupFn {
+  public effect(fn: EffectFn, label?: string): CleanupFn {
     const engine = this;
     const effectObj: IEffect = {
+      label, // Запоминаем имя эффекта для профайлера/логов
       cleanups: new Set(),
       run() {
         this.cleanups.forEach(c => c());
@@ -499,36 +515,84 @@ export class ReactiveEngine {
   }
 
   /**
-   * Создание асинхронного ресурса.
-   * @template T
+   * Создание асинхронного ресурса. Типы на входе: <T - формат ответа, S - источник изменений (сигнал либо computed-кортеж из зачений сигналов .value)>
+   *
+   * Explained 👉 {@link https://github.com/garage-13/reactive-engine/blob/main/README_EN.md#1-async-resources-dependent-on-multiple-signals}
+   *
+   * @template T, S
+   * @see {@link https://github.com/garage-13/reactive-engine/blob/main/src/examples/20-resource/Example20.tsx Реализация базового компонента Example20}
+   * @see {@link https://github.com/garage-13/reactive-engine/blob/main/src/examples/21-multi-resource/service.secondary.ts Сложный пример зависимости ресурсов через computed}
    * @function resource
-   * @param {Function} fetcher - Функция для загрузки данных.
+   * @param {Function} fetcher - Асинхронная функция для загрузки данных.
    * @param {{ value: S }} [source] - Источник данных.
-   * @param {string} [signalName] - Имя сигнала ресурса.
+   * @param {string | ResourceOptions<T>} [optionsOrName] - Имя сигнала или объект конфигурации `{ name: string; validate: (res) => boolean | string; resetDataOnSourceChange?: boolean }`.
    * @returns {Resource<T>} - Асинхронный ресурс.
+   *
+   * @example
+   * // Базовый вызов со строкой (обратная совместимость):
+   * const res = engine.resource(fetcher, source, 'my-resource-name');
+   *
+   * @example
+   * // Современный вызов с валидацией ответа:
+   * const res = engine.resource(fetcher, source, {
+   *   name: 'my-resource-name',
+   *   resetDataOnSourceChange: true, // true by default
+   *   responseValidate: (data) => !!data || 'Данные пусты', // Проверяйте формат в соотв. с дженериком
+   * });
    * @source
    */
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
     source?: { value: S },
-    signalName?: string,
+    optionsOrName?: string | ResourceOptions<T>,
   ): Resource<T> {
-    const state = this.signal<ResourceState<T>>({ data: null, loading: true, error: null }, signalName || 'unnamed_resource');
+    // 1. Обработка полиморфного аргумента (строка или объект) для обратной совместимости
+    const isOptionsObject = optionsOrName && typeof optionsOrName === 'object';
+    const signalName = isOptionsObject
+      ? (optionsOrName as ResourceOptions<T>).name
+      : (optionsOrName as string) || 'unnamed_resource';
+
+    const options: Partial<ResourceOptions<T>> = isOptionsObject
+      ? (optionsOrName as ResourceOptions<T>)
+      : {};
+
+    // Дефолтные настройки
+    const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true;
+    const validate = options.responseValidate;
+
+    const state = this.signal<ResourceState<T>>({ data: null, loading: true, error: null }, signalName);
     let controller: AbortController | null = null;
 
-    const load = async (sValue: S) => {
+    const load = async (sValue: S, isSourceChange = false) => {
       controller?.abort();
       controller = new AbortController();
 
-      // Читаем текущие данные без создания зависимости!
-      const currentData = this.untrack(() => state.value.data);
+      // Логика автоматического сброса: очищаем, только если включена опция И это смена источника
+      const shouldClear = isSourceChange && resetDataOnSourceChange;
+      const currentData = shouldClear ? null : this.untrack(() => state.value.data);
 
-      // Теперь обновление состояния не вызовет перезапуск эффекта
       state.value = { data: currentData, loading: true, error: null };
 
       try {
         const data = await fetcher(sValue, controller.signal);
+
         if (!controller.signal.aborted) {
+          // 2. ВАЛИДАЦИЯ ОТВЕТА СЕРВЕРА
+          if (validate) {
+            const validationResult = validate(data);
+
+            // Если валидация вернула false или строку с ошибкой
+            if (validationResult === false || typeof validationResult === 'string') {
+              const errorMsg = typeof validationResult === 'string'
+                ? validationResult
+                : 'Validation failed for response data';
+
+              state.value = { data: null, loading: false, error: new Error(errorMsg) };
+              return;
+            }
+          }
+
+          // Если валидация пройдена (или отсутствует), записываем данные
           state.value = { data, loading: false, error: null };
         }
       } catch (e: any) {
@@ -538,15 +602,9 @@ export class ReactiveEngine {
       }
     };
 
-    // Чтобы эффект не подписывался на state,
-    // нам нужно изолировать чтение source от чтения state
     this.effect(() => {
-      // Читаем ТОЛЬКО source. Это наша единственная зависимость.
       const sValue = source ? source.value : undefined as S;
-
-      // Вызываем load. Внутри load чтение state.value
-      // не должно регистрироваться как зависимость этого эффекта.
-      load(sValue);
+      load(sValue, true); // При изменении источника передаем true
 
       return () => controller?.abort();
     });
@@ -556,7 +614,7 @@ export class ReactiveEngine {
       get loading() { return state.value.loading; },
       get error() { return state.value.error; },
       get value() { return state.value; },
-      refetch: () => load(source ? source.value : undefined as S),
+      refetch: () => load(source ? source.value : undefined as S, false), // При ручном рефетче передаем false
       subscribe: (cb) => state.subscribe(cb)
     };
   }
