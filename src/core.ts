@@ -153,6 +153,8 @@ export interface ResourceOptions<T> {
   isExponentialBackoffEnabled?: boolean;
   /** Максимальный лимит ожидания между попытками в миллисекундах. По умолчанию: 30000 (30 секунд) */
   maxRetryDelay?: number;
+  /** Максимальное время ожидания ответа сервера в миллисекундах. По умолчанию: отсутствует (бесконечно) */
+  timeout?: number;
 }
 
 /**
@@ -602,66 +604,80 @@ export class ReactiveEngine {
     const baseDelay = options.retryDelay ?? 1000;
     const useExponential = options.isExponentialBackoffEnabled ?? false;
     const maxRetryDelay = options.maxRetryDelay ?? 30000;
+    // Извлекаем настройку таймаута
+    const timeoutMs = options.timeout;
 
     const state = this.signal<ResourceState<T>>(
       { data: null, loading: true, error: null, isRetrying: false },
       signalName
     );
 
-    // ИСПРАВЛЕНИЕ 1: Функция load теперь принимает нативный AbortSignal в качестве аргумента!
-    const load = async (sValue: S, currentSignal: AbortSignal, isSourceChange = false) => {
+    const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
       const shouldClear = isSourceChange && resetDataOnSourceChange;
       const currentData = shouldClear ? null : this.untrack(() => state.value.data);
 
       state.value = { data: currentData, loading: true, error: null, isRetrying: false };
 
       for (let attempt = 0; attempt <= retryCount; attempt++) {
+        // Локальные переменные для очистки слушателей таймаута
+        let timeoutController: AbortController | null = null;
+        let combinedSignal = effectSignal;
+
         try {
-          if (currentSignal.aborted) return; // Условие 1: до запроса
+          if (effectSignal.aborted) return; // Внешний guard-шлагбаум
 
-          const data = await fetcher(sValue, currentSignal);
+          // ИСПРАВЛЕНИЕ: Интеграция таймаута для текущей попытки фетча
+          if (timeoutMs && timeoutMs > 0) {
+            // Создаем нативный сигнал таймаута
+            const timeoutSignal = AbortSignal.timeout(timeoutMs);[1, 2]
 
-          // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ 1: Жесткая проверка СРАЗУ после fetcher.
-          // Если пока парсился json() или выполнялся fetch, прилетел abort — мгновенно выходим!
-          if (currentSignal.aborted) {
-            return;
+            // Объединяем сигнал эффекта (смена source) и сигнал таймаута [3]
+            combinedSignal = AbortSignal.any([effectSignal, timeoutSignal]);[3]
+          }
+
+          // Передаем объединенный сигнал в пользовательский fetcher
+          const data = await fetcher(sValue, combinedSignal);
+
+          // Проверяем, не прилетал ли abort (внешний или таймаут) во время фетча
+          if (combinedSignal.aborted) {
+            // Если это был таймаут, а не внешняя смена источника — пробрасываем в catch для запуска ретраев!
+            if (!effectSignal.aborted) {
+              throw new DOMException('The operation timed out.', 'TimeoutError');
+            }
+            return; // Если внешняя отмена — просто тихо выходим
           }
 
           if (validate) {
             const validationResult = validate(data);
             if (validationResult === false || typeof validationResult === 'string') {
-              // ЕЩЕ ОДНА ПРОВЕРИКА: Вдруг отмена прилетела во время валидации
-              if (currentSignal.aborted) return;
-
+              if (combinedSignal.aborted) return;
               const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed';
               state.value = { data: null, loading: false, error: new Error(errorMsg), isRetrying: false };
               return;
             }
           }
 
-          // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ 2: Последняя guard-проверка прямо перед изменением стейта!
-          // Это гарантирует, что старый асинхронный поток НИКОГДА не затрет актуальные новые данные.
-          if (currentSignal.aborted) {
-            return;
-          }
+          if (combinedSignal.aborted) return;
 
           state.value = { data, loading: false, error: null, isRetrying: false };
           return;
 
         } catch (e: any) {
-          // 1. Если прилетел abort во время fetch — мгновенно выходим
-          if (currentSignal.aborted || e.name === 'AbortError' || e.message?.includes('abort')) {
+          // Если это внешняя отмена (смена источника или refetch) — мгновенно умираем
+          if (effectSignal.aborted || e.name === 'AbortError' && effectSignal.aborted) {
             return;
           }
 
+          // Если это был таймаут запроса ИЛИ обычная сетевая ошибка — идем на круг ретраев!
+          const isTimeout = e.name === 'TimeoutError' || e.name === 'AbortError' || e.message?.includes('timeout');
+
           if (attempt === retryCount) {
-            // Защищаем запись ошибки от Race Condition
-            if (currentSignal.aborted) return;
-            state.value = { data: null, loading: false, error: e, isRetrying: false };
+            if (effectSignal.aborted) return;
+            // Если попытки исчерпаны, записываем ошибку таймаута или сети в стейт
+            const finalError = isTimeout ? new Error(`Request timed out after ${timeoutMs}ms`) : e;
+            state.value = { data: null, loading: false, error: finalError, isRetrying: false };
           } else {
-            // 2. ЖЕСТКИЙ GUARD: Если отмена прилетела прямо перед расчетом задержки,
-            // мы вообще не создаем новый таймер и не пускаем цикл дальше!
-            if (currentSignal.aborted) return;
+            if (effectSignal.aborted) return;
 
             let currentDelay = useExponential ? baseDelay * Math.pow(2, attempt) : baseDelay;
             currentDelay = Math.min(currentDelay, maxRetryDelay);
@@ -670,15 +686,14 @@ export class ReactiveEngine {
 
             state.value = { data: state.value.data, loading: true, error: null, isRetrying: true };
 
-            try {
-              // 3. Уходим в сон
-              await this.delay(currentDelay, currentSignal);
+            const logReason = isTimeout ? 'таймауту' : 'ошибке сети';
+            console.warn(`[Resource Retry] "${signalName}" сбой по ${logReason}. Попытка ${attempt + 1}/${retryCount + 1}...`);
 
-              // 4. КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем сигнал СРАЗУ после просыпания,
-              // ПЕРЕД тем, как цикл for перейдет на следующую итерацию и вызовет fetcher!
-              if (currentSignal.aborted) return;
+            try {
+              // Паузу задержки слушаем ТОЛЬКО по внешнему сигналу эффекта (смена источника)
+              await this.delay(currentDelay, effectSignal);
+              if (effectSignal.aborted) return;
             } catch (delayError) {
-              // Если за время сна прилетел abort и delay выкинул исключение
               return;
             }
           }
@@ -686,26 +701,18 @@ export class ReactiveEngine {
       }
     };
 
-    // ИСПРАВЛЕНИЕ 2: Для ручного метода refetch храним ссылку на контроллер ПОСЛЕДНЕГО активного эффекта
     let activeEffectController: AbortController | null = null;
 
     this.effect(() => {
-      // 1. Четко регистрируем зависимость ТОЛЬКО от источника
       const sValue = source ? source.value : undefined as S;
-
       const effectController = new AbortController();
       activeEffectController = effectController;
 
-      // 2. ИСПРАВЛЕНИЕ: Вызываем load внутри untrack!
-      // Это гарантирует, что мутации state.value внутри load()
-      // НЕ подпишут текущий эффект на изменения самого себя и не вызовут каскадный перезапуск.
       this.untrack(() => {
         load(sValue as S, effectController.signal, true);
       });
 
-      return () => {
-        effectController.abort();
-      };
+      return () => effectController.abort();
     });
 
     return {
@@ -714,7 +721,6 @@ export class ReactiveEngine {
       get error() { return state.value.error; },
       get isRetrying() { return state.value.isRetrying; },
       get value() { return state.value; },
-      // При ручном рефетче отменяем текущий активный контроллер и создаем новый для внеочередного load
       refetch: () => {
         activeEffectController?.abort();
         activeEffectController = new AbortController();

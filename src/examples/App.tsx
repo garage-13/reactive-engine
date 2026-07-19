@@ -5,6 +5,7 @@ import { Example10, Example11 } from './10-computed'
 import { Example20 } from './20-resource'
 import { Example21 } from './21-multi-resource'
 import { Example22 } from './22-resource-exponential-backoff'
+import { Example23 } from './23-resorce-timeout'
 
 export const App = () => {
   return (
@@ -31,6 +32,7 @@ export const App = () => {
           <Example20 />
           <Example21 />
           <Example22 />
+          <Example23 />
         </div>
       </div>
 

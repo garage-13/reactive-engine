@@ -773,3 +773,77 @@ describe('Resources - Multi-Signal Subscription & Race Condition Protection', ()
     consoleSpy.mockRestore();
   });
 });
+
+describe('Resources - Timeout Support', () => {
+  let consoleWarnSpy: any;
+  let engine: ReactiveEngine;
+
+  beforeEach(() => {
+    engine = new ReactiveEngine();
+    vi.useRealTimers(); // Используем реальное время Node.js
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+  });
+
+  afterEach(() => {
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('должен принудительно прерывать зависший запрос по таймауту и запускать ретраи // Этот тест показывает, что асинхронный ресурс принудительно прерывает зависший сетевой запрос ровно через указанное в таймауте время и успешно запускает детерминированную цепочку повторных попыток с корректным обновлением реактивных флагов состояния.', async () => {
+    const fetcher = vi.fn().mockImplementation((_src, signal: AbortSignal) => {
+      return new Promise((_resolve, reject) => {
+        if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+
+        signal.addEventListener('abort', () => {
+          reject(new DOMException('The operation timed out.', 'TimeoutError'));
+        }, { once: true });
+      });
+    });
+
+    const source = engine.signal(1);
+
+    const res = engine.resource(fetcher, source, {
+      name: 'test-timeout-resource',
+      timeout: 10,   // Микро-таймаут 10мс
+      retryCount: 2, // 2 ретрая (всего 3 запроса)
+      retryDelay: 10, // Базовая пауза 10мс (к ней прибавится случайный jitter до 200мс)
+      isExponentialBackoffEnabled: false
+    });
+
+    // --- Старт Попытки 0 ---
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(res.loading).toBe(true);
+    expect(res.isRetrying).toBe(false);
+
+    // 1. Ждем падения первого запроса по таймауту.
+    // Как только он упадет, взведется флаг isRetrying
+    await vi.waitFor(() => {
+      expect(res.isRetrying).toBe(true);
+    }, { timeout: 100, interval: 5 }); // Даем до 100мс на срабатывание таймаута
+
+    expect(fetcher).toHaveBeenCalledTimes(1); // Мы зашли в паузу сна, 2-й запрос еще не ушел
+
+    // 2. Ждем, пока сработает Попытка 1.
+    // Из-за Jitter это займет от 10 до 210мс. vi.waitFor будет терпеливо проверять счетчик.
+    await vi.waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    }, { timeout: 300, interval: 10 });
+
+    expect(res.isRetrying).toBe(true); // Второй запрос тоже пендится в таймауте
+
+    // 3. Ждем, пока сработает финальная Попытка 2.
+    await vi.waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(3);
+    }, { timeout: 300, interval: 10 });
+
+    // 4. Ждем, когда финальный запрос упадет по таймауту и движок полностью сдастся
+    await vi.waitFor(() => {
+      expect(res.loading).toBe(false);
+    }, { timeout: 200, interval: 10 });
+
+    // Финальные проверки стейта после полного завершения цикла
+    expect(res.isRetrying).toBe(false);
+    expect(res.data).toBeNull();
+    expect(res.error).toBeInstanceOf(Error);
+    expect(res.error?.message).toContain('Request timed out after 10ms');
+  });
+});
