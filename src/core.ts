@@ -604,7 +604,6 @@ export class ReactiveEngine {
     const baseDelay = options.retryDelay ?? 1000;
     const useExponential = options.isExponentialBackoffEnabled ?? false;
     const maxRetryDelay = options.maxRetryDelay ?? 30000;
-    // Извлекаем настройку таймаута
     const timeoutMs = options.timeout;
 
     const state = this.signal<ResourceState<T>>(
@@ -620,19 +619,19 @@ export class ReactiveEngine {
 
       for (let attempt = 0; attempt <= retryCount; attempt++) {
         // Локальные переменные для очистки слушателей таймаута
-        let timeoutController: AbortController | null = null;
+        // let timeoutController: AbortController | null = null;
         let combinedSignal = effectSignal;
 
         try {
           if (effectSignal.aborted) return; // Внешний guard-шлагбаум
 
-          // ИСПРАВЛЕНИЕ: Интеграция таймаута для текущей попытки фетча
+          // Интеграция таймаута для текущей попытки фетча
           if (timeoutMs && timeoutMs > 0) {
             // Создаем нативный сигнал таймаута
             const timeoutSignal = AbortSignal.timeout(timeoutMs);[1, 2]
 
             // Объединяем сигнал эффекта (смена source) и сигнал таймаута [3]
-            combinedSignal = AbortSignal.any([effectSignal, timeoutSignal]);[3]
+            combinedSignal = AbortSignal.any([effectSignal, timeoutSignal]);
           }
 
           // Передаем объединенный сигнал в пользовательский fetcher
@@ -681,6 +680,7 @@ export class ReactiveEngine {
 
             let currentDelay = useExponential ? baseDelay * Math.pow(2, attempt) : baseDelay;
             currentDelay = Math.min(currentDelay, maxRetryDelay);
+            // Jitter - это добавление случайного шума (случайной задержки во времени) к фиксированному интервалу между повторными запросами (retries)
             const jitter = Math.random() * 200;
             currentDelay = currentDelay + jitter;
 
