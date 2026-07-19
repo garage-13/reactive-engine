@@ -527,18 +527,17 @@ export class ReactiveEngine {
 
   /**
    * Вспомогательная функция для задержки (sleep), чувствительная к AbortSignal
+   *
+   * Вызов new DOMException('Aborted', 'AbortError') гарантирует,
+   * что ваша кастомная пауза между ретраями this.delay притворяется для движка JavaScript
+   * точно таким же нативным процессом отмены, как и fetch().
+   * Это делает реактивное ядро бесшовным и избавляет от необходимости
+   * писать кучу разных проверок под каждый тип ошибки.
    */
   private delay(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) {
         return reject(new DOMException('Aborted', 'AbortError'));
-        /* NOTE
-        Вызов new DOMException('Aborted', 'AbortError') гарантирует,
-        что ваша кастомная пауза между ретраями this.delay притворяется для движка JavaScript
-        точно таким же нативным процессом отмены, как и fetch().
-        Это делает реактивное ядро бесшовным и избавляет от необходимости
-        писать кучу разных проверок под каждый тип ошибки.
-        */
       }
 
       const timeoutId = setTimeout(() => {
