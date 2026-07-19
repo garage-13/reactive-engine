@@ -47,8 +47,8 @@ export class CartService {
 
     // Асинхронный ресурс автоматически подстраивается под состояние авторизации
     this.cartResource = this.engine.resource(
-      async (_, abortSignal) => {
-        if (!this.authService.isAuthorized.value) return [];
+      async (isAuthorized, abortSignal) => {
+        if (!isAuthorized) throw new Error('Not authorized yet...');
         const res = await fetch('/api/cart', { signal: abortSignal });
         return res.json();
       },
@@ -305,7 +305,7 @@ export const AdvancedBatchDemo = () => {
     try {
       // Имитируем запрос к серверу
       await new Promise((resolve) => setTimeout(resolve, 1000))
-      const fakeResponse = "Успешный ответ от сервера #42"
+      const fakeResponse = 'Успешный ответ от сервера'
 
       // АСИНХРОННЫЙ АВТОБАТЧИНГ:
       // Эти три обновления происходят внутри одной микрозадачи после await.
@@ -416,8 +416,8 @@ const searchSignal = engine.signal('', 'search')
 
 export const cachedSearchResource = engine.resource(
   withCache(
-    async (query, abortSignal) => {
-      const res = await fetch(`https://example.com{query}`, { signal: abortSignal })
+    async (queryValue, abortSignal) => {
+      const res = await fetch(`https://example.com${queryValue}`, { signal: abortSignal })
       return res.json()
     },
     { ttl: 30 * 1000 } // Кэш будет валиден 30 секунд для каждого уникального query

@@ -46,8 +46,8 @@ export class CartService {
 
     // The async resource automatically syncs with the external authorization state
     this.cartResource = this.engine.resource(
-      async (_, abortSignal) => {
-        if (!this.authService.isAuthorized.value) return [];
+      async (isAuthorized, abortSignal) => {
+        if (!isAuthorized) throw new Error('Пользователь еще не авторизован...');
         const res = await fetch('/api/cart', { signal: abortSignal });
         return res.json();
       },
