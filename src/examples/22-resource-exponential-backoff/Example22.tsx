@@ -32,7 +32,15 @@ class Logic extends BaseREService {
       retryCount: 4,               // Сделать до 4 повторов при ошибках сети
       retryDelay: 1000,            // Стартовая задержка 1 секунда
       isExponentialBackoffEnabled: true,    // Интервалы будут: ~1с -> ~2с -> ~4с -> ~8с
-      maxRetryDelay: 10000         // ИСПРАВЛЕНИЕ: Рост остановится на 10 секундах! Попытки 4, 5 и 6 будут ждать ~10с
+      maxRetryDelay: 10000,        // ИСПРАВЛЕНИЕ: Рост остановится на 10 секундах! Попытки 4, 5 и 6 будут ждать ~10с
+      // Добавляем пре-валидацию входного сигнала на уровне настроек:
+      // Если возвращает строку, ядро автоматически запишет её в error, минуя fetch и ретраи
+      validateBeforeFetch: (counterValue) => {
+        if (counterValue === 0) {
+          return `Not started (pre-validation before fetch) for count value ${counterValue}`;
+        }
+        return true; // Валидация успешна, можно делать fetch
+      },
     }
   )
 
@@ -57,7 +65,7 @@ export const Example22 = () => {
           ({counter}) Refresh account data
         </button>
       </div>
-      <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
         <span>{loading ? '🟡 loading...' : !!data ? '🟢 ok' : !!error ? '🔴 err' : '⚪'} | isRetrying: {String(isRetrying)}</span>
         {!!error?.message && <em>{error?.message}</em>}
       </div>

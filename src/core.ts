@@ -1,4 +1,5 @@
 import { useState as useStateFromReact, useEffect as useEffectFromReact } from 'react';
+import { getExtractedValues } from './utils';
 
 // --- ТИПЫ ---
 export type CleanupFn = () => void;
@@ -133,7 +134,7 @@ export interface Computed<T> {
   destroy: () => void;
 }
 
-export interface ResourceOptions<T> {
+export interface ResourceOptions<T, S> {
   name: string;
   /** Автоматически сбрасывать data в null при изменении source. По умолчанию: true */
   resetDataOnSourceChange?: boolean;
@@ -145,6 +146,10 @@ export interface ResourceOptions<T> {
    * - string 👉 попадет в поле error
    * */
   responseValidate?: (responseData: T) => boolean | string;
+
+  /** Функция валидации входных зависимостей (source) перед запуском fetch.
+   * Если возвращает false или string (текст ошибки) — запрос и ретраи блокируются. */
+  validateBeforeFetch?: (sourceValue: S) => boolean | string;
 
   // НАСТРОЙКИ RETRY:
   retryCount?: number;
@@ -581,24 +586,55 @@ export class ReactiveEngine {
    *   resetDataOnSourceChange: true, // true by default
    *   responseValidate: (data) => !!data || 'Данные пусты', // Проверяйте формат в соотв. с дженериком
    * });
+   *
+   * @example
+   * // (Экспериментальная фича)
+   * // В теле fetcher можно выкинуть ошибку в виде
+   * // `throw new Error('[THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY=1][MESSAGE=Your msg]')`
+   * // Причина: Особенности внутренней реализации определения харакрера ошибки и необходимость делать retry (если такая опция передана)
+   * // Рекомендуем вместо этого использовать `validateBeforeFetch` в опциях при создании ресурса.
+   * const res = engine.resource(
+   *   async (counterValue, abortSignal) => {
+   *     if (counterValue === 0)
+   *       throw new Error([
+   *         '[THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY=1]', // Иначе запустится механизм retry (напр. по причине отсутствия сети, далее в этом же примере)
+   *         `[MESSAGE=Stop for count value ${counterValue} - excepted from fetcher fn body]`,
+   *       ].join(' '))
+   *     const res = await fetch(
+   *       [
+   *         `${BASE_API_URL}/profile/search`,
+   *         '?',
+   *         [
+   *           `counter=${counterValue}`,
+   *           '_responseDelay=2000',
+   *         ].join('&')
+   *       ].join(''),
+   *       { signal: abortSignal }
+   *     )
+   *     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+   *     return res.json()
+   *   },
+   *   this.counter,
+   * )
    * @source
    */
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
     source?: { value: S },
-    optionsOrName?: string | ResourceOptions<T>,
+    optionsOrName?: string | ResourceOptions<T, S>, // Добавили S в дженерик опций для типизации аргумента
   ): Resource<T> {
     const isOptionsObject = optionsOrName && typeof optionsOrName === 'object';
     const signalName = isOptionsObject
-      ? (optionsOrName as ResourceOptions<T>).name
+      ? (optionsOrName as ResourceOptions<T, S>).name
       : (optionsOrName as string) || 'unnamed_resource';
 
-    const options: Partial<ResourceOptions<T>> = isOptionsObject
-      ? (optionsOrName as ResourceOptions<T>)
+    const options: Partial<ResourceOptions<T, S>> = isOptionsObject
+      ? (optionsOrName as ResourceOptions<T, S>)
       : {};
 
     const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true;
-    const validate = options.responseValidate;
+    const responseValidate = options.responseValidate;
+    const validateBeforeFetch = options.validateBeforeFetch;
 
     const retryCount = options.retryCount ?? 0;
     const baseDelay = options.retryDelay ?? 1000;
@@ -612,75 +648,89 @@ export class ReactiveEngine {
     );
 
     const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
+      // -- NOTE: #EXTRA_STOP_RESOURCE 2/2 ИНТЕГРАЦИЯ ПРЕ-ВАЛИДАЦИИ: Проверяем входные данные ДО очистки стейта и запуска цикла
+      if (validateBeforeFetch) {
+        const preValidationResult = validateBeforeFetch(sValue)
+        if (preValidationResult === false || typeof preValidationResult === 'string') {
+          const errorMsg = typeof preValidationResult === 'string'
+            ? preValidationResult
+            : 'Pre-fetch validation failed for resource'
+          // Выключаем loading, обнуляем данные и записываем ошибку валидации входных данных
+          state.value = { data: null, loading: false, error: new Error(errorMsg), isRetrying: false }
+          return // ЖЕСТКИЙ ПРЕРЫВ: fetcher и цикл ретраев даже не запустятся!
+        }
+      }
+      // --
       const shouldClear = isSourceChange && resetDataOnSourceChange;
       const currentData = shouldClear ? null : this.untrack(() => state.value.data);
 
       state.value = { data: currentData, loading: true, error: null, isRetrying: false };
 
       for (let attempt = 0; attempt <= retryCount; attempt++) {
-        // Локальные переменные для очистки слушателей таймаута
-        // let timeoutController: AbortController | null = null;
-        let combinedSignal = effectSignal;
+        let combinedSignal = effectSignal
 
         try {
-          if (effectSignal.aborted) return; // Внешний guard-шлагбаум
+          if (effectSignal.aborted) return
 
-          // Интеграция таймаута для текущей попытки фетча
           if (timeoutMs && timeoutMs > 0) {
-            // Создаем нативный сигнал таймаута
-            const timeoutSignal = AbortSignal.timeout(timeoutMs);[1, 2]
-
-            // Объединяем сигнал эффекта (смена source) и сигнал таймаута [3]
-            combinedSignal = AbortSignal.any([effectSignal, timeoutSignal]);
+            const timeoutSignal = AbortSignal.timeout(timeoutMs)
+            combinedSignal = AbortSignal.any([effectSignal, timeoutSignal])
           }
 
-          // Передаем объединенный сигнал в пользовательский fetcher
-          const data = await fetcher(sValue, combinedSignal);
+          const data = await fetcher(sValue, combinedSignal)
 
-          // Проверяем, не прилетал ли abort (внешний или таймаут) во время фетча
           if (combinedSignal.aborted) {
-            // Если это был таймаут, а не внешняя смена источника — пробрасываем в catch для запуска ретраев!
-            if (!effectSignal.aborted) {
-              throw new DOMException('The operation timed out.', 'TimeoutError');
-            }
-            return; // Если внешняя отмена — просто тихо выходим
+            if (!effectSignal.aborted)
+              throw new DOMException('The operation timed out.', 'TimeoutError')
+            return
           }
 
-          if (validate) {
-            const validationResult = validate(data);
+          if (responseValidate) {
+            const validationResult = responseValidate(data)
             if (validationResult === false || typeof validationResult === 'string') {
-              if (combinedSignal.aborted) return;
-              const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed';
-              state.value = { data: null, loading: false, error: new Error(errorMsg), isRetrying: false };
-              return;
+              if (combinedSignal.aborted) return
+              const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed'
+              state.value = { data: null, loading: false, error: new Error(errorMsg), isRetrying: false }
+              return
             }
           }
 
-          if (combinedSignal.aborted) return;
+          if (combinedSignal.aborted) return
 
-          state.value = { data, loading: false, error: null, isRetrying: false };
-          return;
-
+          state.value = { data, loading: false, error: null, isRetrying: false }
+          return
         } catch (e: any) {
-          // Если это внешняя отмена (смена источника или refetch) — мгновенно умираем
-          if (effectSignal.aborted || e.name === 'AbortError' && effectSignal.aborted) {
-            return;
-          }
+          if (effectSignal.aborted || e.name === 'AbortError' && effectSignal.aborted) return
 
-          // Если это был таймаут запроса ИЛИ обычная сетевая ошибка — идем на круг ретраев!
-          const isTimeout = e.name === 'TimeoutError' || e.name === 'AbortError' || e.message?.includes('timeout');
-
-          if (attempt === retryCount) {
+          const isTimeout = e.name === 'TimeoutError' || e.name === 'AbortError' || e.message?.includes('timeout')
+          // -- NOTE: #EXTRA_STOP_RESOURCE 1/2 ПЕРВЫЙ ВАРИАНТ: Перехват императивного throw new Error из тела fetcher
+          const isCustomValidationError = getExtractedValues({
+            tested: [e.message], expectedKey: 'THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY', valueType: 'number',
+          })?.[0] === '1' || false
+          const __defaultCustomValidationErrorMessage = 'Custom validation error'
+          let customValidationErrorMessage: string = isCustomValidationError
+            ? (getExtractedValues({
+              tested: [e.message], expectedKey: 'MESSAGE', valueType: 'string',
+            })?.[0] || __defaultCustomValidationErrorMessage)
+            : __defaultCustomValidationErrorMessage
+          const isFetchBodyValidationError = isCustomValidationError || e.name === 'ValidationError'
+          // --
+          if (attempt === retryCount || isFetchBodyValidationError) {
             if (effectSignal.aborted) return;
-            // Если попытки исчерпаны, записываем ошибку таймаута или сети в стейт
-            const finalError = isTimeout ? new Error(`Request timed out after ${timeoutMs}ms`) : e;
-            state.value = { data: null, loading: false, error: finalError, isRetrying: false };
+            const finalError = isTimeout
+              ? new Error(`Request timed out after ${timeoutMs}ms`, { cause: e })
+              : isCustomValidationError
+                ? new Error(customValidationErrorMessage, { cause: e })
+                : e
+
+            // Гарантированно тушим loading и записываем ошибку
+            state.value = { data: null, loading: false, error: finalError, isRetrying: false }
+            return
           } else {
             if (effectSignal.aborted) return;
 
             let currentDelay = useExponential ? baseDelay * Math.pow(2, attempt) : baseDelay;
             currentDelay = Math.min(currentDelay, maxRetryDelay);
-            // Jitter - это добавление случайного шума (случайной задержки во времени) к фиксированному интервалу между повторными запросами (retries)
             const jitter = Math.random() * 200;
             currentDelay = currentDelay + jitter;
 
@@ -690,7 +740,6 @@ export class ReactiveEngine {
             console.warn(`[Resource Retry] "${signalName}" сбой по ${logReason}. Попытка ${attempt + 1}/${retryCount + 1}...`);
 
             try {
-              // Паузу задержки слушаем ТОЛЬКО по внешнему сигналу эффекта (смена источника)
               await this.delay(currentDelay, effectSignal);
               if (effectSignal.aborted) return;
             } catch (delayError) {

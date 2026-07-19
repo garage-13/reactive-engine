@@ -35,14 +35,20 @@ class Logic extends BaseREService {
       retryDelay: 1000,            // Базовая задержка между попытками
       isExponentialBackoffEnabled: true, // Прогрессивно увеличивать паузу (~1с -> ~2с -> ~4с)
       maxRetryDelay: 5000,         // Ограничить максимальное время ожидания 5 секундами
-
-      /* NOTE: Итого
-      - Всего сетевых вызовов: 4 запроса (1 стартовый + 3 повторных)
-      - Максимальное время на один запрос: Строго 2.5 секунды
-      - Общее время удержания лоадера на экране: Около 17 секунд (4 запроса по 2.5 секунды + ~7 секунд суммарного сна в паузах между ними)
-      */
+      validateBeforeFetch: (counterValue) => {
+        if (counterValue === 0) {
+          return `Not started (pre-validation before fetch) for count value ${counterValue}`;
+        }
+        return true; // Валидация успешна, можно делать fetch
+      },
     }
   )
+
+  /* NOTE: Итого ожидается
+  - Всего сетевых вызовов: 4 запроса (1 стартовый + 3 повторных)
+  - Максимальное время на один запрос: Строго 2.5 секунды
+  - Общее время удержания лоадера на экране: Около 17 секунд (4 запроса по 2.5 секунды + ~7 секунд суммарного сна в паузах между ними)
+  */
 
   public inc() {
     this.counter.value += 1
@@ -75,7 +81,7 @@ export const Example23 = () => {
       </div>
 
       <div className={baseClasses.unitInternalWrapper}>
-        <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Интеллектуальный вывод статуса: если идет повтор, подсвечиваем его отдельно */}
           <span>
             {isRetrying ? '🟠 retrying (timeout)...' :
@@ -90,8 +96,6 @@ export const Example23 = () => {
       </div>
 
       <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data }, null, 2)}</pre>
-
-      <em>4 запроса (1 стартовый + 3 повторных)</em>
     </div>
   )
 }

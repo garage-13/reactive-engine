@@ -12,6 +12,9 @@ class Logic extends BaseREService {
   public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-20:computed:counter');
   public apiState = this.engine.resource(
     async (counterValue, abortSignal) => {
+      if (counterValue === 0)
+        throw new Error(`[THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY=1] [MESSAGE=Stop for count value ${counterValue} - excepted from fetcher fn body]`)
+
       const res = await fetch(
         [
           `${BASE_API_URL}/profile/search`,
@@ -26,7 +29,16 @@ class Logic extends BaseREService {
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
       return res.json()
     },
-    this.counter
+    this.counter,
+    {
+      name: 'example-20:resource',
+      // validateBeforeFetch: (counterValue) => {
+      //   if (counterValue === 0) {
+      //     return `Not started (pre-validation before fetch) for count value ${counterValue}`;
+      //   }
+      //   return true; // Валидация успешна, можно делать fetch
+      // },
+    }
   )
 
   public inc() {
@@ -50,8 +62,8 @@ export const Example20 = () => {
           ({counter}) Refresh account data
         </button>
       </div>
-      <div className={baseClasses.unitInternalWrapper}>
-        <div>{loading ? '🟡 loading...' : !!data ? '🟢 ok' : !!error ? '🔴 err' : '⚪'}</div>
+      <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span>{loading ? '🟡 loading...' : !!data ? '🟢 ok' : !!error ? '🔴 err' : '⚪'}</span>
         {!!error?.message && <em>{error?.message}</em>}
       </div>
       <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data }, null, 2)}</pre>
