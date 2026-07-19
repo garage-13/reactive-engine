@@ -4,6 +4,7 @@ import { Example01 } from './01-signal'
 import { Example10, Example11 } from './10-computed'
 import { Example20 } from './20-resource'
 import { Example21 } from './21-multi-resource'
+import { Example22 } from './22-resource-exponential-backoff'
 
 export const App = () => {
   return (
@@ -29,6 +30,7 @@ export const App = () => {
         <div className={clsx(baseClasses.unitsWrapper)}>
           <Example20 />
           <Example21 />
+          <Example22 />
         </div>
       </div>
 

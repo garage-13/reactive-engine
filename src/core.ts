@@ -81,6 +81,9 @@ export interface ResourceState<T> {
    * @type {any | null}
    */
   error: any | null;
+
+  /** Флаг активного процесса повторных попыток после сбоя сети */
+  isRetrying: boolean;
 }
 
 /**
@@ -142,6 +145,14 @@ export interface ResourceOptions<T> {
    * - string 👉 попадет в поле error
    * */
   responseValidate?: (responseData: T) => boolean | string;
+
+  // НАСТРОЙКИ RETRY:
+  retryCount?: number;
+  retryDelay?: number;
+  /** Включить экспоненциальное увеличение задержки (каждая попытка ждет в 2 раза дольше). По умолчанию: false */
+  isExponentialBackoffEnabled?: boolean;
+  /** Максимальный лимит ожидания между попытками в миллисекундах. По умолчанию: 30000 (30 секунд) */
+  maxRetryDelay?: number;
 }
 
 /**
@@ -515,6 +526,32 @@ export class ReactiveEngine {
   }
 
   /**
+   * Вспомогательная функция для задержки (sleep), чувствительная к AbortSignal
+   */
+  /**
+   * Вспомогательная функция для задержки, чувствительная к AbortSignal
+   */
+  private delay(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) {
+        return reject(new DOMException('Aborted', 'AbortError'));
+      }
+
+      const timeoutId = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+
+      const onAbort = () => {
+        clearTimeout(timeoutId); // СИНХРОННО УБИВАЕТ ТАЙМЕР. В Vitest это заставит таймер исчезнуть из очереди прокрутки
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  /**
    * Создание асинхронного ресурса. Типы на входе: <T - формат ответа, S - источник изменений (сигнал либо computed-кортеж из зачений сигналов .value)>
    *
    * Explained 👉 {@link https://github.com/garage-13/reactive-engine/blob/main/README_EN.md#1-async-resources-dependent-on-multiple-signals}
@@ -546,7 +583,6 @@ export class ReactiveEngine {
     source?: { value: S },
     optionsOrName?: string | ResourceOptions<T>,
   ): Resource<T> {
-    // 1. Обработка полиморфного аргумента (строка или объект) для обратной совместимости
     const isOptionsObject = optionsOrName && typeof optionsOrName === 'object';
     const signalName = isOptionsObject
       ? (optionsOrName as ResourceOptions<T>).name
@@ -556,65 +592,131 @@ export class ReactiveEngine {
       ? (optionsOrName as ResourceOptions<T>)
       : {};
 
-    // Дефолтные настройки
     const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true;
     const validate = options.responseValidate;
 
-    const state = this.signal<ResourceState<T>>({ data: null, loading: true, error: null }, signalName);
-    let controller: AbortController | null = null;
+    const retryCount = options.retryCount ?? 0;
+    const baseDelay = options.retryDelay ?? 1000;
+    const useExponential = options.isExponentialBackoffEnabled ?? false;
+    const maxRetryDelay = options.maxRetryDelay ?? 30000;
 
-    const load = async (sValue: S, isSourceChange = false) => {
-      controller?.abort();
-      controller = new AbortController();
+    const state = this.signal<ResourceState<T>>(
+      { data: null, loading: true, error: null, isRetrying: false },
+      signalName
+    );
 
-      // Логика автоматического сброса: очищаем, только если включена опция И это смена источника
+    // ИСПРАВЛЕНИЕ 1: Функция load теперь принимает нативный AbortSignal в качестве аргумента!
+    const load = async (sValue: S, currentSignal: AbortSignal, isSourceChange = false) => {
       const shouldClear = isSourceChange && resetDataOnSourceChange;
       const currentData = shouldClear ? null : this.untrack(() => state.value.data);
 
-      state.value = { data: currentData, loading: true, error: null };
+      state.value = { data: currentData, loading: true, error: null, isRetrying: false };
 
-      try {
-        const data = await fetcher(sValue, controller.signal);
+      for (let attempt = 0; attempt <= retryCount; attempt++) {
+        try {
+          if (currentSignal.aborted) return; // Условие 1: до запроса
 
-        if (!controller.signal.aborted) {
-          // 2. ВАЛИДАЦИЯ ОТВЕТА СЕРВЕРА
+          const data = await fetcher(sValue, currentSignal);
+
+          // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ 1: Жесткая проверка СРАЗУ после fetcher.
+          // Если пока парсился json() или выполнялся fetch, прилетел abort — мгновенно выходим!
+          if (currentSignal.aborted) {
+            return;
+          }
+
           if (validate) {
             const validationResult = validate(data);
-
-            // Если валидация вернула false или строку с ошибкой
             if (validationResult === false || typeof validationResult === 'string') {
-              const errorMsg = typeof validationResult === 'string'
-                ? validationResult
-                : 'Validation failed for response data';
+              // ЕЩЕ ОДНА ПРОВЕРИКА: Вдруг отмена прилетела во время валидации
+              if (currentSignal.aborted) return;
 
-              state.value = { data: null, loading: false, error: new Error(errorMsg) };
+              const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed';
+              state.value = { data: null, loading: false, error: new Error(errorMsg), isRetrying: false };
               return;
             }
           }
 
-          // Если валидация пройдена (или отсутствует), записываем данные
-          state.value = { data, loading: false, error: null };
-        }
-      } catch (e: any) {
-        if (e.name !== 'AbortError') {
-          state.value = { data: null, loading: false, error: e };
+          // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ 2: Последняя guard-проверка прямо перед изменением стейта!
+          // Это гарантирует, что старый асинхронный поток НИКОГДА не затрет актуальные новые данные.
+          if (currentSignal.aborted) {
+            return;
+          }
+
+          state.value = { data, loading: false, error: null, isRetrying: false };
+          return;
+
+        } catch (e: any) {
+          // 1. Если прилетел abort во время fetch — мгновенно выходим
+          if (currentSignal.aborted || e.name === 'AbortError' || e.message?.includes('abort')) {
+            return;
+          }
+
+          if (attempt === retryCount) {
+            // Защищаем запись ошибки от Race Condition
+            if (currentSignal.aborted) return;
+            state.value = { data: null, loading: false, error: e, isRetrying: false };
+          } else {
+            // 2. ЖЕСТКИЙ GUARD: Если отмена прилетела прямо перед расчетом задержки,
+            // мы вообще не создаем новый таймер и не пускаем цикл дальше!
+            if (currentSignal.aborted) return;
+
+            let currentDelay = useExponential ? baseDelay * Math.pow(2, attempt) : baseDelay;
+            currentDelay = Math.min(currentDelay, maxRetryDelay);
+            const jitter = Math.random() * 200;
+            currentDelay = currentDelay + jitter;
+
+            state.value = { data: state.value.data, loading: true, error: null, isRetrying: true };
+
+            try {
+              // 3. Уходим в сон
+              await this.delay(currentDelay, currentSignal);
+
+              // 4. КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем сигнал СРАЗУ после просыпания,
+              // ПЕРЕД тем, как цикл for перейдет на следующую итерацию и вызовет fetcher!
+              if (currentSignal.aborted) return;
+            } catch (delayError) {
+              // Если за время сна прилетел abort и delay выкинул исключение
+              return;
+            }
+          }
         }
       }
     };
 
-    this.effect(() => {
-      const sValue = source ? source.value : undefined as S;
-      load(sValue, true); // При изменении источника передаем true
+    // ИСПРАВЛЕНИЕ 2: Для ручного метода refetch храним ссылку на контроллер ПОСЛЕДНЕГО активного эффекта
+    let activeEffectController: AbortController | null = null;
 
-      return () => controller?.abort();
+    this.effect(() => {
+      // 1. Четко регистрируем зависимость ТОЛЬКО от источника
+      const sValue = source ? source.value : undefined as S;
+
+      const effectController = new AbortController();
+      activeEffectController = effectController;
+
+      // 2. ИСПРАВЛЕНИЕ: Вызываем load внутри untrack!
+      // Это гарантирует, что мутации state.value внутри load()
+      // НЕ подпишут текущий эффект на изменения самого себя и не вызовут каскадный перезапуск.
+      this.untrack(() => {
+        load(sValue as S, effectController.signal, true);
+      });
+
+      return () => {
+        effectController.abort();
+      };
     });
 
     return {
       get data() { return state.value.data; },
       get loading() { return state.value.loading; },
       get error() { return state.value.error; },
+      get isRetrying() { return state.value.isRetrying; },
       get value() { return state.value; },
-      refetch: () => load(source ? source.value : undefined as S, false), // При ручном рефетче передаем false
+      // При ручном рефетче отменяем текущий активный контроллер и создаем новый для внеочередного load
+      refetch: () => {
+        activeEffectController?.abort();
+        activeEffectController = new AbortController();
+        load(source ? source.value : undefined as S, activeEffectController.signal, false);
+      },
       subscribe: (cb) => state.subscribe(cb)
     };
   }

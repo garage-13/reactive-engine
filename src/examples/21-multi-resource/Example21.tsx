@@ -10,8 +10,14 @@ export const Example21 = observer(() => {
   const secondaryService = useSecondaryService()
 
   return (
-    <div className={clsx(baseClasses.unit, baseClasses['unit--wide'], baseClasses.stack2)}>
-      <div className={baseClasses.absoluteUnitLabel} title='example 21 | Chain of Resources & observer'>example 21 | Chain of Resources & observer</div>
+    <div
+      className={clsx(
+        baseClasses.unit,
+        baseClasses['unit--wide'],
+        baseClasses.stack2)
+      }
+    >
+      <div className={baseClasses.absoluteUnitLabel} title='Chain of Resources & observer'>example 21 | Chain of Resources & observer</div>
       <code>{BASE_API_URL}</code>
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => userInfo.inc()} className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>Refresh account data</button>
