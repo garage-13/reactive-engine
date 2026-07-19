@@ -146,13 +146,12 @@ export interface ResourceOptions<T, S> {
    * - string 👉 попадет в поле error
    * */
   responseValidate?: (responseData: T) => boolean | string;
-
   /** Функция валидации входных зависимостей (source) перед запуском fetch.
    * Если возвращает false или string (текст ошибки) — запрос и ретраи блокируются. */
   validateBeforeFetch?: (sourceValue: S) => boolean | string;
-
-  // НАСТРОЙКИ RETRY:
+  /** Настройка лимита повторов retry. */
   retryCount?: number;
+  /** Настройка задержки первого повтора retry. */
   retryDelay?: number;
   /** Включить экспоненциальное увеличение задержки (каждая попытка ждет в 2 раза дольше). По умолчанию: false */
   isExponentialBackoffEnabled?: boolean;
