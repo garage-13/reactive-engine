@@ -8,23 +8,23 @@ import { useReactiveValue } from '../../hooks';
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 class Logic extends BaseREService {
-  public counter = this.engine.signal<number>(0, 'example-1:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-1:computed:counter');
+  public counter = this.engine.signal<number>(0, 'example-20:signal:counter');
+  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-20:computed:counter');
   public apiState = this.engine.resource(
-    async (deps, abortSignal) => {
-      console.log(deps)
+    async (counterValue, abortSignal) => {
       const res = await fetch(
         [
           `${BASE_API_URL}/profile/search`,
           '?',
           [
-            `counter=${deps}`,
+            `counter=${counterValue}`,
             '_responseDelay=2000',
           ].join('&')
         ].join(''),
         { signal: abortSignal }
-      );
-      return res.json();
+      )
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+      return res.json()
     },
     this.counter
   )
@@ -45,8 +45,10 @@ export const Example20 = () => {
     <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
       <div className={baseClasses.absoluteUnitLabel}>example 20 | Resource</div>
       <code>{BASE_API_URL}</code>
-      <div>
-        <button onClick={() => logic.inc()} className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>({counter}) Refresh account data</button>
+      <div style={{ minWidth: '100%' }}>
+        <button onClick={() => logic.inc()} className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>
+          ({counter}) Refresh account data
+        </button>
       </div>
       <div className={baseClasses.unitInternalWrapper}>
         <div>{loading ? '🟡 loading...' : !!data ? '🟢 ok' : !!error ? '🔴 err' : '⚪'}</div>

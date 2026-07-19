@@ -5,7 +5,7 @@ import { ReactiveEngine } from '../../core'
 import clsx from 'clsx';
 
 class Logic extends BaseREService {
-  public counter = this.engine.signal<number>(0, 'example-0:signal:counter');
+  public counter = this.engine.signal<number>(0, 'example-01:signal:counter');
 
   public inc() {
     this.counter.value += 1

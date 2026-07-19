@@ -14,7 +14,7 @@ export const Example21 = observer(() => {
       <div className={baseClasses.absoluteUnitLabel} title='example 21 | Chain of Resources & observer'>example 21 | Chain of Resources & observer</div>
       <code>{BASE_API_URL}</code>
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => userInfo.inc()} className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>Refresh account data</button>
+        <button onClick={() => userInfo.inc()} className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>Refresh account data</button>
         {
           userInfo.personList.value.map((p) => (
             <button
@@ -22,6 +22,7 @@ export const Example21 = observer(() => {
               onClick={() => userInfo.setActivePersonId(p.id)}
               className={
                 clsx(
+                  btnClasses.btn,
                   btnClasses.neonBtn,
                   btnClasses['neonBtn--secondary'],
                   {

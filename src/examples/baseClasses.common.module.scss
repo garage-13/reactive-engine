@@ -24,23 +24,24 @@ $border-radius-4: 32px;
 .unitsWrapper {
   display: grid;
   width: 100%;
+  align-items: start; // ИСПРАВЛЕНИЕ: прижимает элементы к верху и сжимает их по высоте контента
 
-  // 1. Мобильные устройства (по умолчанию) — 1 колонка
-  grid-template-columns: 1fr;
+  // 1. Мобильные устройства — Безопасное сжатие колонок до 0
+  grid-template-columns: minmax(0, 1fr);
   gap: $grid-gap-2;
 
-  // 2. Планшеты — 2 колонки
+  // 2. Планшеты
   @include device('tablet') {
     gap: $grid-gap-2;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  // 3. Десктопы — Поведение Masonry через CSS Grid
+  // 3. Десктопы
   @include device('desktop') {
-    display: grid; // Возвращаем Grid для управления span-классами
+    display: grid;
     gap: $grid-gap-4;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: masonry; // Активируем нативный режим masonry
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: masonry;
   }
 }
 
@@ -140,6 +141,27 @@ $border-radius-4: 32px;
   display: flex;
   flex-direction: column;
   gap: 32px;
+}
+
+// Добавьте это правило в ваш SCSS файл:
+.stack0,
+.stack1,
+.stack2,
+.stack4 {
+  display: flex;
+  flex-direction: column;
+  min-width: 0; // Разрешает самому стеку сжиматься внутри грида
+
+  &>div {
+    min-width: 0;
+    width: 100%;
+
+    // ИСПРАВЛЕНИЕ: если div позиционирован абсолютно (как .absoluteUnitLabel),
+    // сбрасываем принудительную ширину 100%, возвращая auto
+    &[class*="absolute"] {
+      width: auto;
+    }
+  }
 }
 
 .catSection {

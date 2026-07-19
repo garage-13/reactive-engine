@@ -1,6 +1,20 @@
 @use './var-colors.scss' as *;
 @use './var-monitor-breakpoints.scss' as *;
 
+.btn {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  max-width: 100%;
+  box-sizing: border-box;
+
+  // display: block; // Изменили inline-block на block для строгого контроля ширины
+  display: inline-block; // Вернули inline-block, чтобы width: auto не сжимал кнопку в ноль при block
+  width: auto; // Обязательно возвращаем, чтобы кнопка реагировала на ограничения родителя
+  text-align: center; // Центрируем текст внутри блочной кнопки
+}
+
 // 1. БАЗОВАЯ СТРУКТУРА (все общие размеры, шрифты и поведение при тапе)
 .neonBtn {
   font-weight: bold;
@@ -11,12 +25,9 @@
   text-transform: uppercase;
   letter-spacing: 2px;
   transition: all 0.3s ease;
-
-  // Кросс-браузерный сброс тапа для мобилок/планшетов пишем один раз глобально
   -webkit-tap-highlight-color: transparent;
   outline: none;
 
-  // Адаптив по размерам (чистый, без дублирования цвета)
   @include device('mobile') {
     font-size: 0.8rem;
     padding: 6px 14px;
@@ -33,41 +44,61 @@
   }
 
   // ==========================================
-  // 2. ЦВЕТОВЫЕ МОДИФИКАТОРЫ (Задают только переменные)
+  // 1. ЦВЕТОВЫЕ МОДИФИКАТОРЫ
   // ==========================================
 
-  // ЦВЕТ: Primary (Основной неон)
   &--primary {
-    --btn-color: #{$neon-color}; // Записываем в локальную CSS-переменную для удобства
+    --btn-color: #{$neon-color};
+    --shadow-glow: 0 0 12px color-mix(in srgb, var(--btn-color) 40%, transparent),
+      0 0 24px color-mix(in srgb, var(--btn-color) 20%, transparent);
+    --shadow-soft: 0 4px 12px color-mix(in srgb, var(--btn-color) 20%, transparent);
+    --text-glow: 0 0 4px color-mix(in srgb, var(--btn-color) 40%, transparent);
   }
 
-  // ЦВЕТ: Secondary (Второй неон, например, фиолетовый/розовый)
   &--secondary {
-    --btn-color: #{$neon-secondary-color}; // Сюда подставьте вашу переменную secondary цвета
+    --btn-color: #{$neon-secondary-color};
+    --shadow-glow: 0 0 12px color-mix(in srgb, var(--btn-color) 40%, transparent),
+      0 0 24px color-mix(in srgb, var(--btn-color) 20%, transparent);
+    --shadow-soft: 0 4px 12px color-mix(in srgb, var(--btn-color) 20%, transparent);
+    --text-glow: 0 0 4px color-mix(in srgb, var(--btn-color) 40%, transparent);
+
+    // ГИБКАЯ НАСТРОЙКА: Исключение для комбинации secondary + outlined
+    // Селектор скомпилируется в .neonBtn--secondary.neonBtn--outlined
+    &.neonBtn--outlined {
+      --text-glow: none; // Полностью отключаем свечение текста по умолчанию
+      --shadow-soft: none; // Отключаем мягкую тень в обычном состоянии
+
+      // Если нужно убрать свечение и при наведении (hover):
+      --shadow-glow: none;
+    }
+
+    &.neonBtn--contained {
+      --text-glow: none;
+      --shadow-soft: none;
+      --shadow-glow: none;
+    }
   }
 
   // ==========================================
-  // 3. ТИПЫ ОТОБРАЖЕНИЯ (Используют цвет из модификатора выше)
+  // 2. ТИПЫ ОТОБРАЖЕНИЯ (Универсально используют переменные выше)
   // ==========================================
 
-  // ТИП: Outlined (Прозрачная с обводкой)
+  // ТИП: Outlined
   &--outlined {
     color: var(--btn-color);
     border: 2px solid var(--btn-color);
 
     @include device('desktop') {
-      text-shadow: 0 0 4px rgba($neon-color, 0.4); // Вместо $neon-color можно использовать интерполяцию, если цвета сильно разные
-      box-shadow: 0 4px 12px rgba($neon-color, 0.2);
+      text-shadow: var(--text-glow); // Подхватит тень в зависимости от цвета
+      box-shadow: var(--shadow-soft);
 
       &:hover {
         color: $bg-light;
         background: var(--btn-color);
-        box-shadow: 0 0 12px rgba($neon-color, 0.4),
-          0 0 24px rgba($neon-color, 0.2);
+        box-shadow: var(--shadow-glow); // Подхватит взрывное свечение нужного цвета
       }
     }
 
-    // Поведение фокуса и тапа для outlined
     &:active,
     &:focus-visible {
       outline: 3px solid var(--btn-color);
@@ -75,25 +106,21 @@
     }
   }
 
-  // ТИП: Contained (Полностью залитая кнопка)
+  // ТИП: Contained
   &--contained {
     color: $bg-light;
     background: var(--btn-color);
     border: 2px solid var(--btn-color);
 
     @include device('desktop') {
-      // Изначально имеет мягкое свечение всей плашки
-      box-shadow: 0 4px 14px rgba($neon-color, 0.3);
+      box-shadow: var(--shadow-soft);
 
       &:hover {
-        // При наведении становится ярче (взрывается свечением)
-        box-shadow: 0 0 15px var(--btn-color),
-          0 0 30px rgba($neon-color, 0.4);
-        transform: translateY(-1px); // Небольшой интерактивный подъем
+        box-shadow: var(--shadow-glow);
+        transform: translateY(-1px);
       }
     }
 
-    // Поведение фокуса и тапа для contained (делаем отступ чуть больше, чтобы смотрелось аккуратно)
     &:active,
     &:focus-visible {
       outline: 3px solid var(--btn-color);
