@@ -562,7 +562,7 @@ export class ReactiveEngine {
   }
 
   /**
-   * Создание асинхронного ресурса. Типы на входе: <T - формат ответа, S - источник изменений (сигнал либо computed-кортеж из зачений сигналов .value)>
+   * Создание асинхронного ресурса. Типы на входе: <T - формат ответа, S - источник изменений (сигнал либо computed-кортеж из зачений сигналов через конструкцию `.value`)>
    *
    * Explained 👉 {@link https://github.com/garage-13/reactive-engine/blob/main/README_EN.md#1-async-resources-dependent-on-multiple-signals}
    *
