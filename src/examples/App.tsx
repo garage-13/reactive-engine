@@ -63,7 +63,7 @@ export const App = () => {
           <CardModalWrapper
             title='Example 22'
             description='Resource exponential backoff example (incorrect url)'
-            footerText='Incorrect url'
+            footerText='Incorrect url 👉 HTTP error 404'
           >
             <Example22 />
           </CardModalWrapper>
