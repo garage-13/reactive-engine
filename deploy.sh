@@ -13,8 +13,8 @@ echo "🧹 Удаляем старую сборку..."
 rm -rf dist
 
 echo "📦 Запуск тестов и сборки пакета..."
-npm run test
-npm run build
+yarn test
+yarn build
 
 echo "🚀 Публикация в реестр npm..."
 # Если пакет находится в scope организации (@pravosleva/...),
