@@ -620,7 +620,7 @@ export class ReactiveEngine {
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
     source?: { value: S },
-    optionsOrName?: string | ResourceOptions<T, S>, // Добавили S в дженерик опций для типизации аргумента
+    optionsOrName?: string | ResourceOptions<T, S>,
   ): Resource<T> {
     const isOptionsObject = optionsOrName && typeof optionsOrName === 'object';
     const signalName = isOptionsObject
@@ -647,84 +647,91 @@ export class ReactiveEngine {
     );
 
     const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
-      // -- NOTE: #EXTRA_STOP_RESOURCE 2/2 ИНТЕГРАЦИЯ ПРЕ-ВАЛИДАЦИИ: Проверяем входные данные ДО очистки стейта и запуска цикла
+      if (effectSignal.aborted) return;
+
       if (validateBeforeFetch) {
-        const preValidationResult = validateBeforeFetch(sValue)
+        const preValidationResult = validateBeforeFetch(sValue);
         if (preValidationResult === false || typeof preValidationResult === 'string') {
+          if (effectSignal.aborted) return;
           const errorMsg = typeof preValidationResult === 'string'
             ? preValidationResult
-            : 'Pre-fetch validation failed for resource'
-          // Выключаем loading, обнуляем данные и записываем ошибку валидации входных данных
-          state.value = { data: null, loading: false, error: new Error(errorMsg), isRetrying: false }
-          return // ЖЕСТКИЙ ПРЕРЫВ: fetcher и цикл ретраев даже не запустятся!
+            : 'Pre-fetch validation failed for resource';
+
+          // При ручном refetch (не смена source) сохраняем старые данные, а не зануляем
+          const currentData = isSourceChange ? null : this.untrack(() => state.value.data);
+          state.value = { data: currentData, loading: false, error: new Error(errorMsg), isRetrying: false };
+          return;
         }
       }
-      // --
+
       const shouldClear = isSourceChange && resetDataOnSourceChange;
       const currentData = shouldClear ? null : this.untrack(() => state.value.data);
 
       state.value = { data: currentData, loading: true, error: null, isRetrying: false };
 
       for (let attempt = 0; attempt <= retryCount; attempt++) {
-        let combinedSignal = effectSignal
+        if (effectSignal.aborted) return;
+        let combinedSignal = effectSignal;
 
         try {
-          if (effectSignal.aborted) return
-
           if (timeoutMs && timeoutMs > 0) {
-            const timeoutSignal = AbortSignal.timeout(timeoutMs)
-            combinedSignal = AbortSignal.any([effectSignal, timeoutSignal])
+            const timeoutSignal = AbortSignal.timeout(timeoutMs);
+            combinedSignal = AbortSignal.any([effectSignal, timeoutSignal]);
           }
 
-          const data = await fetcher(sValue, combinedSignal)
+          const data = await fetcher(sValue, combinedSignal);
+
+          if (effectSignal.aborted) return;
 
           if (combinedSignal.aborted) {
-            if (!effectSignal.aborted)
-              throw new DOMException('The operation timed out.', 'TimeoutError')
-            return
+            throw new DOMException('The operation timed out.', 'TimeoutError');
           }
 
           if (responseValidate) {
-            const validationResult = responseValidate(data)
+            const validationResult = responseValidate(data);
             if (validationResult === false || typeof validationResult === 'string') {
-              if (combinedSignal.aborted) return
-              const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed'
-              state.value = { data: null, loading: false, error: new Error(errorMsg), isRetrying: false }
-              return
+              if (effectSignal.aborted) return;
+              const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed';
+              state.value = { data: null, loading: false, error: new Error(errorMsg), isRetrying: false };
+              return;
             }
           }
 
-          if (combinedSignal.aborted) return
+          if (effectSignal.aborted) return;
 
-          state.value = { data, loading: false, error: null, isRetrying: false }
-          return
+          state.value = { data, loading: false, error: null, isRetrying: false };
+          return;
         } catch (e: any) {
-          if (effectSignal.aborted || e.name === 'AbortError' && effectSignal.aborted) return
+          // ЖЕСТКИЙ ВЫХОД: Если внешняя область (эффект или новый refetch) сделала abort,
+          // мы НЕМЕДЛЕННО прекращаем выполнение и ничего не пишем в стейт.
+          if (effectSignal.aborted || (e.name === 'AbortError' && effectSignal.aborted)) return;
 
-          const isTimeout = e.name === 'TimeoutError' || e.name === 'AbortError' || e.message?.includes('timeout')
-          // -- NOTE: #EXTRA_STOP_RESOURCE 1/2 ПЕРВЫЙ ВАРИАНТ: Перехват императивного throw new Error из тела fetcher
+          const isTimeout = e.name === 'TimeoutError' || e.name === 'AbortError' || e.message?.includes('timeout');
+
           const isCustomValidationError = getExtractedValues({
             tested: [e.message], expectedKey: 'THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY', valueType: 'number',
           })?.[0] === '1' || false
-          const __defaultCustomValidationErrorMessage = 'Custom validation error'
+
+          const __defaultCustomValidationErrorMessage = 'Custom validation error';
           let customValidationErrorMessage: string = isCustomValidationError
             ? (getExtractedValues({
               tested: [e.message], expectedKey: 'MESSAGE', valueType: 'string',
             })?.[0] || __defaultCustomValidationErrorMessage)
-            : __defaultCustomValidationErrorMessage
-          const isFetchBodyValidationError = isCustomValidationError || e.name === 'ValidationError'
-          // --
+            : __defaultCustomValidationErrorMessage;
+
+          const isFetchBodyValidationError = isCustomValidationError || e.name === 'ValidationError';
+
           if (attempt === retryCount || isFetchBodyValidationError) {
             if (effectSignal.aborted) return;
+
             const finalError = isTimeout
               ? new Error(`Request timed out after ${timeoutMs}ms`, { cause: e })
               : isCustomValidationError
                 ? new Error(customValidationErrorMessage, { cause: e })
-                : e
+                : e;
 
-            // Гарантированно тушим loading и записываем ошибку
-            state.value = { data: null, loading: false, error: finalError, isRetrying: false }
-            return
+            state.value = { data: null, loading: false, error: finalError, isRetrying: false };
+            return;
           } else {
             if (effectSignal.aborted) return;
 
@@ -733,6 +740,7 @@ export class ReactiveEngine {
             const jitter = Math.random() * 200;
             currentDelay = currentDelay + jitter;
 
+            // Безопасно обновляем статус ретрая, только если сигнал живой
             state.value = { data: state.value.data, loading: true, error: null, isRetrying: true };
 
             const logReason = isTimeout ? 'таймауту' : 'ошибке сети';

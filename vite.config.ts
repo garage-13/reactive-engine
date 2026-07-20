@@ -36,6 +36,21 @@ export default defineConfig({
         },
       } as any, // Приведение к any убирает ошибку overload на объединении типов
     },
-
+  },
+  server: {
+    proxy: {
+      // Все запросы, начинающиеся с /gdebenzin-vite-proxy, пойдут на gdebenzin.app
+      '/gdebenzin-vite-proxy': {
+        target: 'https://gdebenzin.app',
+        changeOrigin: true,
+        // Отрезаем префикс /gdebenzin-vite-proxy перед отправкой на бэкенд
+        rewrite: (path) => path.replace(/^\/gdebenzin-vite-proxy/, ''),
+        headers: {
+          // Имитируем, что запрос пришел напрямую с сайта
+          'Referer': 'https://gdebenzin.app',
+          'Origin': 'https://gdebenzin.app'
+        }
+      },
+    }
   },
 } satisfies UserConfig);
