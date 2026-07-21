@@ -10,6 +10,19 @@ import { useReactiveValue } from '../../hooks'
 const engine = new ReactiveEngine()
 
 export const MapExample = () => {
+  /**
+   * Инжектированный инстанс бизнес-сервиса управления картой.
+   *
+   * Через механизм Dependency Injection (DI) движка `ReactiveEngine` компонент получает
+   * единый синглтон-сервис `MapLogic`. Этот сервис инкапсулирует в себе всю императивную
+   * работу с Google Maps API v3, управление сетевым ресурсом АЗС и синхронизацию
+   * географических координат.
+   *
+   * Использование `engine.inject` гарантирует изолированность бизнес-логики от жизненного
+   * цикла React и позволяет тестировать картографию независимо от слоя представления (UI).
+   *
+   * @type {MapLogic}
+   */
   const logic = engine.inject(MapLogic)
 
   const { loading, data: stations, error } = useReactiveValue(logic.stationsResource)

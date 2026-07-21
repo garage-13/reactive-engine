@@ -200,10 +200,6 @@ export class MapLogic extends BaseREService {
    * @public
    */
   public destroyMap = () => {
-    // if (this.debounceTimer) clearTimeout(this.debounceTimer)
-    // if (this.markersCleanup) { this.markersCleanup(); this.markersCleanup = null; }
-    // if (this.cityEffectCleanup) { this.cityEffectCleanup(); this.cityEffectCleanup = null; }
-
     const globalContext: any = window
     if (globalContext.google?.maps?.event) {
       this.mapListeners.forEach(listener => globalContext.google.maps.event.removeListener(listener))
