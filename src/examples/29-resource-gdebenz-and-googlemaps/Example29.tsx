@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import clsx from 'clsx'
+import { MapLogic } from './service.MapLogic'
 import baseClasses from '../baseClasses.common.module.scss'
 import btnClasses from '../baseClasses.buttons.module.scss'
 import { ReactiveEngine } from '../../core'
-import { MapLogic } from './service.MapLogic'
-import clsx from 'clsx'
 import { useReactiveValue } from '../../hooks'
 // import './fix-googlemaps-exp.css'
 
@@ -23,7 +23,7 @@ export const MapExample = () => {
    *
    * @type {MapLogic}
    */
-  const logic = engine.inject(MapLogic)
+  const logic: MapLogic = engine.inject(MapLogic)
 
   const { loading, data: stations, error } = useReactiveValue(logic.stationsResource)
   const selectedStation = engine.use(logic.selectedStation)

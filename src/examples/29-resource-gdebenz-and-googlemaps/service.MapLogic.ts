@@ -437,7 +437,7 @@ export class MapLogic extends BaseREService {
         marker.addListener('click', () => {
           if (this.activeInfoWindow) this.activeInfoWindow.close()
 
-          // Записываем выбранную станцию в сигнал движка
+          // NOTE: Записываем выбранную станцию в сигнал движка (если нужно)
           // this.selectedStation.value = station
 
           // Создаем InfoWindow. Нативный auto-pan теперь можно вернуть,
@@ -448,7 +448,7 @@ export class MapLogic extends BaseREService {
           })
 
           infoWindow.addListener('closeclick', () => {
-            // NOTE: Сброс "реактивного выбора"
+            // NOTE: Сброс "реактивного выбора" (если нужно)
             // this.selectedStation.value = null
           })
 
