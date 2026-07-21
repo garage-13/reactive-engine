@@ -7,6 +7,12 @@ import { Example20 } from './20-resource'
 import { Example21 } from './21-multi-resource'
 import { Example22 } from './22-resource-exponential-backoff'
 import { Example23 } from './23-resorce-timeout'
+import { MapExample as Example24 } from './24-resource-gdebenz-and-leaflet'
+import { MapExample as Example25 } from './25-resourse-gdebenz-and-leaflet-clusters'
+import { MapExample as Example26 } from './26-resource-gdebenz-and-leaflet-clusters'
+import { MapExample as Example27 } from './27-resource-gdebenz-and-leaflet-clusters'
+import { MapExample as Example28 } from './28-resource-gdebenz-and-yandexmap'
+import { MapExample as Example29 } from './29-resource-gdebenz-and-googlemaps'
 
 export const App = () => {
   return (
@@ -35,7 +41,6 @@ export const App = () => {
           </CardModalWrapper>
           <CardModalWrapper
             title='Example 11'
-            // footerText=''
             description='useReactiveValue hook (subscribed to Example 21)'
           >
             <Example11 />
@@ -73,6 +78,42 @@ export const App = () => {
             footerText='4 requests (1 start + 3 retry) of 2.5 seconds each + ~7 seconds of total sleep in between 👉 Total error after ~17 seconds'
           >
             <Example23 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 24'
+            description='Leaflet exp'
+          >
+            <Example24 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 25'
+            description='Leaflet exp (with clusters)'
+          >
+            <Example25 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 26'
+            description='Leaflet exp (with clusters) & custom ui as DI service'
+          >
+            <Example26 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 27'
+            description='Leaflet exp (with clusters) & custom ui as DI service & bbox signal'
+          >
+            <Example27 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 28'
+            description='Yandex maps exp'
+          >
+            <Example28 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 29'
+            description='Google Maps API (Dynamic Loader + Clusters + Reactive state)'
+          >
+            <Example29 />
           </CardModalWrapper>
         </div>
       </div>

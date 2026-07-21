@@ -1,0 +1,39 @@
+/* 1. Стилизуем главный контейнер балуна (скругления, фон, тени) */
+/* "Выбрать элемент .gm-style-iw-c, который содержит внутри наш маркер" */
+.gm-style:has(.my-station-popup-context) .gm-style-iw-c {
+  border-radius: 16px !important;               /* Закругляем углы */
+  background-color: #1e1e24 !important;         /* Красим фон балуна (темная тема) */
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5) !important; /* Глубокая тень */
+  border: 1px solid #3a3a42 !important;         /* Тонкая рамка */
+  padding: 16px !important;                     /* Настраиваем внутренние отступы */
+}
+
+/* 2. Обнуляем паддинги у внутреннего технического контейнера */
+.gm-style:has(.my-station-popup-context) .gm-style-iw-d {
+  padding: 0 !important;
+  max-height: unset !important;
+  overflow: hidden !important;                  /* Прячем дефолтные скроллбары */
+}
+
+/* 3. Стилизуем заголовок (название АЗС) */
+.gm-style:has(.my-station-popup-context) .gm-style-iw-ch {
+  color: #4caf50 !important;                    /* Зеленый цвет для заголовка */
+  font-family: sans-serif !important;
+  font-size: 15px !important;
+  font-weight: bold !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid #3a3a42 !important;  /* Линия-разделитель между шапкой и телом */
+  margin-bottom: 8px !important;
+}
+
+/* 4. Стилизуем нижний хвостик (стрелочку) балуна */
+.gm-style:has(.my-station-popup-context) .gm-style-iw-tc::after {
+  background-color: #1e1e24 !important;         /* Цвет должен совпадать с фоном балуна */
+  border-right: 1px solid #3a3a42 !important;
+  border-bottom: 1px solid #3a3a42 !important;
+}
+
+/* 5. Стилизуем системный крестик закрытия */
+.gm-style-iw-chr button {
+  border: 1px dashed red !important;
+}

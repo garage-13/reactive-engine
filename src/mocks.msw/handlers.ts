@@ -173,8 +173,18 @@ const specialApiHack = http.all<TQuery, never, NSDMS.TBaseResponseData>(
   'http://local.devtool-1.ru/express-helper/mg/mocks/*',
   specialApiResolver,
 )
+const _gdeBenzApiResolver = http.get('/gdebenzin-vite-proxy/api/v1/stations', ({ request }) => {
+  const url = new URL(request.url)
+  const bbox = url.searchParams.get('bbox')
+
+  // Возвращаем фейковый массив АЗС для тестов
+  return HttpResponse.json([
+    { id: 1, name: 'Тестовая АЗС', title: 'Тестовая АЗС', lat: 45.0, lng: 34.0, slug: 'test' }
+  ])
+})
 
 export const handlers = [
   coreApiHack,
   specialApiHack,
+  // gdeBenzApiResolver,
 ]

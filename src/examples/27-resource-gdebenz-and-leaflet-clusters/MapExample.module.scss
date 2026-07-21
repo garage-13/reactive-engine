@@ -1,0 +1,65 @@
+/* Стили для кастомного балуна */
+.customPopup {
+  :global(.leaflet-popup-content-wrapper) {
+    background: #1e1e24;
+    color: #ffffff;
+    border-radius: 12px;
+    padding: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    border: 1px solid #3a3a42;
+  }
+
+  :global(.leaflet-popup-tip) {
+    background: #1e1e24;
+    border: 1px solid #3a3a42;
+  }
+
+  :global(.leaflet-popup-close-button) {
+    color: #aaaaaa !important;
+    padding: 8px 8px 0 0 !important;
+
+    &:hover {
+      color: #ffffff !important;
+    }
+  }
+}
+
+/* Внутренняя верстка контента заправки */
+.popupContent {
+  font-family: sans-serif;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4caf50;
+    /* Зеленый акцент */
+  }
+
+  p {
+    margin: 0;
+    font-size: 12px;
+    color: #cccccc;
+  }
+
+  .popupBtn {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 11px;
+    text-align: center;
+    transition: background 0.2s;
+
+    &:hover {
+      background: #45a049;
+    }
+  }
+}
