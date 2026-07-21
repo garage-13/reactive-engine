@@ -1,5 +1,5 @@
-import baseClasses from '../baseClasses.common.module.scss'
-import btnClasses from '../baseClasses.buttons.module.scss'
+import baseClasses from '../ui.common.module.scss'
+import btnClasses from '../ui.button.module.scss'
 import clsx from 'clsx';
 import { useUserInfoService, observer, useSecondaryService } from './store';
 

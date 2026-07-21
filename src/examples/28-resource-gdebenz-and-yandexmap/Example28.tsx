@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import baseClasses from '../baseClasses.common.module.scss'
-import btnClasses from '../baseClasses.buttons.module.scss'
+import baseClasses from '../ui.common.module.scss'
+import btnClasses from '../ui.button.module.scss'
 import { ReactiveEngine } from '../../core'
 import { MapLogic } from './service.MapLogic'
 import clsx from 'clsx'
 import { useReactiveValue } from '../../hooks'
+import { Input } from '../shared/Input'
+import { Select } from '../shared/Select'
 
 const engine = new ReactiveEngine()
 
@@ -58,12 +60,12 @@ export const MapExample = () => {
             Пожалуйста, введите его ниже:
           </p>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <input
+            <Input
+              // label='API_KEY'
               type="text"
               placeholder="Вставьте API_KEY"
               value={inputKey}
               onChange={(e) => setInputKey(e.target.value)}
-              style={{ padding: '8px 12px', width: '300px', background: '#111', color: '#fff', border: '1px solid #444', borderRadius: '6px' }}
             />
             <button
               onClick={() => logic.loader.submitApiKey(inputKey)} // Передали вызов в loader-сервис
@@ -77,27 +79,23 @@ export const MapExample = () => {
         <>
           {
             !loadError && (
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <label htmlFor="city-select">Выберите город:</label>
-                <select
+                <Select
                   id="city-select"
                   value={currentCityId}
                   onChange={(e) => logic.setCity(e.target.value)}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#1e1e24',
-                    color: '#fff',
-                    border: '1px solid #3a3a42',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
+                  variant="outlined" // или "contained"
+                  colorType="primary" // или "secondary"
                 >
+                  {/* Если нужен пустой первый пункт (unselected state) как в MUI: */}
+                  {/* <option value="" disabled hidden></option> */}
                   {logic.cities.map((city) => (
                     <option key={city.id} value={city.id}>
                       {city.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             )
           }

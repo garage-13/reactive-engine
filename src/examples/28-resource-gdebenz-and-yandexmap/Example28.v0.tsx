@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import baseClasses from '../baseClasses.common.module.scss'
+import baseClasses from '../ui.common.module.scss'
 import { ReactiveEngine } from '../../core'
 import { MapLogic } from './service.MapLogic.v0'
 import clsx from 'clsx'

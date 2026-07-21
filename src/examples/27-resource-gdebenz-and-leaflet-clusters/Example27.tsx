@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
-import baseClasses from '../baseClasses.common.module.scss'
+import baseClasses from '../ui.common.module.scss'
 import { ReactiveEngine } from '../../core'
 import { MapLogic } from './service.MapLogic'
 import clsx from 'clsx'
 import { useReactiveValue } from '../../hooks'
+import { Select } from '../shared/Select'
 
 const engine = new ReactiveEngine()
 
@@ -36,27 +37,23 @@ export const MapExample = () => {
       </div>
 
       {/* Селект выбора городов */}
-      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
         <label htmlFor="city-select">Выберите город:</label>
-        <select
+        <Select
           id="city-select"
           value={currentCityId}
           onChange={(e) => logic.setCity(e.target.value)}
-          style={{
-            padding: '6px 12px',
-            background: '#1e1e24',
-            color: '#fff',
-            border: '1px solid #3a3a42',
-            borderRadius: '8px',
-            cursor: 'pointer'
-          }}
+          variant="outlined" // или "contained"
+          colorType="primary" // или "secondary"
         >
+          {/* Если нужен пустой первый пункт (unselected state) как в MUI: */}
+          {/* <option value="" disabled hidden></option> */}
           {logic.cities.map((city) => (
             <option key={city.id} value={city.id}>
               {city.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {/* Контейнер для карты Leaflet */}

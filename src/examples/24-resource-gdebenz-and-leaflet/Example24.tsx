@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import baseClasses from '../baseClasses.common.module.scss'
+import baseClasses from '../ui.common.module.scss'
 import { BaseREService } from '../../BaseREService'
 import { ReactiveEngine } from '../../core'
 import clsx from 'clsx'

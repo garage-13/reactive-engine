@@ -1,4 +1,4 @@
-import baseClasses from './baseClasses.common.module.scss'
+import baseClasses from './ui.common.module.scss'
 import clsx from 'clsx'
 import { CardModalWrapper } from './shared'
 import { Example01 } from './01-signal'

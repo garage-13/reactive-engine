@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { MapLogic } from './service.MapLogic'
-import baseClasses from '../baseClasses.common.module.scss'
-import btnClasses from '../baseClasses.buttons.module.scss'
+import baseClasses from '../ui.common.module.scss'
+import btnClasses from '../ui.button.module.scss'
 import { ReactiveEngine } from '../../core'
 import { useReactiveValue } from '../../hooks'
+import { Input } from '../shared/Input'
+import { Select } from '../shared/Select'
 // import './fix-googlemaps-exp.css'
 
 const engine = new ReactiveEngine()
@@ -25,8 +27,43 @@ export const MapExample = () => {
    */
   const logic: MapLogic = engine.inject(MapLogic)
 
+  /**
+   * Реактивное состояние асинхронного ресурса получения списка АЗС.
+   *
+   * Хук `useReactiveValue` подписывает React-компонент на изменения состояния `stationsResource`.
+   * При каждом обновлении географических границ карты (`bbox`) движок автоматически выполняет
+   * fetch-запрос, переводя этот объект в соответствующий статус.
+   *
+   * Деструктуризация возвращает четыре реактивных свойства:
+   * - `loading` {boolean}: Флаг текущего выполнения сетевого запроса к API.
+   * - `data` {Station[] | null}: Массив успешно полученных объектов АЗС для текущего bbox.
+   * - `error` {Error | null}: Объект ошибки, если сетевой запрос или pre-валидация завершились сбоем.
+   * - `isRetrying` {boolean}: Флаг, указывающий на выполнение повторных попыток при экспоненциальном бэк-оффе.
+   */
   const { loading, data: stations, error } = useReactiveValue(logic.stationsResource)
+
+  /**
+   * Текущая выбранная пользователем автозаправочная станция (АЗС).
+   *
+   * Хук `engine.use` осуществляет прямую атомарную подписку React-компонента на сигнал `selectedStation`.
+   * Компонент будет автоматически перерендерен только тогда, когда изменится значение именно этого сигнала
+   * (например, при клике на кнопку «Выбрать АЗС» внутри балуна карты или при сбросе выбора).
+   *
+   * Используется для декларативного отображения карточки активной заправки под картой.
+   *
+   * @type {Station | null}
+   */
   const selectedStation = engine.use(logic.selectedStation)
+
+  /**
+   * Идентификатор текущего активного города для выпадающего списка (селекта).
+   *
+   * Хук `engine.use` связывает реактивный сигнал `currentCityId` со значением (`value`) HTML-селекта.
+   * Обеспечивает синхронизацию интерфейса: при выборе города в выпадающем списке экшен `setCity`
+   * меняет сигнал, что приводит к автоматическому обновлению значения в селекте и перелёту камеры.
+   *
+   * @type {string}
+   */
   const currentCityId = engine.use(logic.currentCityId)
 
   // Читаем реактивное состояние прямо из инжектированного загрузчика Google Maps
@@ -64,12 +101,11 @@ export const MapExample = () => {
             Пожалуйста, введите его ниже:
           </p>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <input
+            <Input
               type="text"
               placeholder="Вставьте Google API_KEY"
               value={inputKey}
               onChange={(e) => setInputKey(e.target.value)}
-              style={{ padding: '8px 12px', width: '300px', background: '#111', color: '#fff', border: '1px solid #444', borderRadius: '6px' }}
             />
             <button
               onClick={() => logic.loader.submitApiKey(inputKey)}
@@ -83,18 +119,25 @@ export const MapExample = () => {
         <>
           {
             !loadError && (
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <label htmlFor="city-select">Выберите город:</label>
-                <select
+                <Select
                   id="city-select"
+                  // label="Выберите город"
                   value={currentCityId}
                   onChange={(e) => logic.setCity(e.target.value)}
-                  style={{ padding: '6px 12px', background: '#1e1e24', color: '#fff', border: '1px solid #3a3a42', borderRadius: '6px', cursor: 'pointer' }}
+                  variant="outlined"       // или "contained"
+                  colorType="primary"      // или "secondary"
                 >
+                  {/* Если нужен пустой первый пункт (unselected state) как в MUI: */}
+                  {/* <option value="" disabled hidden></option> */}
+
                   {logic.cities.map((city) => (
-                    <option key={city.id} value={city.id}>{city.name}</option>
+                    <option key={city.id} value={city.id}>
+                      {city.name}
+                    </option>
                   ))}
-                </select>
+                </Select>
               </div>
             )
           }
@@ -128,7 +171,7 @@ export const MapExample = () => {
 
       {selectedStation && (
         <button
-          onClick={() => logic.focusOnStation(selectedStation)}
+          onClick={() => logic.focusOnStation(selectedStation, true)}
           style={{
             padding: '16px',
             border: '1px solid lightgray',

@@ -1,0 +1,190 @@
+@use './var-colors.scss' as *;
+@use './var-monitor-breakpoints.scss' as *;
+
+// ==========================================================================
+// 1. РОДИТЕЛЬСКИЙ КОНТЕЙНЕР (Управляет позиционированием лейбла и переменными)
+// ==========================================================================
+.neonInput-wrapper {
+  position: relative;
+  display: inline-block;
+  // width: 100%;
+  box-sizing: border-box;
+  // margin-top: 10px; // Запас сверху, чтобы поднятый лейбл не обрезался родителем
+
+  // ЦВЕТОВОЙ МОДИФИКАТОР: Primary
+  &--primary {
+    --input-color: #{$neon-color};
+    --shadow-glow: 0 0 12px color-mix(in srgb, var(--input-color) 40%, transparent),
+      0 0 24px color-mix(in srgb, var(--input-color) 20%, transparent);
+    --shadow-soft: 0 4px 12px color-mix(in srgb, var(--input-color) 20%, transparent);
+    --text-glow: 0 0 4px color-mix(in srgb, var(--input-color) 40%, transparent);
+  }
+
+  // ЦВЕТОВОЙ МОДИФИКАТОР: Secondary
+  &--secondary {
+    --input-color: #{$neon-secondary-color};
+    --shadow-glow: 0 0 12px color-mix(in srgb, var(--input-color) 40%, transparent),
+      0 0 24px color-mix(in srgb, var(--input-color) 20%, transparent);
+    --shadow-soft: 0 4px 12px color-mix(in srgb, var(--input-color) 20%, transparent);
+    --text-glow: 0 0 4px color-mix(in srgb, var(--input-color) 40%, transparent);
+
+    &.neonInput-wrapper--outlined {
+      --text-glow: none;
+      --shadow-soft: none;
+      --shadow-glow: none;
+    }
+
+    &.neonInput-wrapper--contained {
+      --text-glow: none;
+      --shadow-soft: none;
+      --shadow-glow: none;
+    }
+  }
+}
+
+// ==========================================================================
+// 2. БАЗОВЫЙ ПЛАВАЮЩИЙ ЛЕЙБЛ (MUI Style)
+// ==========================================================================
+.neonInput-label {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; // Чтобы клик проходил сквозь текст в сам input
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 1px;
+  transition: all 0.2s ease;
+  color: color-mix(in srgb, var(--input-color) 60%, #fff); // Приглушенный цвет в покое
+}
+
+// ==========================================================================
+// 3. БАЗОВАЯ СТРУКТУРА САМОГО INPUT
+// ==========================================================================
+.neonInput {
+  width: 100%;
+  box-sizing: border-box;
+  font-weight: bold;
+  font-family: 'Courier New', Courier, monospace;
+  background: transparent;
+  transition: all 0.3s ease;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+
+  // ------------------------------------------------------------------------
+  // СТИЛИЗАЦИЯ АВТОКОМПЛИТА (Новый блок)
+  // ------------------------------------------------------------------------
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus,
+  &:-webkit-autofill:active {
+    // Трюк с тенью, чтобы перекрыть дефолтный цвет фона браузера (делаем фон черным #000)
+    // Если тип Contained использует другой фон, это значение можно будет адаптировать ниже
+    -webkit-box-shadow: 0 0 0 1000px #000 inset !important;
+
+    // Цвет текста при автозаполнении (делаем белым/светлым)
+    -webkit-text-fill-color: #{$bg-light} !important;
+
+    // Переход для плавности
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  // Адаптивные размеры (высота регулируется паддингами)
+  @include device('mobile') {
+    font-size: 0.8rem;
+    padding: 6px 14px;
+  }
+
+  @include device('tablet') {
+    font-size: 1rem;
+    padding: 8px 16px;
+  }
+
+  @include device('desktop') {
+    font-size: 1rem;
+    padding: 8px 16px;
+  }
+
+  // Скрытие стандартного плейсхолдера, так как его роль играет label
+  &::placeholder {
+    color: transparent;
+  }
+
+  // ==========================================
+  // ТОЧКА СВЯЗИ: АНИМАЦИЯ ЛЕЙБЛА ПРИ ФОКУСЕ И АВТОКОМПЛИТЕ
+  // ==========================================
+  // Добавлен селектор &:-webkit-autofill, чтобы лейбл взлетал наверх, если браузер заполнил поле
+  &:focus+.neonInput-label,
+  &:-webkit-autofill+.neonInput-label,
+  &:not(:placeholder-shown)+.neonInput-label {
+    top: 0;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--input-color);
+    text-shadow: var(--text-glow);
+  }
+}
+
+// ==========================================================================
+// 4. ТИПЫ ОТОБРАЖЕНИЯ (Привязываются через контекст wrapper)
+// ==========================================================================
+
+// ТИП: Outlined
+.neonInput-wrapper--outlined {
+  .neonInput {
+    color: #{$bg-light}; // Текст ввода светлый
+    border: 2px solid color-mix(in srgb, var(--input-color) 40%, transparent); // Полупрозрачная рамка в покое
+    border-radius: 8px;
+
+    @include device('desktop') {
+      &:hover {
+        border-color: var(--input-color);
+        box-shadow: var(--shadow-soft);
+      }
+    }
+
+    &:focus {
+      border-color: var(--input-color);
+      box-shadow: var(--shadow-glow);
+    }
+  }
+
+  // Эффект "вырезанной рамки" поднятого лейбла (как в оригинальном MUI)
+  .neonInput:focus+.neonInput-label,
+  .neonInput:not(:placeholder-shown)+.neonInput-label {
+    background: #000; // Сюда нужно передать цвет общего фона страницы, чтобы перекрыть рамку
+  }
+}
+
+// ТИП: Contained (Залитый фон)
+.neonInput-wrapper--contained {
+  .neonInput {
+    color: $bg-light;
+    background: color-mix(in srgb, var(--input-color) 10%, transparent); // Легкая неоновая подсветка фона
+    border: none;
+    border-bottom: 2px solid color-mix(in srgb, var(--input-color) 40%, transparent); // Линия снизу
+    border-radius: 8px 8px 0 0;
+
+    @include device('desktop') {
+      &:hover {
+        background: color-mix(in srgb, var(--input-color) 15%, transparent);
+        border-bottom-color: var(--input-color);
+      }
+    }
+
+    &:focus {
+      background: color-mix(in srgb, var(--input-color) 20%, transparent);
+      border-bottom-color: var(--input-color);
+      box-shadow: var(--shadow-soft);
+    }
+
+    // Переопределение фона автокомплита под полупрозрачный неоновый фон Contained-версии
+    &:-webkit-autofill,
+    &:-webkit-autofill:hover,
+    &:-webkit-autofill:focus,
+    &:-webkit-autofill:active {
+      // Подбираем цвет, близкий к color-mix(in srgb, var(--input-color) 10%, transparent) на черном фоне
+      -webkit-box-shadow: 0 0 0 1000px #1a1a1a inset !important;
+    }
+  }
+}

@@ -1,13 +1,15 @@
-import { defineConfig, UserConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import dts from "vite-plugin-dts";
-import path from "path";
+import { defineConfig, UserConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import dts from 'vite-plugin-dts'
+import path from 'path'
+// import tsconfigPaths from 'vite-tsconfig-paths'
 
 export default defineConfig({
   base: "./",
   plugins: [
     dts({ bundleTypes: true, insertTypesEntry: true }),
-    react()
+    react(),
+    // tsconfigPaths(),
   ],
   resolve: {
     dedupe: ["react", "react-dom"],
