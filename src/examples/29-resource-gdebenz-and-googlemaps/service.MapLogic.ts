@@ -3,6 +3,9 @@ import { MapUiService } from './service.MapUiService'
 import { GoogleMapsLoaderService } from './service.GoogleMapsLoaderService'
 import { MarkerClusterer } from '@googlemaps/markerclusterer'
 
+/**
+ * Описание структуры данных автозаправочной станции (АЗС).
+ */
 export interface Station {
   id: number
   name: string
@@ -12,6 +15,9 @@ export interface Station {
   slug: string
 }
 
+/**
+ * Описание структуры географических данных города.
+ */
 export interface City {
   id: string
   name: string
@@ -21,6 +27,9 @@ export interface City {
   bbox: string // Стартовый bbox для инициализации ресурса
 }
 
+/**
+ * Фиксированный список городов, доступных пользователю для переключения в интерфейсе.
+ */
 const AVAILABLE_CITIES: City[] = [
   { id: 'moscow', name: 'Москва', lat: 55.7558, lng: 37.6173, zoom: 11, bbox: '55.4898,37.3193,56.0095,37.9675' },
   { id: 'spb', name: 'Санкт-Петербург', lat: 59.9343, lng: 30.3351, zoom: 11, bbox: '59.7444,29.9142,60.0906,30.6475' },
@@ -28,28 +37,50 @@ const AVAILABLE_CITIES: City[] = [
   { id: 'krasnodar', name: 'Краснодар', lat: 45.0355, lng: 38.9747, zoom: 11, bbox: '44.9602,38.8785,45.1326,39.1235' }
 ]
 
+/**
+ * Бизнес-сервис управления картой Google Maps и синхронизации с реактивным движком.
+ *
+ * Класс изолирует всю императивную работу с картографией (инициализация, маркеры, события),
+ * предоставляя React-компоненту исключительно декларативный интерфейс через сигналы.
+ *
+ * Реализует паттерн "Единственный источник правды" (Single Source of Truth), где состояние
+ * экрана карты диктует значения выходных координат для API-ресурса.
+ *
+ * @extends BaseREService
+ */
 export class MapLogic extends BaseREService {
+  /** Список доступных городов для построения элементов управления в UI. */
   public cities: City[] = AVAILABLE_CITIES
 
-  // 1. БАЗОВЫЕ РЕАКТИВНЫЕ СИГНАЛЫ (Источники правды)
+  /** Реактивный сигнал идентификатора текущего выбранного города. По умолчанию 'moscow'. */
   public currentCityId = this.createSignal<string>('moscow', 'map:signal:city-id')
+
+  /** Реактивный сигнал текущей выбранной заправки (активный элемент в приложении). */
   public selectedStation = this.createSignal<Station | null>(null, 'map:signal:selected-station')
 
-  // Географическое состояние карты в сигналах
+  /** Реактивный сигнал текущих географических координат центра карты. */
   public mapCenter = this.createSignal<{ lat: number; lng: number }>({ lat: 55.7558, lng: 37.6173 }, 'map:signal:center')
+
+  /** Реактивный сигнал текущего масштаба (зума) карты. */
   public mapZoom = this.createSignal<number>(11, 'map:signal:zoom')
 
-  // Сигнал-блокировщик: сообщает, вызвано ли движение карты программным экшеном
+  /** Реактивный сигнал-блокировщик. Взводится в true, если движение карты вызвано программным экшеном. */
   public isProgrammatic = this.createSignal<boolean>(false, 'map:signal:is-programmatic')
 
-  // Динамический bbox теперь является реактивным COMPUTED свойством
+  /** Выходной реактивный сигнал географических границ экрана в формате "south,west,north,east" для API-запросов. */
   public bbox = this.createSignal<string>(AVAILABLE_CITIES[0].bbox, 'map:signal:bbox')
 
-  // Инжектируем вспомогательные сервисы через DI
+  /** UI-сервис генерации HTML-контента балунов (внедряется через DI). */
   private ui = this.engine.inject(MapUiService)
+
+  /** Инфраструктурный сервис ленивой загрузки Google Maps API v3 (внедряется через DI). */
   public loader = this.engine.inject(GoogleMapsLoaderService)
 
-  // Реактивный ресурс: автоматически перезапускается при мутации bbox
+  /**
+   * Реактивный ресурс получения списка АЗС.
+   * Автоматически перезапускается при изменении сигнала `this.bbox`.
+   * Поддерживает отмену предыдущих незавершенных сетевых запросов через `abortSignal`.
+   */
   public stationsResource = this.engine.resource(
     async (bboxValue, abortSignal) => {
       const url = new URL('/gdebenzin-vite-proxy/api/v1/stations', window.location.origin)
@@ -67,19 +98,30 @@ export class MapLogic extends BaseREService {
   )
 
   // Внутренние императивные сущности Google Maps (скрыты от реактивного графа)
+  /** Инстанс карты Google Maps. */
   private map: any = null
+  /** Инстанс библиотеки кластеризации маркеров. */
   private markerClusterer: MarkerClusterer | null = null
+  /** Инстанс текущего открытого всплывающего окна (балуна) на карте. */
   private activeInfoWindow: any = null
-  // Свойство класса для хранения ВСЕХ скачанных АЗС за сессию
+  /** Накопительный кэш отрисованных маркеров: [stationId] -> { инстанс_маркера, данные_станции } (для хранения ВСЕХ скачанных АЗС за сессию). */
   private markersMap = new Map<number, { marker: any; station: Station }>()
 
-  // Хранилище для функций очистки реактивных эффектов движка
+  /** Массив функций очистки (disposers) для реактивных эффектов движка. */
   private disposers: (() => void)[] = []
+  /** Массив зарегистрированных слушателей событий карты Google Maps. */
   private mapListeners: any[] = []
+  /** Ссылка на DOM-контейнер, в котором смонтирована карта. */
   private lastContainer: HTMLDivElement | null = null
 
   /**
-   * ИНИЦИАЛИЗАЦИЯ КАРТЫ
+   * Инициализация инстанса карты Google Maps в переданном DOM-контейнере.
+   * Вызывается автоматически из React-компонента при его монтировании.
+   *
+   * @public
+   * @async
+   * @param {HTMLDivElement} container - DOM-элемент для монтирования холста карты.
+   * @returns {Promise<void>}
    */
   public initializeMap = async (container: HTMLDivElement) => {
     this.lastContainer = container
@@ -121,7 +163,8 @@ export class MapLogic extends BaseREService {
   }
 
   /**
-   * РЕАКТИВНЫЕ ЭФФЕКТЫ ДВИЖКА (Вся магия синхронизации здесь)
+   * Инициализация реактивных эффектов движка для синхронизации стейта с картой.
+   * @private
    */
   private initReactiveEffects() {
     this.cleanupEffects()
@@ -151,8 +194,11 @@ export class MapLogic extends BaseREService {
   }
 
   /**
- * Полная очистка при уничтожении компонента
- */
+   * Полное уничтожение карты, очистка слушателей и освобождение памяти.
+   * Вызывается автоматически из React-компонента при его размонтировании.
+   *
+   * @public
+   */
   public destroyMap = () => {
     // if (this.debounceTimer) clearTimeout(this.debounceTimer)
     // if (this.markersCleanup) { this.markersCleanup(); this.markersCleanup = null; }
@@ -181,13 +227,21 @@ export class MapLogic extends BaseREService {
     this.lastContainer = null
   }
 
+  /**
+   * Очистка зарегистрированных реактивных эффектов.
+   * @private
+   */
   private cleanupEffects() {
     this.disposers.forEach(dispose => dispose())
     this.disposers = []
   }
 
   /**
-   * ЭКШЕН: Выбор города. Просто обновляет реактивные сигналы!
+   * Экшен переключения текущего города из UI селекта.
+   * Императивно обновляет реактивные сигналы позиции для триггера эффекта камеры.
+   *
+   * @public
+   * @param {string} cityId - Идентификатор выбранного города.
    */
   public setCity = (cityId: string) => {
     const foundCity = this.cities.find(c => c.id === cityId)
@@ -202,30 +256,29 @@ export class MapLogic extends BaseREService {
   }
 
   /**
-   * ЭКШЕН: Фокус на АЗС. Просто обновляет реактивные сигналы!
-   * @param station - объект АЗС
-   * @param keepCurrentZoom - если true, зум карты не изменится (для клика по маркеру)
+   * Публичный экшен для фокусировки камеры карты на конкретной АЗС и программного открытия балуна.
+   *
+   * Метод используется для управления картой из внешних UI-компонентов React (например, при клике
+   * на карточку заправки в списке или блок «Реактивный выбор»). Перелёт и позиционирование
+   * выполняются через обновление базовых сигналов `mapCenter` и `mapZoom`, что атомарно
+   * обрабатывается реактивным эффектом синхронизации камеры.
+   *
+   * Логика работы:
+   * 1. Взводит сигнал-блокировщик `isProgrammatic.value = true`, изолируя это движение от ручного скролла.
+   * 2. Обновляет географические сигналы центра и зума. В зависимости от параметра `keepCurrentZoom`
+   *    карта либо плавно центрируется на текущем масштабе (сценарий клика по маркеру), либо выставляет
+   *    детальный масштаб `16` (сценарий внешнего клика по списку).
+   * 3. Обращается к накопительному кэшу `this.markersMap` для извлечения долгоживущего инстанса маркера.
+   * 4. Асинхронно импортирует библиотеку окон Google Maps, инициализирует новое окно `InfoWindow`
+   *    с версткой из UI-сервиса и программно открывает его над найденным маркером-якорем.
+   *
+   * @public
+   * @async
+   * @param {Station} station - Объект АЗС, на которую необходимо сфокусировать карту.
+   * @param {boolean} [keepCurrentZoom=false] - Флаг сохранения текущего масштаба. Если `true`, масштаб
+   * карты не изменится. Используется для предотвращения неожиданного сброса зума при кликах по маркерам.
+   * @returns {Promise<void>} Промис, разрешающийся после асинхронного импорта библиотек Google Maps и открытия окна.
    */
-  // public focusOnStation = (station: Station, keepCurrentZoom = false) => {
-  //   if (!this.map || !station.lat || !station.lng) return
-
-  //   this.isProgrammatic.value = true
-  //   this.mapCenter.value = { lat: station.lat, lng: station.lng }
-
-  //   if (keepCurrentZoom) {
-  //     // Если нужно сохранить зум, берем текущий зум карты и записываем его в сигнал,
-  //     // чтобы сработал эффект cameraDisposer, но без изменения масштаба
-  //     this.mapZoom.value = this.map.getZoom() || 11
-  //   } else {
-  //     // Для клика из внешнего списка React выставляем фиксированный детальный зум
-  //     this.mapZoom.value = 16
-  //   }
-  // }
-  /**
- * ЭКШЕН: Фокус на АЗС с автоматическим открытием балуна (InfoWindow)
- * @param station - объект АЗС
- * @param keepCurrentZoom - если true, зум карты не изменится (для клика по маркеру)
- */
   public focusOnStation = async (station: Station, keepCurrentZoom = false) => {
     if (!this.map || !station.lat || !station.lng) return
 
@@ -277,7 +330,27 @@ export class MapLogic extends BaseREService {
   }
 
   /**
-   * ИНФРАСТРУКТУРНЫЙ КОЛЛБЭК: Вызывается картой при остановке камеры
+   * Инфраструктурный коллбэк, срабатывающий при полной остановке камеры карты (событие 'idle').
+   *
+   * Метод является ключевым звеном в реализации паттерна "Единственный источник правды"
+   * (Single Source of Truth), где текущее географическое состояние экрана карты управляет
+   * реактивным стейтом приложения, а не наоборот.
+   *
+   * Логика работы метода:
+   * 1. Метод извлекает точные географические границы видимой области экрана (`LatLngBounds`).
+   * 2. С помощью дебаунса в 300 мс (для предотвращения спама запросами во время микро-корректировок)
+   *    формируется строка формата `south,west,north,east`, которая записывается в сигнал `this.bbox`.
+   * 3. Изменение `this.bbox` автоматически перезапускает реактивный ресурс `stationsResource`
+   *    для подгрузки АЗС под новую область видимости.
+   * 4. Если движение карты было ручным (пользователь скроллил мышью или зумил), метод синхронизирует
+   *    сигналы `this.mapCenter` и `this.mapZoom` со слепком экрана карты, чтобы другие компоненты
+   *    приложения знали актуальную позицию камеры.
+   *
+   * Благодаря событийно-командной схеме и отсутствию реактивных эффектов, которые слушали бы `bbox`
+   * и двигали карту в ответ, данный метод полностью застрахован от бесконечных циклов и зацикливания камеры.
+   *
+   * @private
+   * @returns {void}
    */
   private handleMapIdle = () => {
     if (!this.map) return
@@ -311,9 +384,28 @@ export class MapLogic extends BaseREService {
   }
 
   /**
- * НАКОПИТЕЛЬНЫЙ ДЕКЛАРАТИВНЫЙ РЕНДЕР (Без удаления и без морганий)
- */
-  private async renderMarkers(stations: Station[] | null) {
+   * Декларативный накопительный рендеринг маркеров АЗС на карте.
+   *
+   * Метод реализует паттерн накопительного кэширования (Accumulative Cache) для предотвращения
+   * моргания интерфейса и самопроизвольного закрытия всплывающих окон при обновлении области `bbox`.
+   * Вместо полного удаления маркеров при каждом прилёте данных от API, метод сравнивает новые
+   * поступления с уже отрисованными объектами:
+   *
+   * 1. Ранее не встречавшиеся АЗС инициализируются как новые инстансы `Marker`, сохраняются
+   *    в постоянный кэш `this.markersMap` и массово добавляются в кластеризатор.
+   * 2. Уже существующие заправки полностью игнорируются при перерисовке, что сохраняет их
+   *    DOM-структуру в памяти Google Maps, гарантируя стабильность открытых окон `InfoWindow`.
+   *
+   * При клике на маркер метод закрывает предыдущие окна, переводит сигнал `selectedStation`
+   * в активное состояние, привязывает `InfoWindow` к маркеру-якорю и инициирует плавный
+   * перелёт камеры к выбранной точке.
+   *
+   * @private
+   * @async
+   * @param {Station[] | null} stations - Массив объектов АЗС, полученный из реактивного ресурса `stationsResource`.
+   * @returns {Promise<void>} Промис, разрешающийся после успешной ленивой загрузки библиотек Google Maps и рендеринга маркеров.
+   */
+  private async renderMarkers(stations: Station[] | null): Promise<void> {
     if (!this.markerClusterer || !this.map) return
 
     // Если данных нет, ничего не делаем (или очищаем при полной размонтировке)
@@ -382,6 +474,21 @@ export class MapLogic extends BaseREService {
     }
   }
 
+  /**
+   * Обработчик глобального делегирования событий клика для контента балунов.
+   *
+   * Поскольку Google Maps рендерит всплывающие окна (InfoWindow) в собственном
+   * изолированном DOM-дереве, стандартные обработчики кликов React (onClick)
+   * на элементах внутри `createHtmlContent` не работают.
+   *
+   * Метод слушает все клики по контейнеру карты, перехватывает нажатия на кастомную
+   * кнопку «Выбрать АЗС» по её CSS-классу, извлекает идентификатор заправки из
+   * атрибута `data-station-id` и реактивно сохраняет выбранную станцию в сигнал.
+   *
+   * @private
+   * @param {MouseEvent} e - Нативное браузерное событие клика мыши.
+   * @returns {void}
+   */
   private handlePopupLayerClick = (e: MouseEvent) => {
     const target = e.target as HTMLElement
     if (this.ui.isSelectButton(target)) {
