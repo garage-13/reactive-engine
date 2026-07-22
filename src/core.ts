@@ -820,7 +820,6 @@ export class ReactiveEngine {
     this.reactAdapters = { useState, useEffect };
   }
 
-
   /**
    * Использование реактивного значения в React компоненте.
    * @template T

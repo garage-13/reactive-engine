@@ -120,6 +120,13 @@ Unlike traditional State Management in React (via Context API or immutability-ba
 
 ## 🛠️ Basic Examples
 
+> You can clone this repo and run `yarn && yarn start` for see life local demo.
+```bash
+git clone https://github.com/garage-13/reactive-engine.git
+yarn
+yarn start
+```
+
 ### 1. Initializing the Engine and Signals
 
 You can declare your reactive state in pure TypeScript/JavaScript files completely outside the React component tree.

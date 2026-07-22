@@ -39,6 +39,7 @@ $border-radius-4: 32px;
 
   // 3. Десктопы
   @include device('desktop') {
+    align-items: start; // Возвращаем прижатие к верху для корректной работы masonry
     display: grid;
     gap: $grid-gap-4;
     grid-template-columns: repeat(3, minmax(0, 1fr));

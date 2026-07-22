@@ -121,6 +121,11 @@ const cartService = engine.inject(CartService);
 
 ## 🛠️ Базовые примеры
 
+> Вы можете склонировать этот репозиторий и запустить локальное демо
+```bash
+git clone https://github.com/garage-13/reactive-engine.git && yarn && yarn start
+```
+
 ### 1. Создание инстанса движка и сигналов
 
 Вы можете объявлять реактивное состояние в чистых TypeScript/JavaScript файлах вне иерархии React-компонентов.
