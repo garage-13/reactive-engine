@@ -566,8 +566,8 @@ export class ReactiveEngine {
    * Explained 👉 {@link https://github.com/garage-13/reactive-engine/blob/main/README_EN.md#1-async-resources-dependent-on-multiple-signals}
    *
    * @template T, S
-   * @see {@link https://github.com/garage-13/reactive-engine/blob/main/src/examples/20-resource/Example20.tsx Реализация базового компонента Example20}
-   * @see {@link https://github.com/garage-13/reactive-engine/blob/main/src/examples/21-multi-resource/service.secondary.ts Сложный пример зависимости ресурсов через computed}
+   * @see {@link https://github.com/garage-13/reactive-engine/blob/main/src/examples/200-resource/Example200.tsx Реализация базового компонента Example200}
+   * @see {@link https://github.com/garage-13/reactive-engine/blob/main/src/examples/201-multi-resource/service.secondary.ts Сложный пример зависимости ресурсов через computed}
    * @function resource
    * @param {Function} fetcher - Асинхронная функция для загрузки данных.
    * @param {{ value: S }} [source] - Источник данных.

@@ -20,7 +20,7 @@ export const Example001 = () => {
 
   return (
     <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
-      <div className={baseClasses.absoluteUnitLabel}>example 01 | Signal</div>
+      <div className={baseClasses.absoluteUnitLabel}>Signal example</div>
       <code>{counter}</code>
       <div className={baseClasses.catSection}>
         <button onClick={() => logic.inc()} className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>INC</button>
