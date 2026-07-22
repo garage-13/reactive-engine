@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import baseClasses from '../ui.common.module.scss'
 import btnClasses from '../ui.button.module.scss'
 import { ReactiveEngine } from '../../core'
-import { Cube3DLogic } from './service.Cube3DLogic'
+import { Cube3DLogic } from './service.Cube3DLogic.v2'
 import clsx from 'clsx'
 
 const engine = new ReactiveEngine()
@@ -46,7 +46,7 @@ export const ThreeJsExample = () => {
 
       {/* Панель управления 1: Выбор цвета (Оптимизированный рендер через массив) */}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%', justifyContent: 'center' }}>
-        <span style={{ fontSize: '13px', color: '#aaa' }}>Цвет:</span>
+        <span>Цвет:</span>
         {[
           { hex: '#1a73e8', label: 'Синий' },
           { hex: '#4caf50', label: 'Зелёный' },
