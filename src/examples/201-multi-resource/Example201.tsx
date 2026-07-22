@@ -17,7 +17,7 @@ export const Example201 = observer(() => {
         baseClasses.stack2)
       }
     >
-      <div className={baseClasses.absoluteUnitLabel} title='Chain of Resources & observer'>example 21 | Chain of Resources & observer</div>
+      <div className={baseClasses.absoluteUnitLabel} title='Chain of Resources & observer'>Chain of Resources & observer</div>
       <code>{BASE_API_URL}</code>
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => userInfo.inc()} className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>Refresh account data</button>

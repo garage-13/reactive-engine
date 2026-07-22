@@ -5,8 +5,7 @@ import { ReactiveEngine } from '../../core'
 import clsx from 'clsx';
 
 class Logic extends BaseREService {
-  public counter = this.engine.signal<number>(0, 'example-10:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-10:computed:counter');
+  public counter = this.engine.signal<number>(0, 'example-01:signal:counter');
 
   public inc() {
     this.counter.value += 1
@@ -15,14 +14,14 @@ class Logic extends BaseREService {
 
 const engine = new ReactiveEngine()
 
-export const Example10 = () => {
+export const Example001 = () => {
   const logic = engine.inject(Logic)
   const counter = engine.use(logic.counter)
 
   return (
     <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
-      <div className={baseClasses.absoluteUnitLabel}>example 10 | Computed</div>
-      <code>{counter} | x2 = {logic.doubledCounter.value}</code>
+      <div className={baseClasses.absoluteUnitLabel}>example 01 | Signal</div>
+      <code>{counter}</code>
       <div className={baseClasses.catSection}>
         <button onClick={() => logic.inc()} className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>INC</button>
       </div>

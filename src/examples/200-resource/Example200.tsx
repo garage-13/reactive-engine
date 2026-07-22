@@ -55,7 +55,7 @@ export const Example200 = () => {
 
   return (
     <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
-      <div className={baseClasses.absoluteUnitLabel}>example 20 | Resource</div>
+      <div className={baseClasses.absoluteUnitLabel}>Resource example</div>
       <code>{BASE_API_URL}</code>
       <div style={{ minWidth: '100%' }}>
         <button onClick={() => logic.inc()} className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>

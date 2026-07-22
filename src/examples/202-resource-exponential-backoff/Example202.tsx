@@ -58,7 +58,7 @@ export const Example202 = () => {
 
   return (
     <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
-      <div className={baseClasses.absoluteUnitLabel} title='Resource with exponential backoff support'>example 22 | Resource with exponential backoff support</div>
+      <div className={baseClasses.absoluteUnitLabel} title='Resource with exponential backoff support'>Resource with exponential backoff support</div>
       <code>{BASE_API_URL}</code>
       <div style={{ minWidth: '100%' }}>
         <button onClick={() => logic.inc()} className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>

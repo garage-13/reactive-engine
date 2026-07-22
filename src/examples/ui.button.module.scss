@@ -79,6 +79,15 @@
     }
   }
 
+  // МОДИФИКАТОР: Красная (опасная) кнопка
+  &--danger {
+    --btn-color: #{$neon-danger-color}; // Убедитесь, что эта переменная есть в var-colors.scss
+    --shadow-glow: 0 0 12px color-mix(in srgb, var(--btn-color) 40%, transparent),
+      0 0 24px color-mix(in srgb, var(--btn-color) 20%, transparent);
+    --shadow-soft: 0 4px 12px color-mix(in srgb, var(--btn-color) 20%, transparent);
+    --text-glow: 0 0 4px color-mix(in srgb, var(--btn-color) 40%, transparent);
+  }
+
   // ==========================================
   // 2. ТИПЫ ОТОБРАЖЕНИЯ (Универсально используют переменные выше)
   // ==========================================

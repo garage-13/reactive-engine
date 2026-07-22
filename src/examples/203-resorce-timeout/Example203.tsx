@@ -8,7 +8,7 @@ import { useReactiveValue } from '../../hooks';
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 class Logic extends BaseREService {
-  public counter = this.engine.signal<number>(0, 'example-23:signal:counter');
+  public counter = this.engine.signal<number>(0, 'example-203:signal:counter');
 
   public apiState = this.engine.resource(
     async (counterValue, abortSignal) => {
@@ -29,7 +29,7 @@ class Logic extends BaseREService {
     },
     this.counter,
     {
-      name: 'example-23:resource:timeout-and-retry',
+      name: 'example-203:resource:timeout-and-retry',
       timeout: 2500,               // Прервать запрос, если сервер не отвечает более 2.5 секунд
       retryCount: 3,               // Сделать до 3 повторных попыток после каждого таймаута
       retryDelay: 1000,            // Базовая задержка между попытками

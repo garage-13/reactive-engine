@@ -1,8 +1,9 @@
 import baseClasses from './ui.common.module.scss'
 import clsx from 'clsx'
 import { CardModalWrapper } from './shared'
-import { Example01 } from './01-signal'
-import { Example10, Example11 } from './10-computed'
+import { Example001 } from './001-signal'
+import { AudioPlayerExample as Example002 } from './002-signal-audioplayer'
+import { Example100, Example101 } from './100-computed'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
 import { Example202 } from './202-resource-exponential-backoff'
@@ -23,10 +24,16 @@ export const App = () => {
         <h2>0. Signal</h2>
         <div className={clsx(baseClasses.unitsWrapper)}>
           <CardModalWrapper
-            title='Example 01'
+            title='Example 001'
             description='Counter'
           >
-            <Example01 />
+            <Example001 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 002'
+            description='Audioplayer'
+          >
+            <Example002 />
           </CardModalWrapper>
         </div>
       </div>
@@ -35,16 +42,16 @@ export const App = () => {
         <h2>1. Computed</h2>
         <div className={clsx(baseClasses.unitsWrapper)}>
           <CardModalWrapper
-            title='Example 10'
+            title='Example 100'
             description='Counter & Doubled value'
           >
-            <Example10 />
+            <Example100 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 11'
-            description='useReactiveValue hook (subscribed to Example 21)'
+            title='Example 101'
+            description='useReactiveValue hook (subscribed to Example 201)'
           >
-            <Example11 />
+            <Example101 />
           </CardModalWrapper>
         </div>
       </div>
