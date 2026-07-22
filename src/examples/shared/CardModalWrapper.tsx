@@ -46,7 +46,7 @@ export const CardModalWrapper = ({
       {description && <p style={{ fontSize: 'bold', color: 'gray', margin: 0, fontFamily: 'system-ui' }}>{description}</p>}
 
       {/* Кнопка-триггер для открытия */}
-      <div>
+      <div style={{ marginTop: 'auto' }}>
         <button
           onClick={() => setIsOpen(true)}
           className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}

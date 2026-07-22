@@ -1,6 +1,6 @@
 import baseClasses from '../ui.common.module.scss'
 import clsx from 'clsx';
-import { useSecondaryService } from '../21-multi-resource/store';
+import { useSecondaryService } from '../201-multi-resource/store';
 import { useReactiveValue } from '../../hooks';
 
 export const Example11 = () => {

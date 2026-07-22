@@ -107,9 +107,9 @@ export const MapExample = () => {
               // e.currentTarget.style.background = '#2a2a35'
             }}
           >
-            <b style={{ color: '#4caf50', fontSize: '14px' }}>📍 Реактивный выбор (нажмите, чтобы показать на карте):</b>
+            <b style={{ color: '#4caf50', fontSize: '14px' }}>📍 Реактивный выбор (нажмите для перелета по карте):</b>
             <code>
-              ID: {selectedStation.id} | {selectedStation.title || selectedStation.name} | {selectedStation.lat.toFixed(4)}, {selectedStation.lng.toFixed(4)}
+              ID: {selectedStation.id} | {selectedStation.title || selectedStation.name || 'Noname'} | {selectedStation.lat.toFixed(4)}, {selectedStation.lng.toFixed(4)}
             </code>
           </button>
         )

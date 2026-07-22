@@ -23,8 +23,8 @@ export class UserInfoService extends BaseREService {
   // }
   // --
 
-  public counter = this.engine.signal<number>(0, 'example-21:UserInfoService:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-21:UserInfoService:computed:counter');
+  public counter = this.engine.signal<number>(0, 'example-201:UserInfoService:signal:counter');
+  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-201:UserInfoService:computed:counter');
 
   public activePersonId = this.engine.signal<string | null>(null)
 

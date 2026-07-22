@@ -88,7 +88,7 @@ export const MapExample = () => {
       style={{ fontFamily: 'system-ui' }}
     >
       <div className={baseClasses.absoluteUnitLabel}>
-        Google Maps API (Dynamic Loader + Clusters + Reactive state)
+        Google Maps + Clusters + Reactive state
       </div>
 
       {isKeyMissing ? (
@@ -174,11 +174,11 @@ export const MapExample = () => {
           onClick={() => logic.focusOnStation(selectedStation, true)}
           style={{
             padding: '16px',
-            border: '1px solid lightgray',
+            border: '2px solid lightgray',
             borderRadius: '8px',
             textAlign: 'left',
           }}>
-          <strong style={{ color: '#4caf50' }}>Реактивный выбор:</strong>
+          <b style={{ color: '#4caf50' }}>Реактивный выбор</b>
           <br />
           {selectedStation.title || selectedStation.name} (ID: {selectedStation.id})
         </button>

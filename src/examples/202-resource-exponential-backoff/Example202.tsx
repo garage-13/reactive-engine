@@ -8,8 +8,8 @@ import { useReactiveValue } from '../../hooks';
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 class Logic extends BaseREService {
-  public counter = this.engine.signal<number>(0, 'example-22:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-22:computed:counter');
+  public counter = this.engine.signal<number>(0, 'example-202:signal:counter');
+  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-202:computed:counter');
   public apiState = this.engine.resource(
     async (counterValue, abortSignal) => {
       const res = await fetch(
@@ -28,7 +28,7 @@ class Logic extends BaseREService {
     },
     this.counter,
     {
-      name: 'example-22:resource:exp-backoff-exp',
+      name: 'example-202:resource:exp-backoff-exp',
       retryCount: 4,               // Сделать до 4 повторов при ошибках сети
       retryDelay: 1000,            // Стартовая задержка 1 секунда
       isExponentialBackoffEnabled: true,    // Интервалы будут: ~1с -> ~2с -> ~4с -> ~8с
@@ -51,7 +51,7 @@ class Logic extends BaseREService {
 
 const engine = new ReactiveEngine()
 
-export const Example22 = () => {
+export const Example202 = () => {
   const logic = engine.inject(Logic)
   const counter = engine.use(logic.counter)
   const { loading, data, error, isRetrying } = useReactiveValue(logic.apiState)

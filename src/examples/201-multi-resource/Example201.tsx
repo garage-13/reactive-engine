@@ -5,7 +5,7 @@ import { useUserInfoService, observer, useSecondaryService } from './store';
 
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
-export const Example21 = observer(() => {
+export const Example201 = observer(() => {
   const userInfo = useUserInfoService()
   const secondaryService = useSecondaryService()
 

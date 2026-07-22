@@ -8,8 +8,8 @@ import { useReactiveValue } from '../../hooks';
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 class Logic extends BaseREService {
-  public counter = this.engine.signal<number>(0, 'example-20:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-20:computed:counter');
+  public counter = this.engine.signal<number>(0, 'example-200:signal:counter');
+  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-200:computed:counter');
   public apiState = this.engine.resource(
     async (counterValue, abortSignal) => {
       if (counterValue === 0)
@@ -31,7 +31,7 @@ class Logic extends BaseREService {
     },
     this.counter,
     {
-      name: 'example-20:resource',
+      name: 'example-200:resource',
       // validateBeforeFetch: (counterValue) => {
       //   if (counterValue === 0) {
       //     return `Not started (pre-validation before fetch) for count value ${counterValue}`;
@@ -48,7 +48,7 @@ class Logic extends BaseREService {
 
 const engine = new ReactiveEngine()
 
-export const Example20 = () => {
+export const Example200 = () => {
   const logic = engine.inject(Logic)
   const counter = engine.use(logic.counter)
   const { loading, data, error } = useReactiveValue(logic.apiState)

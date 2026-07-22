@@ -12,7 +12,7 @@ export class SecondaryService extends BaseREService {
 
   private isUserDataReceived = this.engine.computed<boolean>(
     () => !this.userInfoService.apiState.loading && !!this.userInfoService.apiState.data,
-    'example-21:computed:isUserDataReceived'
+    'example-201:computed:isUserDataReceived'
   )
 
   private apiDeps = this.engine.computed<[boolean, string | null]>(() => [
@@ -42,7 +42,7 @@ export class SecondaryService extends BaseREService {
     },
     this.apiDeps,
     {
-      name: 'example-21:resource:accessPolicies',
+      name: 'example-201:resource:accessPolicies',
       resetDataOnSourceChange: true,
       responseValidate: (res) => {
         // Пример: Бэкенд ответил 200, но ожидаемое поле отсутствует, что для нас критично

@@ -3,16 +3,17 @@ import clsx from 'clsx'
 import { CardModalWrapper } from './shared'
 import { Example01 } from './01-signal'
 import { Example10, Example11 } from './10-computed'
-import { Example20 } from './20-resource'
-import { Example21 } from './21-multi-resource'
-import { Example22 } from './22-resource-exponential-backoff'
-import { Example23 } from './23-resorce-timeout'
-import { MapExample as Example24 } from './24-resource-gdebenz-and-leaflet'
-import { MapExample as Example25 } from './25-resourse-gdebenz-and-leaflet-clusters'
-import { MapExample as Example26 } from './26-resource-gdebenz-and-leaflet-clusters'
-import { MapExample as Example27 } from './27-resource-gdebenz-and-leaflet-clusters'
-import { MapExample as Example28 } from './28-resource-gdebenz-and-yandexmap'
-import { MapExample as Example29 } from './29-resource-gdebenz-and-googlemaps'
+import { Example200 } from './200-resource'
+import { Example201 } from './201-multi-resource'
+import { Example202 } from './202-resource-exponential-backoff'
+import { Example203 } from './203-resorce-timeout'
+import { MapExample as Example204 } from './204-resource-gdebenz-and-leaflet'
+import { MapExample as Example205 } from './205-resourse-gdebenz-and-leaflet-clusters'
+import { MapExample as Example206 } from './206-resource-gdebenz-and-leaflet-clusters'
+import { MapExample as Example207 } from './207-resource-gdebenz-and-leaflet-clusters'
+import { MapExample as Example208 } from './208-resource-gdebenz-and-yandexmap'
+import { MapExample as Example209 } from './209-resource-gdebenz-and-googlemaps'
+import { MapExample as Example210 } from './210-resource-gdebenz-mapbox'
 
 export const App = () => {
   return (
@@ -52,68 +53,74 @@ export const App = () => {
         <h2>2. Resource</h2>
         <div className={clsx(baseClasses.unitsWrapper)}>
           <CardModalWrapper
-            title='Example 20'
+            title='Example 200'
             description='Resource example'
           >
-            <Example20 />
+            <Example200 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 21'
+            title='Example 201'
             footerText='Account data request for person list 👉 Person id should be selected 👉 Person data request'
             description='Multi resource chaining example & observer hoc MobX like'
             useTwoColumns
           >
-            <Example21 />
+            <Example201 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 22'
+            title='Example 202'
             description='Resource exponential backoff example (incorrect url)'
             footerText='Incorrect url 👉 Retry x4 👉 HTTP error 404'
           >
-            <Example22 />
+            <Example202 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 23'
+            title='Example 203'
             description='Resource timeout example (response delay 15s)'
             footerText='4 requests (1 start + 3 retry) of 2.5 seconds each + ~7 seconds of total sleep in between 👉 Total error after ~17 seconds'
           >
-            <Example23 />
+            <Example203 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 24'
-            description='Leaflet exp'
+            title='Example 204'
+            description='Leaflet'
           >
-            <Example24 />
+            <Example204 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 25'
-            description='Leaflet exp (with clusters)'
+            title='Example 205'
+            description='Leaflet with clusters'
           >
-            <Example25 />
+            <Example205 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 26'
-            description='Leaflet exp (with clusters) & custom ui as DI service'
+            title='Example 206'
+            description='Leaflet with clusters & custom ui as DI service'
           >
-            <Example26 />
+            <Example206 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 27'
-            description='Leaflet exp (with clusters) & custom ui as DI service & bbox signal'
+            title='Example 207'
+            description='Leaflet with clusters & custom ui as DI service & bbox signal'
           >
-            <Example27 />
+            <Example207 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 28'
-            description='Yandex maps exp'
+            title='Example 208'
+            description='Yandex Maps'
           >
-            <Example28 />
+            <Example208 />
           </CardModalWrapper>
           <CardModalWrapper
-            title='Example 29'
-            description='Google Maps API (Dynamic Loader + Clusters + Reactive state)'
+            title='Example 209'
+            description='Google Maps'
           >
-            <Example29 />
+            <Example209 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 210'
+            description='MapBox'
+          >
+            <Example210 />
           </CardModalWrapper>
         </div>
       </div>

@@ -57,7 +57,7 @@ class Logic extends BaseREService {
 
 const engine = new ReactiveEngine()
 
-export const Example23 = () => {
+export const Example203 = () => {
   const logic = engine.inject(Logic)
   const counter = engine.use(logic.counter)
 

@@ -1600,6 +1600,11 @@ magic-string@^0.30.17, magic-string@^0.30.21:
   dependencies:
     "@jridgewell/sourcemap-codec" "^1.5.5"
 
+mapbox-gl@^3.26.0:
+  version "3.26.0"
+  resolved "https://registry.yarnpkg.com/mapbox-gl/-/mapbox-gl-3.26.0.tgz#cad7597fc328c9057a16cf49b043ce4f2404f0d6"
+  integrity sha512-N+Y8VmvpD6xDeP0hAbegPZeEMY5TtnLcV0gEUBZ/KHq3s/yUKQm0PVG9JEkId0QFMMe5/W+FEjoyV4NI3B/N7A==
+
 mdn-data@2.27.1:
   version "2.27.1"
   resolved "https://registry.yarnpkg.com/mdn-data/-/mdn-data-2.27.1.tgz#e37b9c50880b75366c4d40ac63d9bbcacdb61f0e"
