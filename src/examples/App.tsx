@@ -4,6 +4,7 @@ import { CardModalWrapper } from './shared'
 import { Example001 } from './001-signal'
 import { AudioPlayerExample as Example002 } from './002-signal-audioplayer'
 import { Example100, Example101 } from './100-computed'
+import { ThreeJsExample as Example102 } from './102-compted-threejs'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
 import { Example202 } from './202-resource-exponential-backoff'
@@ -52,6 +53,12 @@ export const App = () => {
             description='useReactiveValue hook (subscribed to Example 201)'
           >
             <Example101 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 102'
+            description='Three.js exp'
+          >
+            <Example102 />
           </CardModalWrapper>
         </div>
       </div>
