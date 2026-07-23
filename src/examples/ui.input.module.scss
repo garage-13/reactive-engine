@@ -7,7 +7,7 @@
 .neonInput-wrapper {
   position: relative;
   display: inline-block;
-  // width: 100%;
+  // width: auto;
   box-sizing: border-box;
   // margin-top: 10px; // Запас сверху, чтобы поднятый лейбл не обрезался родителем
 
@@ -54,7 +54,7 @@
   font-family: 'Courier New', Courier, monospace;
   letter-spacing: 1px;
   transition: all 0.2s ease;
-  color: color-mix(in srgb, var(--input-color) 60%, #fff); // Приглушенный цвет в покое
+  // color: color-mix(in srgb, var(--input-color) 60%, #fff); // Приглушенный цвет в покое
 }
 
 // ==========================================================================
@@ -132,7 +132,7 @@
 // ТИП: Outlined
 .neonInput-wrapper--outlined {
   .neonInput {
-    color: #{$bg-light}; // Текст ввода светлый
+    color: #{$neon-color}; // Текст ввода светлый
     border: 2px solid color-mix(in srgb, var(--input-color) 40%, transparent); // Полупрозрачная рамка в покое
     border-radius: 8px;
 

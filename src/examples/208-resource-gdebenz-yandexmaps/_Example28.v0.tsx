@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import baseClasses from '../ui.common.module.scss'
 import { ReactiveEngine } from '../../core'
-import { MapLogic } from './service.MapLogic.v0'
+import { MapLogic } from './_service.MapLogic.v0'
 import clsx from 'clsx'
 import { useReactiveValue } from '../../hooks'
 

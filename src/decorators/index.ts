@@ -1,2 +1,6 @@
 export * from './createObserver'
 export * from './withCache'
+export * from './withDebounce'
+export * from './withLongPolling'
+export * from './withThrottle'
+export * from './withThrottleAndCache'

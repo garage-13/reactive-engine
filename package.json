@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "0.3.11-beta",
+  "version": "0.3.12-beta",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -66,10 +66,13 @@
     "@yandex/ymaps3-clusterer": "^0.0.12",
     "clsx": "^2.1.1",
     "jsdom": "^29.1.1",
+    "kaplay": "^3001.0.19",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "mapbox-gl": "^3.26.0",
     "msw": "^2.15.0",
+    "phaser": "^4.2.1",
+    "pixi.js": "^8.19.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sass-embedded": "^1.100.0",

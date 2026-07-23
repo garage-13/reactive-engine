@@ -93,7 +93,9 @@ export const ThreeJsExample = () => {
             Pause
           </button>
         )}
+      </div>
 
+      <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'center' }}>
         <button
           disabled={currentSpeed === 1}
           onClick={() => logic.setSpeed(1)}
@@ -113,5 +115,6 @@ export const ThreeJsExample = () => {
         </button>
       </div>
     </div>
+
   )
 }

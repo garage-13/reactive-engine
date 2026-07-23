@@ -1,12 +1,13 @@
 import clsx from 'clsx'
 import styles from '../../ui.input.module.scss'
-import React, { useId } from 'react';
+import React, { CSSProperties, useId } from 'react';
 
 // Расширяем стандартные пропсы обычного HTML-инпута
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   variant?: 'outlined' | 'contained';
   colorType?: 'primary' | 'secondary';
+  style?: CSSProperties;
 }
 
 export const Input: React.FC<InputProps> = ({

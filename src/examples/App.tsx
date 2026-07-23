@@ -6,6 +6,11 @@ import { AudioPlayerExample as Example002 } from './002-signal-audioplayer'
 import { Example100 } from './100-computed'
 import { Example101 } from './101-computed'
 import { ThreeJsExample as Example102 } from './102-computed-threejs'
+import { Pixi2DExample as Example103 } from './103-computed-pixijs'
+import { Phaser2DExample as Example104 } from './104-computed-phaserjs'
+import { Kaboom2DExample as Example105 } from './105-computed-kaboomjs'
+import { HistoryStateExample as Example106 } from './106-computed-history-state'
+import { MultiStepFormExample as Example107 } from './107-multistep-logic-di-undo-cache'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
 import { Example202 } from './202-resource-exponential-backoff'
@@ -17,6 +22,11 @@ import { MapExample as Example207 } from './207-resource-gdebenz-leaflet-cluster
 import { MapExample as Example208 } from './208-resource-gdebenz-yandexmaps'
 import { MapExample as Example209 } from './209-resource-gdebenz-googlemaps'
 import { MapExample as Example210 } from './210-resource-gdebenz-mapbox'
+import { SearchExample as Example211 } from './211-resource-withDebounce'
+import { Throttle2DExample as Example212 } from './212-resource-withThrottle'
+import { ThrottleCacheExample as Example213 } from './213-resource-withThrottleAndCache'
+// import { LiveNotificationsExample as Example214 } from './214-long-polling-as-while'
+import { LiveNotificationsExample as Example215 } from './215-resource-withLongPolling'
 
 export const App = () => {
   return (
@@ -57,9 +67,39 @@ export const App = () => {
           </CardModalWrapper>
           <CardModalWrapper
             title='Example 102'
-            description='Three.js exp'
+            description='Three.js (3D engine)'
           >
             <Example102 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 103'
+            description='Pixi.js (2D engine)'
+          >
+            <Example103 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 104'
+            description='Phaser (2D engine)'
+          >
+            <Example104 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 105'
+            description='Kaboom.js / Kaplay (2D engine)'
+          >
+            <Example105 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 106'
+            description='LocalStorage Cache & State Undo Demo'
+          >
+            <Example106 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 107'
+            description='Multi-Step Form (DI + Undo + Cache)'
+          >
+            <Example107 />
           </CardModalWrapper>
         </div>
       </div>
@@ -136,6 +176,36 @@ export const App = () => {
             description='MapBox'
           >
             <Example210 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 211'
+            description='withDebounce decorator'
+          >
+            <Example211 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 212'
+            description='withThrottle decorator'
+          >
+            <Example212 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 213'
+            description='withThrottleAndCache decorator'
+          >
+            <Example213 />
+          </CardModalWrapper>
+          {/* <CardModalWrapper
+            title='Example 214'
+            description='Long polling'
+          >
+            <Example214 />
+          </CardModalWrapper> */}
+          <CardModalWrapper
+            title='Example 215'
+            description='Resource & withLongPolling decorator (experimental)'
+          >
+            <Example215 />
           </CardModalWrapper>
         </div>
       </div>

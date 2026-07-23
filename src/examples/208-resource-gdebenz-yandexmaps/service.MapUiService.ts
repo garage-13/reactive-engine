@@ -1,6 +1,14 @@
 import { BaseREService } from '../../BaseREService'
-import { Station } from './service.MapLogic.v0'
 import styles from './MapExample.module.scss'
+
+export interface Station {
+  id: number
+  name: string
+  title: string
+  lat: number
+  lng: number
+  slug: string
+}
 
 export class MapUiService extends BaseREService {
   public createHtmlContent(station: Station): string {
