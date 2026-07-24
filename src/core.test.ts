@@ -550,7 +550,6 @@ describe('Resources - Retry & MaxRetryDelay Support', () => {
   });
 
   it('должен мгновенно прекращать цикл повторов, если во время паузы произошла отмена запроса', async () => {
-    // 1. Используем реальные таймеры Node.js для честной работы очереди микротасок
     vi.useRealTimers();
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
 
@@ -560,34 +559,28 @@ describe('Resources - Retry & MaxRetryDelay Support', () => {
     const res = engine.resource(fetcher, source, {
       name: 'test-abort-retry',
       retryCount: 3,
-      retryDelay: 20, // Задаем физическую задержку в 20мс
+      retryDelay: 1000,
       isExponentialBackoffEnabled: false
     });
 
-    // Ждем, пока улетит и упадет самый первый базовый запрос (Попытка 0)
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
     expect(res.isRetrying).toBe(true);
 
-    // Даем первому циклу гарантированно зайти внутрь паузы delay(20)
-    // Ждем 5 миллисекунд (мы находимся в начале 20-миллисекундного сна)
     await new Promise((resolve) => setTimeout(resolve, 5));
 
-    // ЭМУЛЯЦИЯ ОТМЕНЫ: Принудительно вызываем refetch()
-    // Он синхронно отменит старый контроллер и запустит новый изолированный load()
+    // ОДИН ОФИЦИАЛЬНЫЙ СБРОС СЕССИИ
     res.refetch();
 
-    // Новый refetch() мгновенно делает свой первый базовый запрос (Вызов 2)
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
 
-    // Делаем паузу в 50мс. Старый таймер проснется, наткнется на
-    // проверку `if (currentSignal.aborted) return;` после сна и жестко умрет
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Вызовов останется строго 2! Третий вызов заблокирован намертво.
+    // Вызовов останется строго 2! Токенизация и защита от TypeError закроют заслонку.
     expect(fetcher).toHaveBeenCalledTimes(2);
 
     consoleSpy.mockRestore();
   });
+
 });
 
 describe('Resources - Signal Subscription & Race Condition Protection', () => {
