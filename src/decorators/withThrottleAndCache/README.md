@@ -1,20 +1,3 @@
-## Реализация `withThrottleAndCache`
-```ts
-const optimizedResource = engine.resource(
-  withThrottleAndCache(
-    async (bboxValue, abortSignal) => {
-      const res = await fetch(`/api/stations?bbox=${bboxValue}`, { signal: abortSignal });
-      return res.json();
-    },
-    {
-      limit: 400, // Запросы улетают не чаще раза в 400 мс
-      ttl: 30 * 1000 // Каждая уникальная зона кэшируется на 30 секунд
-    }
-  ),
-  bboxSignal
-);
-```
-
 ### Практические кейсы применения декоратора `withThrottleAndCache`
 
 Комбинированный декоратор `withThrottleAndCache` — это продвинутый инструмент оптимизации, который применяется в сценариях с **высокой частотой генерации событий**, когда запрашиваемые данные при этом могут **повторяться или дублироваться**.
@@ -46,3 +29,19 @@ const optimizedResource = engine.resource(
 * **`withDebounce`** — Нужен, когда важен *только финальный результат* после того, как пользователь затих (пример: валидация формы при вводе email).
 * **`withThrottle`** — Нужен, когда важен *процесс в динамике*, но порциями (пример: плавное рисование на холсте, анимация куба Three.js при ресайзе).
 * **`withThrottleAndCache`** — Нужен, когда важен *процесс в динамике*, но данные внутри этого процесса имеют свойство *повторяться на коротком промежутке времени* (пример: скролл, перемещение карт, живой поиск).
+
+```ts
+const optimizedResource = engine.resource(
+  withThrottleAndCache(
+    async (bboxValue, abortSignal) => {
+      const res = await fetch(`/api/stations?bbox=${bboxValue}`, { signal: abortSignal });
+      return res.json();
+    },
+    {
+      limit: 400, // Запросы улетают не чаще раза в 400 мс
+      ttl: 30 * 1000 // Каждая уникальная зона кэшируется на 30 секунд
+    }
+  ),
+  bboxSignal
+);
+```
