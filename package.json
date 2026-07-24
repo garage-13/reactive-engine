@@ -65,6 +65,7 @@
     "@vitest/ui": "^4.1.10",
     "@yandex/ymaps3-clusterer": "^0.0.12",
     "clsx": "^2.1.1",
+    "eslint-plugin-import-x": "^4.17.1",
     "jsdom": "^29.1.1",
     "kaplay": "^3001.0.19",
     "leaflet": "^1.9.4",

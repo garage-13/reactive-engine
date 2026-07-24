@@ -55,7 +55,7 @@ export class Phaser2DLogic extends AbstractService {
   private resizeThrottleTimeout: ReturnType<typeof setTimeout> | null = null
   private memorySpeed = 1
 
-  // ИСПРАВЛЕНИЕ: Добавили объявление упущенного свойства lastContainer
+  // Добавили объявление упущенного свойства lastContainer
   private lastContainer: HTMLDivElement | null = null
 
   public initializePhaser = (canvasContainer: HTMLDivElement) => {
@@ -65,7 +65,7 @@ export class Phaser2DLogic extends AbstractService {
     const width = canvasContainer.clientWidth
     const height = canvasContainer.clientHeight
 
-    // ИСПРАВЛЕНИЕ: Переписали коллбэки создания и обновления через self-ссылку
+    // Переписали коллбэки создания и обновления через self-ссылку
     // для полного соответствия встроенным типам SceneCreateCallback в GameConfig
     const self = this
 
@@ -100,7 +100,7 @@ export class Phaser2DLogic extends AbstractService {
     this.activeScene = scene
     this.spritesGroup = scene.add.group()
 
-    // ИСПРАВЛЕНИЕ: Создаем графику через scene.add и убираем невалидное свойство 'add'
+    // Создаем графику через scene.add
     const graphics = scene.add.graphics()
 
     graphics.fillStyle(0x00b4d8, 0.8)

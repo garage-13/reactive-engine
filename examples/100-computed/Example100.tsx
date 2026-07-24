@@ -23,7 +23,10 @@ export const Example100 = () => {
       <div className={baseClasses.absoluteUnitLabel}>Computed</div>
       <code>{counter} | x2 = {logic.doubledCounter.value}</code>
       <div className={baseClasses.catSection}>
-        <button onClick={() => logic.inc()} className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>INC</button>
+        <button
+          onClick={() => logic.inc()}
+          className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}
+        >INC</button>
       </div>
     </div>
   )
