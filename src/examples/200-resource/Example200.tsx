@@ -32,12 +32,6 @@ class Logic extends BaseREService {
     this.counter,
     {
       name: 'example-200:resource',
-      // validateBeforeFetch: (counterValue) => {
-      //   if (counterValue === 0) {
-      //     return `Not started (pre-validation before fetch) for count value ${counterValue}`;
-      //   }
-      //   return true; // Валидация успешна, можно делать fetch
-      // },
     }
   )
 

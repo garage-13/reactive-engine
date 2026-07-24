@@ -1,4 +1,3 @@
-import { ReactiveEngine } from '~/core';
 import { BaseREService } from '../../BaseREService'
 
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
@@ -12,11 +11,9 @@ export class UserInfoService extends BaseREService {
   // -- NOTE: DERTY_MISTAKE 2/3 ✅ Correct way (variant 2)
   // constructor(engine: ReactiveEngine) {
   //   super(engine);
-
   //   this.engine.effect(() => {
   //     // Подписываемся на изменение counter
   //     const _ = this.counter.value;
-
   //     // Синхронно сбрасываем выбранного пользователя при каждом изменении счетчика
   //     this.engine.untrack(() => this.resetActivePersonId());
   //   });

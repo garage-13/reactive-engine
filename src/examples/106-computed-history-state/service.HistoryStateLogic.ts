@@ -29,7 +29,7 @@ export class HistoryStateLogic extends BaseREService {
   private syncTrigger = this.createSignal<HistoryAction | null>(null, 'history:signal:sync-trigger')
 
   /**
-   * ИСПРАВЛЕННЫЙ РЕСУРС: Логирование перенесено прямо в асинхронное тело функции.
+   * Логирование перенесено прямо в асинхронное тело функции.
    * Это на 100% страхует от зависаний страницы и скрытых зацикливаний.
    */
   public syncResource = this.engine.resource(

@@ -80,7 +80,6 @@ export const HistoryStateExample = () => {
           disabled={!canUndo}
           onClick={() => logic.undo()}
           className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--secondary'], btnClasses['neonBtn--outlined'])}
-          // style={{ flex: 1 }}
           style={{ gridColumn: 'span 3' }}
         >
           ↩️ Откатить (Undo)

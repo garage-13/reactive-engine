@@ -11,7 +11,7 @@ const INITIAL_DEFAULT_STATE: FormStateSnapshot = {
 }
 
 export class MultiStepFormLogic extends BaseREService {
-  // Внедряем сервис истории через DI движка
+  /** Внедренный сервис истории через DI движка */
   public history = this.engine.inject(FormHistoryService)
 
   // Базовые сигналы состояния формы (восстанавливаются из кэша истории)
@@ -59,8 +59,6 @@ export class MultiStepFormLogic extends BaseREService {
       this.history.commit(description, currentSnapshot, prevSnapshot)
     }
   }
-
-  // --- ВЫЧИСЛЯЕМЫЕ СВОЙСТВА (COMPUTED) ДЛЯ ВАЛИДАЦИИ ШАГОВ ---
 
   /** Проверка валидности первого шага (Имя) */
   public isStep1Valid = this.createComputed<boolean>(() => {

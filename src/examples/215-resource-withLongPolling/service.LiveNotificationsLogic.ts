@@ -14,7 +14,7 @@ interface ServerResponse {
   notifications: NotificationItem[]
 }
 
-// ИСПРАВЛЕНИЕ: Из кортежа убран сигнал isServerOnline.
+// Из кортежа убран сигнал isServerOnline.
 // Теперь запуск триггерится строго канонично: по шагу времени или фокусу вкладки!
 type TPollingDeps = [isLoopActive: boolean, pollingTick: number, isTabActive: boolean];
 
