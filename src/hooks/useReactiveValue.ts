@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useCallback, useMemo, useEffect } from "react";
+import { useSyncExternalStore, useCallback, useMemo, useEffect } from 'react'
 import { CleanupFn } from '../core';
 
 interface ObservableItem<T> {

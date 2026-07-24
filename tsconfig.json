@@ -38,11 +38,13 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "src"
+    "src",
+    "examples/mocks.msw"
   ],
   "exclude": [
     "node_modules",
-    "tmp"
+    "tmp",
+    "examples"
   ],
   "references": [
     {

@@ -7,12 +7,23 @@ import path from 'path'
 export default defineConfig({
   base: "./",
   plugins: [
-    dts({ bundleTypes: true, insertTypesEntry: true }),
+    dts({
+      bundleTypes: true,
+      insertTypesEntry: true,
+      // Исключаем примеры из генерации деклараций типов основного билда
+      exclude: ['examples/**/*'],
+    }),
     react(),
     // tsconfigPaths(),
   ],
   resolve: {
     dedupe: ["react", "react-dom"],
+    alias: {
+      '~': path.resolve(__dirname, './examples'), // Ведет в папку examples в корне проекта
+      '@src': path.resolve(__dirname, './src'),
+      '@pravosleva/reactive-engine': path.resolve(__dirname, './src'),
+      '@dist': path.resolve(__dirname, './dist'),
+    },
   },
   build: {
     emptyOutDir: true,

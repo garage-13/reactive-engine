@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2022"
+    ],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": [
+      "vite/client"
+    ],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "~/*": [
+        "./*"
+      ],
+      "@src": [
+        "../src/index.ts"
+      ],
+      "@src/*": [
+        "../src/*"
+      ],
+      "@pravosleva/reactive-engine": [
+        "../src/index.ts"
+      ],
+      "@dist": [
+        "../dist/index.js"
+      ],
+      "@dist/*": [
+        "../dist/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*",
+    "../src/**/*"
+  ]
+}
