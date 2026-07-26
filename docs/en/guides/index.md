@@ -1,4 +1,4 @@
-# 🚀 ReactiveEngine Core Framework (Instruction in English 🇬🇧)
+# 🚀 ReactiveEngine Core Framework (instruction in English 🇬🇧)
 A lightweight, type-safe reactive engine built with TypeScript, featuring Dependency Injection and seamless React integration.
 
 https://t.me/bash_exp_ru/3393
@@ -14,8 +14,6 @@ yarn add @pravosleva/reactive-engine
 # or
 pnpm add @pravosleva/reactive-engine
 ```
-
----
 
 ## 🧱 Built-in Dependency Injection (DI Container)
 
@@ -116,8 +114,6 @@ Unlike traditional State Management in React (via Context API or immutability-ba
 * **Automatic Batching:** The engine groups multiple signal modifications into "batches" using microtasks. Network resources or heavy effects won't re-trigger 10 times in a row when updating 10 signals within the same synchronous execution block.
 * **Smart Asynchrony:** The `resource` tool orchestrates a native `AbortController` out of the box, automatically cancelling stale pending network requests whenever dependencies change.
 
----
-
 ## 🛠️ Basic Examples
 
 > You can clone this repo and run `yarn && yarn start` for see life local demo.
@@ -173,8 +169,6 @@ export const Counter = () => {
   )
 }
 ```
-
----
 
 ## 🔥 Advanced Examples
 
@@ -685,8 +679,6 @@ export const UserHeader = () => {
   return <h1>Hello, {name}!</h1>
 }
 ```
-
----
 
 ## 🗂️ License
 
