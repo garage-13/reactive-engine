@@ -3,8 +3,8 @@
 layout: home
 
 hero:
-  name: "Reactive Engine"
-  text: "Логическое ядро проекта"
+  name: Reactive Engine
+  text: Логическое ядро проекта
   tagline: My great project tagline
   actions:
     - theme: brand
@@ -13,6 +13,9 @@ hero:
     - theme: alt
       text: Декраторы
       link: /decorators
+    - theme: alt
+      text: Хуки
+      link: /hooks
 
 features:
   - title: Минимум ререндеров

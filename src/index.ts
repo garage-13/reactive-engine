@@ -1,4 +1,4 @@
-export * from './BaseREService'
+export * from './AbstractService'
 export * from './BaseREServiceEnhanced'
 
 export * from './core'

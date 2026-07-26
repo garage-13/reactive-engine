@@ -1,5 +1,3 @@
-# Decorator `withLongPolling`
-
 <!--@include: ../../../src/decorators/withLongPolling/README.en.md-->
 
 ## Example

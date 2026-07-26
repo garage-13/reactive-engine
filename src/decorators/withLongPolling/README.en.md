@@ -1,3 +1,5 @@
+# `withLongPolling` decorator
+
 The updated `withLongPolling` decorator is a high-performance tool for building a real-time update infrastructure using the standard HTTP protocol. In the v2 architecture, the decorator is completely free of hidden background `while` loops and recursive timeouts that were breaking the state manager scheduler.
 
 It now operates as a pure command ticker: it executes exactly one long network transaction and then declaratively requests the business service to advance the reactive `pollingTick` signal. Changing the signal invalidates the `engine.resource` resource cache, forcing the engine core to legitimately and natively open the next HTTP connection.

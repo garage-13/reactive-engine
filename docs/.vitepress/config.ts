@@ -29,6 +29,12 @@ export default defineConfig({
         ],
         // Боковое меню для русской версии
         sidebar: {
+          '/guides/': [
+            {
+              text: 'Руководство',
+              items: [{ text: 'Введение', link: '/guides/introduction' }]
+            }
+          ],
           '/decorators/': [
             {
               text: 'Декораторы (RU)',
@@ -41,12 +47,16 @@ export default defineConfig({
               ]
             }
           ],
-          '/guides/': [
+          '/hooks/': [
             {
-              text: 'Руководство',
-              items: [{ text: 'Введение', link: '/guides/introduction' }]
+              text: 'Хуки (RU)',
+              items: [
+                { text: 'Обзор', link: '/hooks/' },
+                { text: 'useReactiveSubscription', link: '/hooks/useReactiveSubscription' },
+                { text: 'useReactiveValue', link: '/hooks/useReactiveValue' },
+              ]
             }
-          ]
+          ],
         },
         docFooter: {
           prev: 'Предыдущая страница',
@@ -78,6 +88,12 @@ export default defineConfig({
         ],
         // Боковое меню для английской версии
         sidebar: {
+          '/en/guides/': [
+            {
+              text: 'Guide',
+              items: [{ text: 'Introduction', link: '/en/guides/introduction' }]
+            }
+          ],
           '/en/decorators/': [
             {
               text: 'Decorators (EN)',
@@ -90,12 +106,6 @@ export default defineConfig({
               ]
             }
           ],
-          '/en/guides/': [
-            {
-              text: 'Guide',
-              items: [{ text: 'Introduction', link: '/en/guides/introduction' }]
-            }
-          ]
         },
         docFooter: {
           prev: 'Previous page',

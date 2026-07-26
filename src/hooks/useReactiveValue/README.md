@@ -1,0 +1,36 @@
+# Хук `useReactiveValue`
+
+Хук для извлечения значения из Signal/Computed/Resource и авто-ререндера компонента. Поддерживает React 18+ и ленивые фабрики без утечек памяти.
+
+## Итоги тестирования
+
+Тесты для обоих хуков проверяют их главную задачу: извлечение текущего значения из сигнала и автоматический запуск перерисовки компонента (ререндер) при обновлении данных.
+Для проверки реактивного обновления мы будем использовать `renderHook` и `act`.
+### 🔍 Что важного проверяет этот тест:
+1. **Синхронизация стейта**: Тест должен вызывать ререндер... критически важен. Он гарантирует, что когда ядро вашей библиотеки пушит новое значение через коллбек `subscribe(newValue)`, React-компонент мгновенно узнает об этом и обновляет интерфейс.
+2. **Параметризация через замыкание**: Функция `runReactiveValueTests` позволяет прогнать один и тот же строгий контракт поведения сразу на двух разных архитектурах хуков. Если вы где-то ошиблись в логике обновления `useRef` в старой версии или в ссылках новой — тест сразу это покажет.
+
+## Пример
+
+```tsx
+import React from 'react';
+import { useReactiveValue } from './useReactiveValue';
+import { counterSignal, doubleComputed } from './myState';
+// Предположим, что counterSignal и doubleComputed созданы где-то в вашем приложении
+
+export const StandaloneCounter = () => {
+  // Хук сам подпишется, вытащит значение наружу и будет триггерить ререндер компонента
+  const count = useReactiveValue(counterSignal);
+  const doubleCount = useReactiveValue(doubleComputed);
+
+  return (
+    <div style={{ border: '2px solid purple', padding: '15px', borderRadius: '8px' }}>
+      <h4>Компонент на базе изолированного useReactiveValue</h4>
+      <p>Обычное значение: {count}</p>
+      <p>Удвоенное значение: {doubleCount}</p>
+
+      <button onClick={() => counterSignal.value++}>Увеличить</button>
+    </div>
+  );
+};
+```

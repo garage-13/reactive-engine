@@ -1,5 +1,3 @@
-# Декоратор `withDebounce`
-
 <!-- Вставляем README как живой текст (символы @ и ../../.. работают одинаково) -->
 <!--@include: ../../src/decorators/withDebounce/README.md-->
 

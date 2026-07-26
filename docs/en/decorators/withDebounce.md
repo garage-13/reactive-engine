@@ -1,5 +1,3 @@
-# Decorator `withDebounce`
-
 <!--@include: ../../../src/decorators/withDebounce/README.en.md-->
 
 ## Example

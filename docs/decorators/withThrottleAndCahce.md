@@ -1,5 +1,3 @@
-# Декоратор `withThrottleAndCahce`
-
 <!-- Вставляем README как живой текст (символы @ и ../../.. работают одинаково) -->
 <!--@include: ../../src/decorators/withThrottleAndCahce/README.md-->
 
