@@ -1,7 +1,7 @@
 <!-- Вставляем README как живой текст (символы @ и ../../.. работают одинаково) -->
 <!--@include: ../../src/decorators/withThrottleAndCahce/README.md-->
 
-## Пример использования
+## Еще пример
 
 <<< ../../examples/213-resource-withThrottleAndCache/service.ThrottleCacheLogic.ts{ts}
 
