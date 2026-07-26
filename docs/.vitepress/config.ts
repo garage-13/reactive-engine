@@ -23,9 +23,9 @@ export default defineConfig({
       themeConfig: {
         // НАВИГАЦИЯ ДЛЯ РУССКОЙ ВЕРСИИ
         nav: [
-          { text: 'Руководство', link: '/guides/introduction' },
+          { text: 'Руководство', link: '/guides/' },
           { text: 'Декораторы', link: '/decorators/' },
-          // { text: 'API Справочник', link: '/api/' }
+          { text: 'Хуки', link: '/hooks/' }
         ],
         // Боковое меню для русской версии
         sidebar: {
