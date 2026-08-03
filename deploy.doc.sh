@@ -47,6 +47,7 @@ fi
 echo "Current Node.js version: $(node -v)"
 # --------------------------------------------
 
+# Загрузка переменных окружения
 source ./_aux.read-env.sh
 PROD_TARGET_PATH_BUILD_DIR=$(read_env PROD_TARGET_PATH_BUILD_DIR .env.production.local)
 
@@ -63,11 +64,16 @@ fi
 # Деплой
 if [ "$DRY_RUN" = true ]; then
     echo '-- [DRY-RUN] DOC DEPLOY STARTED 🛫 (Simulation)'
+
     # Флаг -n у rsync показывает, что было бы отправлено, не меняя файлы
-    rsync -av --dry-run --delete docs/.vitepress/dist/ "$PROD_TARGET_PATH_BUILD_DIR"
+    rsync -a --dry-run --delete --itemize-changes docs/.vitepress/dist/ "$PROD_TARGET_PATH_BUILD_DIR" | grep -v '^\.' || true
+
     echo '-- [DRY-RUN] DOC DEPLOY COMPLETED 🛬 (Simulation)'
 else
     echo '-- DOC DEPLOY STARTED 🛫'
+
+    # Чистый живой rsync
     rsync -av --delete docs/.vitepress/dist/ "$PROD_TARGET_PATH_BUILD_DIR"
+
     echo '-- DOC DEPLOY COMPLETED 🛬'
 fi

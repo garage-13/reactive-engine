@@ -1,4 +1,4 @@
-# 🚀 ReactiveEngine Core Framework (instruction in English 🇬🇧)
+# 🚀 ReactiveEngine Core Framework
 A lightweight, type-safe reactive engine built with TypeScript, featuring Dependency Injection and seamless React integration.
 
 https://t.me/bash_exp_ru/3393
