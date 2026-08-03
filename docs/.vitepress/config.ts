@@ -4,6 +4,12 @@ import { defineConfig } from 'vitepress'
 const PUBLIC_URL = process.env.VITE_PUBLIC_URL
   ? `${process.env.VITE_PUBLIC_URL}/`.replace(/\/+$/, '/')
   : '/reactive-engine'
+// Считываем ключ из переменных окружения (например, из .env.production.local)
+// Если переменной нет, можно указать фолбек-строку или оставить пустой
+const GA4_KEY = process.env.VITE_GA4_KEY || 'G-XXXXXXXXXX'
+
+// ВРЕМЕННЫЙ ТЕСТ: Выведет ключ прямо в терминал при сборке
+console.log('\n--- [CHECK] VITE_GA4_KEY VALUE:', GA4_KEY, '---\n')
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -121,6 +127,33 @@ export default defineConfig({
       },
     }
   },
+
+  // Массив head отвечает за инжекты в тег <head> каждой страницы
+  head: [
+    // 1. Подключение внешнего скрипта библиотеки GA4
+    [
+      'script',
+      {
+        async: '', // Пустой атрибут async пишется именно так
+        src: `https://www.googletagmanager.com/gtag/js?id=${GA4_KEY}`
+      }
+    ],
+    // 2. Инициализирующий инлайн-скрипт
+    [
+      'script',
+      {},
+      `
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        // Флаг send_page_view: false отключает автоматический первый трек,
+        // так как наш роутер в теме сам отправит событие при инициализации приложения
+        gtag('config', '${GA4_KEY}', { send_page_view: false });
+      `
+    ]
+  ],
+
   themeConfig: {
     // Включаем встроенный локальный поиск
     search: {
