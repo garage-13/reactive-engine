@@ -5,7 +5,7 @@ layout: home
 hero:
   name: Reactive Engine
   text: Логическое ядро проекта
-  tagline: My great project tagline
+  tagline: Предсказуемый и быстрый граф реактивных вычислений
   actions:
     - theme: brand
       text: Основное описание

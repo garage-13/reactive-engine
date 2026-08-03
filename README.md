@@ -19,6 +19,35 @@ yarn add @pravosleva/reactive-engine
 pnpm add @pravosleva/reactive-engine
 ```
 
+```tsx
+import { AbstractService, ReactiveEngine } from '@pravosleva/reactive-engine'
+
+class Logic extends AbstractService {
+  public counter = this.engine.signal<number>(0, 'example-01:signal:counter');
+
+  public inc() {
+    this.counter.value += 1
+  }
+}
+
+const engine = new ReactiveEngine()
+
+export const Example001 = () => {
+  const logic = engine.inject(Logic)
+  const counter = engine.use(logic.counter)
+
+  return (
+    <div>
+      <div>Signal example</div>
+      <code>{counter}</code>
+      <div className={baseClasses.catSection}>
+        <button onClick={() => logic.inc()}>+ INC</button>
+      </div>
+    </div>
+  )
+}
+```
+
 ## 🎯 What Problems This Library Solves
 
 When building large-scale React applications, developers constantly run into architectural bottlenecks imposed by built-in state tools. `@pravosleva/reactive-engine` is designed to elegantly solve the following pain points:
