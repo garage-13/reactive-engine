@@ -43,7 +43,7 @@ export default defineConfig({
               items: [
                 { text: 'Введение', link: '/guides/introduction' },
                 { text: 'Быстрый старт', link: '/guides/quick-start' },
-                { text: 'Философия (подробно)', link: '/guides' },
+                { text: 'Философия движка', link: '/guides' },
               ]
             }
           ],
