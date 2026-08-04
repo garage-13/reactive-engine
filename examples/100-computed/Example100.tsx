@@ -4,8 +4,8 @@ import { AbstractService, ReactiveEngine } from '@pravosleva/reactive-engine'
 import clsx from 'clsx'
 
 class Logic extends AbstractService {
-  public counter = this.engine.signal<number>(0, 'example-10:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-10:computed:counter');
+  public counter = this.engine.signal<number>(0, 'example-100:signal:counter');
+  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-100:computed:counter');
 
   public inc() {
     this.counter.value += 1

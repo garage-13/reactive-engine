@@ -16,6 +16,9 @@ hero:
     - theme: alt
       text: Хуки
       link: /hooks
+    - theme: alt
+      text: Примеры и сущности
+      link: /examples
 
 features:
   - title: Минимум ререндеров

@@ -1,5 +1,5 @@
 <!-- Вставляем README как живой текст (символы @ и ../../.. работают одинаково) -->
-<!--@include: ../../src/decorators/withThrottleAndCahce/README.md-->
+<!--@include: ../../src/decorators/withThrottleAndCache/README.md-->
 
 ## Еще пример
 

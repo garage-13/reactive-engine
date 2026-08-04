@@ -13,8 +13,8 @@ console.log('\n--- [CHECK] VITE_GA4_KEY VALUE:', GA4_KEY, '---\n')
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  title: "Reactive Engine",
-  description: "Логическое ядро проекта",
+  title: 'Reactive Engine',
+  description: 'Логическое ядро проекта',
   base: PUBLIC_URL,
 
   // Настройка локализации (Мультиязычность)
@@ -31,7 +31,8 @@ export default defineConfig({
         nav: [
           { text: 'Руководство', link: '/guides/' },
           { text: 'Декораторы', link: '/decorators/' },
-          { text: 'Хуки', link: '/hooks/' }
+          { text: 'Хуки', link: '/hooks/' },
+          { text: 'Примеры и сущности', link: '/examples/' },
         ],
         // Боковое меню для русской версии
         sidebar: {
@@ -60,6 +61,47 @@ export default defineConfig({
                 { text: 'Обзор', link: '/hooks/' },
                 { text: 'useReactiveSubscription', link: '/hooks/useReactiveSubscription' },
                 { text: 'useReactiveValue', link: '/hooks/useReactiveValue' },
+              ]
+            }
+          ],
+          '/examples/': [
+            {
+              text: 'Все примеры и сущности',
+              items: [
+                { text: 'Сигналы', link: '/examples/signal' },
+                { text: 'Вычисляемые значения', link: '/examples/computed' },
+                { text: 'Ресурсы', link: '/examples/resource' },
+              ]
+            }
+          ],
+          '/examples/signal/': [
+            {
+              text: '0xx | Сигналы',
+              items: [
+                { text: 'Все примеры и сущности', link: '/examples' },
+                { text: 'Счетчик', link: '/examples/signal/001' },
+                { text: 'Аудиоплеер', link: '/examples/signal/002' },
+              ]
+            }
+          ],
+          '/examples/computed/': [
+            {
+              text: '1xx | Вычисляемые значения',
+              items: [
+                { text: 'Все примеры и сущности', link: '/examples' },
+                { text: 'Удвоенный счетчик', link: '/examples/computed/100' },
+              ]
+            }
+          ],
+          '/examples/resource/': [
+            {
+              text: '2xx | Ресурсы',
+              items: [
+                { text: 'Все примеры и сущности', link: '/examples' },
+                { text: 'Зависимость от одного сигнала', link: '/examples/resource/200' },
+                { text: 'Зависимость от нескольких синалов', link: '/examples/resource/201' },
+                { text: 'Ресурс с настройками "из коробки" (isExponentialBackoffEnabled)', link: '/examples/resource/202' },
+                { text: 'Ресурс с настройками "из коробки" (timeout)', link: '/examples/resource/203' },
               ]
             }
           ],

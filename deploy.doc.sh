@@ -51,6 +51,10 @@ echo "Current Node.js version: $(node -v)"
 source ./_aux.read-env.sh
 PROD_TARGET_PATH_BUILD_DIR=$(read_env PROD_TARGET_PATH_BUILD_DIR .env.production.local)
 
+# Читаем ключ аналитики и принудительно экспортируем его в окружение для Node.js
+VITE_GA4_KEY_VALUE=$(read_env VITE_GA4_KEY .env.production.local)
+export VITE_GA4_KEY="$VITE_GA4_KEY_VALUE"
+
 # Сборка документации
 echo '--> Building documentation... 🛠️'
 yarn docs:build
