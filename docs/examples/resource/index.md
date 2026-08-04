@@ -1,5 +1,8 @@
 ---
 layout: doc
+next:
+  text: 'Пример 200: Зависимость от одного сигнала'
+  link: '/examples/resource/200'
 ---
 
 # Ресурсы

@@ -1,5 +1,8 @@
 ---
 layout: doc
+next:
+  text: 'Пример 100: Удвоенный счетчик'
+  link: '/examples/computed/100'
 ---
 
 # Вычисляемые значения
