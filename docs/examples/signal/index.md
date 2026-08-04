@@ -3,6 +3,9 @@ layout: doc
 next:
   text: 'Пример 001: Счетчик'
   link: '/examples/signal/001'
+prev:
+  text: 'Все примеры и сущности'
+  link: '/examples'
 ---
 
 # Сигналы

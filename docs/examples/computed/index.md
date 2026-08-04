@@ -3,6 +3,9 @@ layout: doc
 next:
   text: 'Пример 100: Удвоенный счетчик'
   link: '/examples/computed/100'
+prev:
+  text: 'Все примеры и сущности'
+  link: '/examples'
 ---
 
 # Вычисляемые значения

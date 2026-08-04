@@ -29,7 +29,8 @@ export default defineConfig({
       themeConfig: {
         // НАВИГАЦИЯ ДЛЯ РУССКОЙ ВЕРСИИ
         nav: [
-          { text: 'Руководство', link: '/guides/' },
+          { text: 'Руководство', link: '/guides/introduction' },
+          { text: 'Быстрый старт', link: '/guides/quick-start' },
           { text: 'Декораторы', link: '/decorators/' },
           { text: 'Хуки', link: '/hooks/' },
           { text: 'Примеры и сущности', link: '/examples/' },
@@ -39,7 +40,11 @@ export default defineConfig({
           '/guides/': [
             {
               text: 'Руководство',
-              items: [{ text: 'Введение', link: '/guides/introduction' }]
+              items: [
+                { text: 'Введение', link: '/guides/introduction' },
+                { text: 'Быстрый старт', link: '/guides/quick-start' },
+                { text: 'Философия (подробно)', link: '/guides' },
+              ]
             }
           ],
           '/decorators/': [
@@ -76,9 +81,9 @@ export default defineConfig({
           ],
           '/examples/signal/': [
             {
-              text: '0xx | Сигналы',
+              text: 'Сигналы',
               items: [
-                { text: 'Все примеры и сущности', link: '/examples' },
+                // { text: 'Все примеры и сущности', link: '/examples' },
                 { text: '001: Счетчик', link: '/examples/signal/001' },
                 { text: '002: Аудиоплеер', link: '/examples/signal/002' },
               ]
@@ -86,18 +91,18 @@ export default defineConfig({
           ],
           '/examples/computed/': [
             {
-              text: '1xx | Вычисляемые значения',
+              text: 'Вычисляемые значения',
               items: [
-                { text: 'Все примеры и сущности', link: '/examples' },
+                // { text: 'Все примеры и сущности', link: '/examples' },
                 { text: '100: Удвоенный счетчик', link: '/examples/computed/100' },
               ]
             }
           ],
           '/examples/resource/': [
             {
-              text: '2xx | Ресурсы',
+              text: 'Ресурсы',
               items: [
-                { text: 'Все примеры и сущности', link: '/examples' },
+                // { text: 'Все примеры и сущности', link: '/examples' },
                 { text: '200: Зависимость от одного сигнала', link: '/examples/resource/200' },
                 { text: '201: Зависимость от нескольких синалов', link: '/examples/resource/201' },
                 { text: '202: Ресурс с настройками "из коробки" (isExponentialBackoffEnabled)', link: '/examples/resource/202' },
@@ -132,16 +137,20 @@ export default defineConfig({
       themeConfig: {
         // НАВИГАЦИЯ ДЛЯ АНГЛИЙСКОЙ ВЕРСИИ
         nav: [
-          { text: 'Guide', link: '/en/guides/introduction' },
+          { text: 'Introduction', link: '/en/guides/introduction' },
+          { text: 'Quick start', link: '/en/guides/quick-start' },
           { text: 'Decorators', link: '/en/decorators/' },
-          // { text: 'API Reference', link: '/en/api/' }
         ],
         // Боковое меню для английской версии
         sidebar: {
           '/en/guides/': [
             {
               text: 'Guide',
-              items: [{ text: 'Introduction', link: '/en/guides/introduction' }]
+              items: [
+                { text: 'Introduction', link: '/en/guides/introduction' },
+                { text: 'Quick start', link: '/en/guides/quick-start' },
+                { text: 'Philosophy', link: '/en/guides' },
+              ]
             }
           ],
           '/en/decorators/': [
@@ -153,6 +162,26 @@ export default defineConfig({
                 { text: 'withDebounce', link: '/en/decorators/withDebounce' },
                 { text: 'withThrottleAndCache', link: '/en/decorators/withThrottleAndCache' },
                 { text: 'withLongPolling', link: '/en/decorators/withLongPolling' }
+              ]
+            }
+          ],
+          '/en/examples/': [
+            {
+              text: 'All examples',
+              items: [
+                { text: 'Signals', link: '/en/examples/signal' },
+                // { text: 'Вычисляемые значения', link: '/en/examples/computed' },
+                // { text: 'Ресурсы', link: '/en/examples/resource' },
+              ]
+            }
+          ],
+          '/en/examples/signal/': [
+            {
+              text: 'Signals',
+              items: [
+                // { text: 'All examples', link: '/en/examples' },
+                { text: '001: Counter', link: '/en/examples/signal/001' },
+                // { text: '002: Аудиоплеер', link: '/en/examples/signal/002' },
               ]
             }
           ],

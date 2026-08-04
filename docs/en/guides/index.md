@@ -1,3 +1,9 @@
+---
+layout: doc
+prev: false
+next: false
+---
+
 # 🚀 ReactiveEngine Core Framework
 A lightweight, type-safe reactive engine built with TypeScript, featuring Dependency Injection and seamless React integration.
 
@@ -8,11 +14,7 @@ https://t.me/bash_exp_ru/3393
 A lightweight, ultra-performant, and framework-agnostic reactive engine powered by Signals and transparent dependency tracking, tailored for React and TypeScript applications.
 
 ```bash
-npm install @pravosleva/reactive-engine
-# or
 yarn add @pravosleva/reactive-engine
-# or
-pnpm add @pravosleva/reactive-engine
 ```
 
 ## 🧱 Built-in Dependency Injection (DI Container)

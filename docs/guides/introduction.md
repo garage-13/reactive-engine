@@ -1,3 +1,10 @@
+---
+layout: doc
+next:
+  text: 'Быстрый старт'
+  link: '/guides/quick-start'
+---
+
 # Введение в Reactive Engine
 
 `@pravosleva/reactive-engine` — это сверхлегкое, ультрапроизводительное логическое ядро и стейт-менеджер для современных приложений. Архитектура движка построена на концепции **сигналов (Signals)** и направлена на обеспечение предсказуемого потока данных с микрооптимизацией процесса рендеринга.
@@ -17,55 +24,10 @@
 
 1. **`Signal<T>`** — минимальная неделимая ячейка реактивного состояния (источник правды).
 2. **`Computed<T>`** — ленивое вычисляемое значение, производное от других сигналов.
-3. **`Resource<T>`** — реактивная обертка над асинхронными операциями (запросы к API, лонг-поллинг).
-
-## Быстрый старт с React
-
-Бизнес-логика оформляется в виде независимых сервисов (классов), которые затем подключаются к React-компонентам через специализированные хуки.
-
-### 1. Определение логики (Сервис)
-
-```ts
-import { AbstractService, ReactiveEngine } from '@pravosleva/reactive-engine'
-
-export class Logic extends AbstractService {
-  public counter = this.engine.signal<number>(0, 'example-001:signal:counter');
-
-  public inc() {
-    this.counter.value += 1
-  }
-}
-```
-
-### 2. Интеграция с UI (React-компонент)
-
-Для подписки на реактивные изменения используется хук `useReactiveValue`. Он извлекает чистое значение и подписывает компонент на обновления.
-
-```tsx
-import { Logic } from './Logic'
-
-const engine = new ReactiveEngine()
-
-export const Example001 = () => {
-  const logic = engine.inject(Logic)
-  const counter = engine.use(logic.counter)
-
-  return (
-    <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
-      <div className={baseClasses.absoluteUnitLabel}>Signal example</div>
-      <code>{counter}</code>
-      <div className={baseClasses.catSection}>
-        <button
-          onClick={() => logic.inc()}
-        >INC</button>
-      </div>
-    </div>
-  )
-}
-```
+3. **`Resource<T, S>`** — реактивная обертка над асинхронными операциями (запросы к API, лонг-поллинг).
 
 ## Что изучать дальше?
 
 Переходите к разделу документации, чтобы детальнее изучить возможности движка:
 * Изучите работу с декларативным получением данных в [документации ресурсов](/decorators/withLongPolling).
-* Посмотрите, как оптимизировать частые вызовы событий с помощью дебаунса в [@withDebounce](/decorators/withDebounce).
+* Посмотрите, как оптимизировать частые вызовы событий с помощью дебаунса в [withDebounce](/decorators/withDebounce).

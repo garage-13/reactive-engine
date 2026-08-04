@@ -8,6 +8,8 @@ head:
   - - meta
     - name: keywords
       content: reactive, signals, javascript
+prev: false
+next: false
 ---
 
 # 🚀 ReactiveEngine
@@ -20,11 +22,7 @@ https://t.me/bash_exp_ru/3393
 Легковесный, ультра-производительный и независимый реактивный движок на базе сигналов (Signals) и прозрачного отслеживания зависимостей для React и TypeScript приложений.
 
 ```bash
-npm install @pravosleva/reactive-engine
-# или
 yarn add @pravosleva/reactive-engine
-# или
-pnpm add @pravosleva/reactive-engine
 ```
 
 ## 🧱 Встроенный Dependency Injection (DI-контейнер)
@@ -68,24 +66,24 @@ export class CartService {
 }
 ```
 
-### Регистрация и использование в приложении
+### Registration and Resolution
 
-Вы можете регистрировать зависимости как готовые инстансы, классы или фабричные функции. Движок сам создаст их и закеширует при первом обращении.
+You can register dependencies as plain values, classes, or custom factory functions. The core container caches resolved instances automatically upon the very first resolution invocation.
 
 ```ts
-import { ReactiveEngine } from '@pravosleva/reactive-engine';
-import { AuthService, CartService } from './services';
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { AuthService, CartService } from './services'
 
-const engine = new ReactiveEngine();
+const engine = new ReactiveEngine()
 
-// Регистрируем сервисы (они будут созданы лениво только при первом вызове inject)
-engine.provide(AuthService, (eng) => new AuthService(eng));
-engine.provide(CartService, (eng) => new CartService(eng));
+// Register factories (they will be evaluated lazily on demand)
+engine.provide(AuthService, (eng) => new AuthService(eng))
+engine.provide(CartService, (eng) => new CartService(eng))
 
-// Где-то в коде приложения или компоненте:
-const cartService = engine.inject(CartService);
-// Движок увидит, что CartService нужен AuthService,
-// автоматически создаст AuthService, затем создаст CartService, свяжет их и вернет готовый результат.
+// Anywhere in your application or React hook:
+const cartService = engine.inject(CartService)
+// The engine recognizes that CartService requires AuthService,
+// instantiates AuthService, provisions CartService, hooks them together, and returns the singleton.
 ```
 
 ## 🎯 Какие проблемы решает эта библиотека?
