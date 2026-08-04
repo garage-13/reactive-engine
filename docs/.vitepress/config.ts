@@ -49,7 +49,7 @@ export default defineConfig({
                 { text: 'Обзор', link: '/decorators/' },
                 { text: 'withCache', link: '/decorators/withCache' },
                 { text: 'withDebounce', link: '/decorators/withDebounce' },
-                { text: 'withThrottleAndCahce', link: '/decorators/withThrottleAndCahce' },
+                { text: 'withThrottleAndCache', link: '/decorators/withThrottleAndCache' },
                 { text: 'withLongPolling', link: '/decorators/withLongPolling' }
               ]
             }
@@ -149,7 +149,7 @@ export default defineConfig({
                 { text: 'Overview', link: '/en/decorators/' },
                 { text: 'withCache', link: '/en/decorators/withCache' },
                 { text: 'withDebounce', link: '/en/decorators/withDebounce' },
-                { text: 'withThrottleAndCahce', link: '/en/decorators/withThrottleAndCahce' },
+                { text: 'withThrottleAndCache', link: '/en/decorators/withThrottleAndCache' },
                 { text: 'withLongPolling', link: '/en/decorators/withLongPolling' }
               ]
             }

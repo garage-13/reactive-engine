@@ -1,8 +1,9 @@
 // https://vitepress.dev/guide/custom-theme
 import { h } from 'vue'
-import type { Theme } from 'vitepress'
+import type { Theme as TTheme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import './style.css'
+import type { EnhanceAppContext } from 'vitepress'
 
 export default {
   extends: DefaultTheme,
@@ -11,7 +12,7 @@ export default {
       // https://vitepress.dev/guide/extending-default-theme#layout-slots
     })
   },
-  enhanceApp({ router }) {
+  enhanceApp({ router }: EnhanceAppContext) {
     if (typeof window !== 'undefined') {
 
       // Переменные для хранения состояния скролла
@@ -86,4 +87,4 @@ export default {
       }
     }
   }
-} satisfies Theme
+} satisfies TTheme

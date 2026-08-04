@@ -19,3 +19,15 @@ features:
     details: Примеры создания и использования.
     link: /examples/resource/
 ---
+
+::: tip Исходный код на GitHub
+Полный рабочий код этого примеров Вы можете изучить в репозитории проекта:
+👉 **[github.com](https://github.com/garage-13/reactive-engine/blob/main/examples)**
+
+Вы также можете склонировать этот репозиторий и запустить локальное демо:
+```bash
+git clone https://github.com/garage-13/reactive-engine.git
+yarn
+yarn start
+```
+:::

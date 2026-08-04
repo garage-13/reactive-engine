@@ -19,9 +19,9 @@ features:
     details: Применяется в сценариях с высокой частотой генерации событий, когда нам важен непрерывный процесс изменений в динамике, но с жестким ограничением максимальной частоты вызовов.
     link: /decorators/withThrottle
   - icon: ⏳
-    title: withThrottleAndCahce
+    title: withThrottleAndCache
     details: Комбинированный продвинутый инструмент оптимизации (декоратор), который применяется в сценариях с высокой частотой генерации событий, когда запрашиваемые данные при этом могут повторяться или дублироваться.
-    link: /decorators/withThrottleAndCahce
+    link: /decorators/withThrottleAndCache
   - icon: 🔄
     title: withLongPolling
     details: Автоматически организует периодические запросы к серверу для обновления ресурсов в реальном времени.
