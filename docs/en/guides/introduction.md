@@ -4,16 +4,12 @@
 
 The primary goal of the engine is to completely isolate business logic from the UI framework, reducing component re-renders to an absolute minimum.
 
----
-
 ## Key Features
 
 * **Instant Atomic Updates:** Components subscribe strictly to specific primitive signals (`Signal`) or computed properties (`Computed`) rather than a monolithic state object. A change in a single signal updates *only* the specific UI components that actually read it.
 * **$O(1)$ Computations:** Derived states (`Computed`) are lazy by design. They cache their results and never trigger recalculations until their underlying source signals change.
 * **Automatic Batching:** Multiple synchronous state updates are automatically grouped into a single microtask. Network resources or heavy side-effects won't re-trigger 10 times in a row when 10 signals are updated within the same cycle.
 * **Smart Asynchrony Control:** The built-in `resource` tool orchestrates an `AbortController` out of the box. Whenever dependencies change, the engine automatically aborts previous pending network requests, effectively preventing race conditions.
-
----
 
 ## Architectural Building Blocks
 
@@ -23,8 +19,6 @@ The engine operates using three core primitives:
 2. **`Computed<T>`** — A lazy computed value derived from other signals.
 3. **`Resource<T>`** — A reactive wrapper for asynchronous operations (API fetch requests, long-polling).
 
----
-
 ## Quick Start with React
 
 Business logic is encapsulated in decoupled services (classes), which are then connected to React components using specialized hooks.
@@ -32,27 +26,15 @@ Business logic is encapsulated in decoupled services (classes), which are then c
 ### 1. Defining the Logic (Service)
 
 ```ts
-import { Signal, Computed } from '@pravosleva/reactive-engine';
+import { AbstractService, ReactiveEngine } from '@pravosleva/reactive-engine'
 
-export class CounterService {
-  // Atomic state
-  public readonly count = new Signal<number>(0);
+export class Logic extends AbstractService {
+  public counter = this.engine.signal<number>(0, 'example-001:signal:counter');
 
-  // Computed state (automatically cached)
-  public readonly doubleCount = new Computed<number>(() => {
-    return this.count.value * 2;
-  });
-
-  public increment = (): void => {
-    this.count.value += 1;
-  };
-
-  public decrement = (): void => {
-    this.count.value -= 1;
-  };
+  public inc() {
+    this.counter.value += 1
+  }
 }
-
-export const counterLogic = new CounterService();
 ```
 
 ### 2. UI Integration (React Component)
@@ -60,28 +42,27 @@ export const counterLogic = new CounterService();
 To subscribe to reactive changes, use the `useReactiveValue` hook. It extracts the raw value and subscribes the component to updates.
 
 ```tsx
-import React from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { counterLogic } from './CounterService';
+import { Logic } from './Logic'
 
-export const CounterOption: React.FC = () => {
-  // The component re-renders ONLY when count or doubleCount changes
-  const count = useReactiveValue(counterLogic.count);
-  const doubleCount = useReactiveValue(counterLogic.doubleCount);
+const engine = new ReactiveEngine()
+
+export const Example001 = () => {
+  const logic = engine.inject(Logic)
+  const counter = engine.use(logic.counter)
 
   return (
-    <div style={{ padding: '16px', border: '1px solid #ccc' }}>
-      <h2>Counter: {count}</h2>
-      <h3>Double Value: {doubleCount}</h3>
-
-      <button onClick={counterLogic.increment}>+</button>
-      <button onClick={counterLogic.decrement}>-</button>
+    <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
+      <div className={baseClasses.absoluteUnitLabel}>Signal example</div>
+      <code>{counter}</code>
+      <div className={baseClasses.catSection}>
+        <button
+          onClick={() => logic.inc()}
+        >INC</button>
+      </div>
     </div>
-  );
-};
+  )
+}
 ```
-
----
 
 ## What to Learn Next?
 

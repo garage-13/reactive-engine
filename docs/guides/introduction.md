@@ -26,27 +26,15 @@
 ### 1. Определение логики (Сервис)
 
 ```ts
-import { Signal, Computed } from '@pravosleva/reactive-engine';
+import { AbstractService, ReactiveEngine } from '@pravosleva/reactive-engine'
 
-export class CounterService {
-  // Атомарное состояние
-  public readonly count = new Signal<number>(0);
+export class Logic extends AbstractService {
+  public counter = this.engine.signal<number>(0, 'example-001:signal:counter');
 
-  // Вычисляемое состояние (автоматически кешируется)
-  public readonly doubleCount = new Computed<number>(() => {
-    return this.count.value * 2;
-  });
-
-  public increment = (): void => {
-    this.count.value += 1;
-  };
-
-  public decrement = (): void => {
-    this.count.value -= 1;
-  };
+  public inc() {
+    this.counter.value += 1
+  }
 }
-
-export const counterLogic = new CounterService();
 ```
 
 ### 2. Интеграция с UI (React-компонент)
@@ -54,25 +42,26 @@ export const counterLogic = new CounterService();
 Для подписки на реактивные изменения используется хук `useReactiveValue`. Он извлекает чистое значение и подписывает компонент на обновления.
 
 ```tsx
-import React from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
-import { counterLogic } from './CounterService';
+import { Logic } from './Logic'
 
-export const CounterOption: React.FC = () => {
-  // Компонент перерендерится ТОЛЬКО при изменении count или doubleCount
-  const count = useReactiveValue(counterLogic.count);
-  const doubleCount = useReactiveValue(counterLogic.doubleCount);
+const engine = new ReactiveEngine()
+
+export const Example001 = () => {
+  const logic = engine.inject(Logic)
+  const counter = engine.use(logic.counter)
 
   return (
-    <div style={{ padding: '16px', border: '1px solid #ccc' }}>
-      <h2>Счетчик: {count}</h2>
-      <h3>Удвоенное значение: {doubleCount}</h3>
-
-      <button onClick={counterLogic.increment}>+</button>
-      <button onClick={counterLogic.decrement}>-</button>
+    <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
+      <div className={baseClasses.absoluteUnitLabel}>Signal example</div>
+      <code>{counter}</code>
+      <div className={baseClasses.catSection}>
+        <button
+          onClick={() => logic.inc()}
+        >INC</button>
+      </div>
     </div>
-  );
-};
+  )
+}
 ```
 
 ## Что изучать дальше?

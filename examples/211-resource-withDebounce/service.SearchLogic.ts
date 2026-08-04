@@ -1,6 +1,5 @@
 import { AbstractService } from '@pravosleva/reactive-engine'
 
-// Наш декоратор дебаунса (wip)
 interface DebounceOptions {
   delay?: number
 }
@@ -58,7 +57,7 @@ export class SearchLogic extends AbstractService {
    */
   public searchResource = this.engine.resource(
     withDebounce(
-      async (queryValue, abortSignal) => {
+      async (queryValue, _abortSignal) => {
         // Имитируем задержку ответа от сервера (например, чтение из базы)
         await new Promise((resolve) => setTimeout(resolve, 400))
 

@@ -1,3 +1,15 @@
+---
+layout: doc
+outline: 'deep'
+label: 'На этой странице' # Кастомный заголовок для правого меню вместо "On this page"
+title: "ReactiveEngine" # Переопределит h1 для тега <title>
+description: "Минималистичный реактивный движок на TypeScript с Dependency Injection и интеграцией для React."
+head:
+  - - meta
+    - name: keywords
+      content: reactive, signals, javascript
+---
+
 # 🚀 ReactiveEngine
 Минималистичный реактивный движок на TypeScript с Dependency Injection и интеграцией для React.
 

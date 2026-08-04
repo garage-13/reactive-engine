@@ -79,8 +79,8 @@ export default defineConfig({
               text: '0xx | Сигналы',
               items: [
                 { text: 'Все примеры и сущности', link: '/examples' },
-                { text: 'Счетчик', link: '/examples/signal/001' },
-                { text: 'Аудиоплеер', link: '/examples/signal/002' },
+                { text: '001: Счетчик', link: '/examples/signal/001' },
+                { text: '002: Аудиоплеер', link: '/examples/signal/002' },
               ]
             }
           ],
@@ -89,7 +89,7 @@ export default defineConfig({
               text: '1xx | Вычисляемые значения',
               items: [
                 { text: 'Все примеры и сущности', link: '/examples' },
-                { text: 'Удвоенный счетчик', link: '/examples/computed/100' },
+                { text: '100: Удвоенный счетчик', link: '/examples/computed/100' },
               ]
             }
           ],
@@ -98,10 +98,12 @@ export default defineConfig({
               text: '2xx | Ресурсы',
               items: [
                 { text: 'Все примеры и сущности', link: '/examples' },
-                { text: 'Зависимость от одного сигнала', link: '/examples/resource/200' },
-                { text: 'Зависимость от нескольких синалов', link: '/examples/resource/201' },
-                { text: 'Ресурс с настройками "из коробки" (isExponentialBackoffEnabled)', link: '/examples/resource/202' },
-                { text: 'Ресурс с настройками "из коробки" (timeout)', link: '/examples/resource/203' },
+                { text: '200: Зависимость от одного сигнала', link: '/examples/resource/200' },
+                { text: '201: Зависимость от нескольких синалов', link: '/examples/resource/201' },
+                { text: '202: Ресурс с настройками "из коробки" (isExponentialBackoffEnabled)', link: '/examples/resource/202' },
+                { text: '203: Ресурс с настройками "из коробки" (timeout)', link: '/examples/resource/203' },
+                { text: '205: Карта заправок + Leaflet + кластеризация', link: '/examples/resource/205' },
+                { text: '211: Ресурс + withDebounce', link: '/examples/resource/211' },
               ]
             }
           ],
