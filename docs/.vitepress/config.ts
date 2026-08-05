@@ -29,11 +29,11 @@ export default defineConfig({
       themeConfig: {
         // НАВИГАЦИЯ ДЛЯ РУССКОЙ ВЕРСИИ
         nav: [
-          { text: 'Руководство', link: '/guides' },
+          { text: 'Введение', link: '/guides' },
           { text: 'Быстрый старт', link: '/guides/quick-start' },
           { text: 'Декораторы', link: '/decorators/' },
           { text: 'Хуки', link: '/hooks/' },
-          { text: 'Примеры и сущности', link: '/examples/' },
+          { text: 'Примеры', link: '/examples/' },
         ],
         // Боковое меню для русской версии
         sidebar: {
@@ -44,6 +44,7 @@ export default defineConfig({
                 { text: 'Введение', link: '/guides' },
                 { text: 'Быстрый старт', link: '/guides/quick-start' },
                 { text: 'Философия движка', link: '/guides/philosophy' },
+                { text: 'Подробное описание', link: '/guides/introduction' },
               ]
             }
           ],
@@ -150,6 +151,7 @@ export default defineConfig({
                 { text: 'Guides', link: '/en/guides' },
                 { text: 'Quick start', link: '/en/guides/quick-start' },
                 { text: 'Philosophy', link: '/en/guides/philosophy' },
+                { text: 'Introduction', link: '/guides/introduction' },
               ]
             }
           ],

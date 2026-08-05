@@ -7,13 +7,15 @@ next:
 
 # Quick Start with React
 
+## Install
+
 ```bash
 yarn add @pravosleva/reactive-engine
 ```
 
-Business logic is encapsulated in decoupled services (classes), which are then connected to React components using specialized hooks.
+## Step 1. Defining the Logic (Service)
 
-## 1. Defining the Logic (Service)
+Business logic is encapsulated in decoupled services (classes), which are then connected to React components using specialized hooks.
 
 ```ts
 import { AbstractService } from '@pravosleva/reactive-engine'
@@ -27,7 +29,7 @@ export class Logic extends AbstractService {
 }
 ```
 
-## 2. UI Integration (React Component)
+## Step 2. UI Integration (React Component)
 
 To subscribe to reactive changes, use the `useReactiveValue` hook. It extracts the raw value and subscribes the component to updates.
 
