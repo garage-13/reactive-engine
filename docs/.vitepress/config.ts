@@ -29,7 +29,7 @@ export default defineConfig({
       themeConfig: {
         // НАВИГАЦИЯ ДЛЯ РУССКОЙ ВЕРСИИ
         nav: [
-          { text: 'Руководство', link: '/guides/introduction' },
+          { text: 'Руководство', link: '/guides' },
           { text: 'Быстрый старт', link: '/guides/quick-start' },
           { text: 'Декораторы', link: '/decorators/' },
           { text: 'Хуки', link: '/hooks/' },
@@ -41,9 +41,9 @@ export default defineConfig({
             {
               text: 'Руководство',
               items: [
-                { text: 'Введение', link: '/guides/introduction' },
+                { text: 'Введение', link: '/guides' },
                 { text: 'Быстрый старт', link: '/guides/quick-start' },
-                { text: 'Философия движка', link: '/guides' },
+                { text: 'Философия движка', link: '/guides/philosophy' },
               ]
             }
           ],
@@ -137,7 +137,7 @@ export default defineConfig({
       themeConfig: {
         // НАВИГАЦИЯ ДЛЯ АНГЛИЙСКОЙ ВЕРСИИ
         nav: [
-          { text: 'Introduction', link: '/en/guides/introduction' },
+          { text: 'Guides', link: '/en/guides' },
           { text: 'Quick start', link: '/en/guides/quick-start' },
           { text: 'Decorators', link: '/en/decorators/' },
         ],
@@ -147,9 +147,9 @@ export default defineConfig({
             {
               text: 'Guide',
               items: [
-                { text: 'Introduction', link: '/en/guides/introduction' },
+                { text: 'Guides', link: '/en/guides' },
                 { text: 'Quick start', link: '/en/guides/quick-start' },
-                { text: 'Philosophy', link: '/en/guides' },
+                { text: 'Philosophy', link: '/en/guides/philosophy' },
               ]
             }
           ],

@@ -12,7 +12,7 @@ hero:
       link: /en/guides/quick-start
     - theme: alt
       text: Core Description
-      link: /en/guides/introduction
+      link: /en/guides
     - theme: alt
       text: Decorators
       link: /en/decorators

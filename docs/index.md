@@ -12,7 +12,7 @@ hero:
       link: /guides/quick-start
     - theme: alt
       text: Описание
-      link: /guides/introduction
+      link: /guides
     - theme: alt
       text: Декраторы
       link: /decorators
