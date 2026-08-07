@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/ui.button.module.scss'
-import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import { Pixi2DLogic } from './service.Pixi2DLogic.v2'
 import clsx from 'clsx'
 

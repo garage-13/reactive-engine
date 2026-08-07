@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ReactiveEngine } from './core'; // Путь к вашему ядру
+import { ReactiveEngine } from './react'; // Путь к вашему ядру
 import { Signal, Computed, Resource } from './core';
 
 /* NOTE

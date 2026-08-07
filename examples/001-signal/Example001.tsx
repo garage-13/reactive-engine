@@ -1,12 +1,13 @@
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/ui.button.module.scss'
-import { AbstractService, ReactiveEngine } from '@pravosleva/reactive-engine'
+import { AbstractService } from '@pravosleva/reactive-engine'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import clsx from 'clsx'
 
 class Logic extends AbstractService {
   public counter = this.engine.signal<number>(0, 'example-001:signal:counter');
 
-  public inc() {
+  public inc = () => {
     this.counter.value += 1
   }
 }
@@ -23,7 +24,7 @@ export const Example001 = () => {
       <code>{counter}</code>
       <div className={baseClasses.catSection}>
         <button
-          onClick={() => logic.inc()}
+          onClick={logic.inc}
           className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}
         >INC</button>
       </div>

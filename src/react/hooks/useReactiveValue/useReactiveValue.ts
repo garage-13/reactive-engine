@@ -1,5 +1,5 @@
 import { useSyncExternalStore, useCallback, useMemo, useEffect } from 'react'
-import { CleanupFn } from '../../core'
+import { CleanupFn } from '../../../core'
 
 interface ObservableItem<T> {
   readonly value: T;

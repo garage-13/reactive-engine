@@ -3,6 +3,9 @@
     "paths": {
       "~/*": [
         "./src/*"
+      ],
+      "~/react/*": [
+        "./src/react/*"
       ]
     },
     "rootDir": "./src",

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/ui.button.module.scss'
-import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import { LiveNotificationsLogic } from './service.LiveNotificationsLogic'
 import clsx from 'clsx'
 

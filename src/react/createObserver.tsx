@@ -1,5 +1,5 @@
-import React, { useSyncExternalStore, useMemo, useEffect, useRef } from 'react';
-import { ReactiveEngine } from '../core';
+import React, { useSyncExternalStore, useMemo, useEffect, useRef } from 'react'
+import { ReactiveEngine } from '../core'
 
 /**
  * Свойства для инлайн-компонента {@link Observer}.

@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "0.4.3-beta",
+  "version": "1.0.1-beta",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -28,7 +28,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.mjs",
+      "require": "./dist/react/index.cjs"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
@@ -50,6 +56,14 @@
   "peerDependencies": {
     "react": "^18.0.0 || ^19.2.0",
     "react-dom": "^18.0.0 || ^19.2.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@googlemaps/js-api-loader": "^2.1.1",

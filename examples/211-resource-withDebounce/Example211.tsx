@@ -1,4 +1,4 @@
-import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine'
+import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { SearchLogic } from './service.SearchLogic'
 import { Input } from '~/shared/Input'
 import baseClasses from '~/ui.common.module.scss'

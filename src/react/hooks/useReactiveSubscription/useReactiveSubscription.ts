@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Signal, CleanupFn } from '../../core'
+import { Signal, CleanupFn } from '../../../core'
 
 /**
  * Универсальный хук для подписки на изменения Signal, Computed или Resource.

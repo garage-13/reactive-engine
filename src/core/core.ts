@@ -1,91 +1,5 @@
-import { useState as useStateFromReact, useEffect as useEffectFromReact } from 'react';
-import { getExtractedValues } from './utils';
-
-// --- ТИПЫ ---
-export type CleanupFn = () => void;
-export type EffectFn = () => CleanupFn | void;
-export type Token<T> = string | symbol | { new(engine: ReactiveEngine, ...args: any[]): T };
-export type Factory<T> = (engine: ReactiveEngine) => T;
-
-export interface IEffect {
-  run: () => void;
-  label?: string;
-  cleanups: Set<CleanupFn>;
-}
-
-export interface ResourceState<T> {
-  data: T | null;
-  loading: boolean;
-  error: any | null;
-}
-
-/**
- * Функция для очистки эффекта.
- * @typedef {() => void} CleanupFn
- */
-
-/**
- * Функция эффекта, которая может возвращать функцию очистки.
- * @typedef {() => CleanupFn | void} EffectFn
- */
-
-/**
- * Токен для зависимости.
- * @typedef {string | symbol | { new(engine: ReactiveEngine, ...args: any[]): T }} Token<T>
- */
-
-/**
- * Фабрика для создания сервиса.
- * @template T
- * @typedef {(engine: ReactiveEngine) => T} Factory<T>
- */
-
-/**
- * Интерфейс для эффекта.
- * @interface IEffect
- */
-export interface IEffect {
-  /**
-   * Запуск эффекта.
-   * @function run
-   * @returns {void}
-   */
-  run: () => void;
-
-  /**
-   * Коллекция функций очистки.
-   * @type {Set<CleanupFn>}
-   */
-  cleanups: Set<CleanupFn>;
-}
-
-/**
- * Интерфейс для состояния ресурса.
- * @template T Data format
- * @interface ResourceState<T>
- */
-export interface ResourceState<T> {
-  /**
-   * Данные ресурса.
-   * @type {T | null}
-   */
-  data: T | null;
-
-  /**
-   * Состояние загрузки ресурса.
-   * @type {boolean}
-   */
-  loading: boolean;
-
-  /**
-   * Ошибка ресурса.
-   * @type {any | null}
-   */
-  error: any | null;
-
-  /** Флаг активного процесса повторных попыток после сбоя сети */
-  isRetrying: boolean;
-}
+import { ResourceOptions, ResourceState, SignalOptions } from './types';
+import { getExtractedValues } from '../utils'
 
 /**
  * Интерфейс для сигнала.
@@ -107,6 +21,11 @@ export interface Signal<T> {
    */
   subscribe: (cb: (val: T) => void) => CleanupFn;
 }
+
+export type CleanupFn = () => void;
+export type EffectFn = () => CleanupFn | void;
+export type Token<T> = string | symbol | { new(engine: ReactiveEngine, ...args: any[]): T };
+export type Factory<T> = (engine: ReactiveEngine) => T;
 
 /**
  * Интерфейс для вычисляемого значения.
@@ -134,31 +53,14 @@ export interface Computed<T> {
   destroy: () => void;
 }
 
-export interface ResourceOptions<T, S> {
-  name: string;
-  /** Автоматически сбрасывать data в null при изменении source. По умолчанию: true */
-  resetDataOnSourceChange?: boolean;
-  /** Функция для валидации успешного ответа сервера перед его сохранением в стейт.
-   *
-   * Варианты возвращаемого значения:
-   * - true 👉 все ок
-   * - false 👉 в error попадет стандартный текст ошибки
-   * - string 👉 попадет в поле error
-   * */
-  responseValidate?: (responseData: T) => boolean | string;
-  /** Функция валидации входных зависимостей (source) перед запуском fetch.
-   * Если возвращает false или string (текст ошибки) — запрос и ретраи блокируются. */
-  validateBeforeFetch?: (sourceValue: S) => boolean | string;
-  /** Настройка лимита повторов retry. */
-  retryCount?: number;
-  /** Настройка задержки первого повтора retry. */
-  retryDelay?: number;
-  /** Включить экспоненциальное увеличение задержки (каждая попытка ждет в 2 раза дольше). По умолчанию: false */
-  isExponentialBackoffEnabled?: boolean;
-  /** Максимальный лимит ожидания между попытками в миллисекундах. По умолчанию: 30000 (30 секунд) */
-  maxRetryDelay?: number;
-  /** Максимальное время ожидания ответа сервера в миллисекундах. По умолчанию: отсутствует (бесконечно) */
-  timeout?: number;
+/**
+ * Интерфейс для эффекта.
+ * @interface IEffect
+ */
+export interface IEffect {
+  run: () => void;
+  label?: string;
+  cleanups: Set<CleanupFn>;
 }
 
 /**
@@ -189,30 +91,33 @@ export interface Resource<T> extends ResourceState<T> {
   readonly value: ResourceState<T>;
 }
 
-/**
- * Интерфейс для опций сигнала.
- * @template T
- * @interface SignalOptions<T>
- */
-export interface SignalOptions<T> {
-  /**
-   * Имя сигнала.
-   * @type {string}
-   */
-  name?: string;
-
-  /**
-   * Валидатор значения сигнала.
-   * @function validate
-   * @param {T} val - Значение для валидации.
-   * @returns {boolean | string} - Результат валидации.
-   */
-  validate?: (val: T) => boolean | string;
-}
-
 // --- ЯДРО ---
 /**
- * Класс реактивного движка.
+ * Класс `ReactiveEngine` представляет собой реактивную систему, которая позволяет создавать и управлять реактивными объектами,
+ * сигналами, эффектами, асинхронными ресурсами и другими реактивными примитивами. Реактивные механизмы облегчают разработку
+ * сложных пользовательских интерфейсов и приложений, автоматически отслеживая зависимости между данными и реактивно обновляя UI.
+ *
+ * Основные возможности `ReactiveEngine` включают:
+ * - **Сигналы (Signals)**: Реактивные переменные с поддержкой подписки на изменения.
+ * - **Эффекты (Effects)**: Автоматические функции, которые выполняются при изменении зависимых сигналов.
+ * - **Ресурсы (Resources)**: Асинхронные ресурсы с поддержкой повторных попыток и валидации.
+ * - **Прокси-объекты (Proxy Objects)**: Реактивное обертывание объектов для отслеживания изменений свойств.
+ * - **Интеграция с React**: Удобные методы для интеграции реактивного ядра с компонентами React.
+ *
+ * Пример использования:
+ *
+ * ```javascript
+ * const engine = new ReactiveEngine();
+ * const count = engine.signal(0);
+ *
+ * engine.effect(() => {
+ *   console.log(`Count is ${count.value}`);
+ * });
+ *
+ * count.value++; // Выведет: Count is 1
+ * ```
+ *
+ * @class
  */
 export class ReactiveEngine {
   private activeEffect: IEffect | null = null;
@@ -233,15 +138,6 @@ export class ReactiveEngine {
    * Использование unknown вместо any гарантирует безопасную работу с типами prev/next.
    */
   public onSignalChange?: (name: string, next: unknown, prev: unknown) => void;
-
-  // Описываем строгие типы для адаптеров React, чтобы не ломать встроенные типы React.
-  private reactAdapters: {
-    useState: typeof useStateFromReact;
-    useEffect: typeof useEffectFromReact;
-  } = {
-      useState: useStateFromReact,
-      useEffect: useEffectFromReact,
-    };
 
   /**
    * DI: Регистрация зависимости.
@@ -361,7 +257,7 @@ export class ReactiveEngine {
           });
         }
       },
-      subscribe(cb) {
+      subscribe(cb: (val: T) => void) {
         // Чистая и безопасная подписка для React:
         // Мы вызываем cb, но НЕ передаем туда аргументы, чтобы не ломать useSyncExternalStore
         return engine.effect(() => {
@@ -457,7 +353,7 @@ export class ReactiveEngine {
     // Создаем инстанс computed
     const computedInstance: Computed<T> = {
       get value() { return sig.value; },
-      subscribe: (cb) => sig.subscribe(cb),
+      subscribe: (cb: (val: T) => void) => sig.subscribe(cb),
       destroy() {
         performCleanup();
       }
@@ -782,7 +678,7 @@ export class ReactiveEngine {
         activeEffectController = new AbortController();
         load(source ? source.value : undefined as S, activeEffectController.signal, false);
       },
-      subscribe: (cb) => state.subscribe(cb)
+      subscribe: (cb: (val: ResourceState<T>) => void) => state.subscribe(cb)
     };
   }
 
@@ -802,57 +698,6 @@ export class ReactiveEngine {
     } finally {
       this.activeEffect = prev; // Возвращаем эффект на место
     }
-  }
-
-  /**
-   * Установка адаптеров React.
-   * @function setReactAdapters
-   * @param {Function} useState - Функция useState из React.
-   * @param {Function} useEffect - Функция useEffect из React.
-   * @returns {void}
-   * @source
-   */
-  // Импортируйте useState и useEffect на верхнем уровне файла из 'react'
-  public setReactAdapters(
-    useState: typeof useStateFromReact,
-    useEffect: typeof useEffectFromReact
-  ): void {
-    this.reactAdapters = { useState, useEffect };
-  }
-
-  /**
-   * Использование реактивного значения в React компоненте.
-   * @template T
-   * @function use
-   * @param {{ value: T; subscribe: (cb: (v: T) => void) => CleanupFn }} item - Реактивный объект.
-   * @returns {T} - Значение реактивного объекта.
-   * @source
-   */
-  public use<T>(item: { value: T; subscribe: (cb: (v: T) => void) => CleanupFn }): T {
-    if (!this.reactAdapters) {
-      throw new Error("[React Error]: Адаптеры React не установлены. Вызовите engine.setReactAdapters(useState, useEffect).");
-    }
-
-    // NOTE: (защита) проверяем, что нам передали объект сигнала
-    if (!item || typeof item.subscribe !== 'function') {
-      const errorMsg = `
-        [Reactive Error]: engine.use() получил некорректный объект!
-        Скорее всего, вы пытаетесь подписаться на свойство сервиса, которое не было инициализировано.
-        Проверьте, что в классе написано: public mySignal = this.engine.signal(...)
-      `;
-      console.error(errorMsg, { item });
-      throw new Error(errorMsg);
-    }
-    const [val, setVal] = this.reactAdapters.useState(item.value);
-
-    this.reactAdapters.useEffect(
-      () => {
-        return item.subscribe(setVal);
-      },
-      [item]
-    );
-
-    return val;
   }
 
   /**

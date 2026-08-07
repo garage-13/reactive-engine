@@ -35,6 +35,9 @@
       "@pravosleva/reactive-engine": [
         "../src/index.ts"
       ],
+      "@pravosleva/reactive-engine/react": [
+        "../src/react/index.ts"
+      ],
       "@dist": [
         "../dist/index.js"
       ],

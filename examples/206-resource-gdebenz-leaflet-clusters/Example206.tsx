@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import baseClasses from '~/ui.common.module.scss'
-import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine'
+import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { MapLogic, Station } from './service.MapLogic'
 import clsx from 'clsx'
 

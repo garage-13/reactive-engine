@@ -1,6 +1,6 @@
 import { UserInfoService } from './service.firstly'
 import { SecondaryService } from './service.secondary'
-import { ReactiveEngine, createObserver } from '@pravosleva/reactive-engine'
+import { ReactiveEngine, createObserver } from '@pravosleva/reactive-engine/react'
 
 const engine = new ReactiveEngine()
 

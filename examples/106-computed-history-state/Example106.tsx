@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/ui.button.module.scss'
-import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine'
+import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { HistoryStateLogic } from './service.HistoryStateLogic'
 import { Input } from '~/shared/Input'
 import clsx from 'clsx'

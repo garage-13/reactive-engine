@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import baseClasses from '~/ui.common.module.scss'
-import { AbstractService, ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine'
+import { AbstractService, ReactiveEngine } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import clsx from 'clsx'
 
 // Описываем структуру АЗС из ответа API

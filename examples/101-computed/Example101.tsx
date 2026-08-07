@@ -1,6 +1,6 @@
 import baseClasses from '~/ui.common.module.scss'
 import clsx from 'clsx'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { useSecondaryService } from '~/201-multi-resource/store'
 
 export const Example101 = () => {

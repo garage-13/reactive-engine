@@ -1,5 +1,5 @@
 import { MouseEvent } from 'react'
-import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine'
+import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { Throttle2DLogic } from './service.Throttle2DLogic'
 import baseClasses from '~/ui.common.module.scss'
 import clsx from 'clsx'

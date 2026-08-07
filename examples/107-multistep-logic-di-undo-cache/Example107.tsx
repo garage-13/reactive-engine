@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/ui.button.module.scss'
-import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine'
+import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { MultiStepFormLogic } from './service.MultiStepFormLogic'
 import { Input } from '~/shared/Input'
 import clsx from 'clsx'

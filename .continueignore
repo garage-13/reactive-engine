@@ -22,3 +22,9 @@ __tests__/
 # Исключаем скрытые файлы конфигураций IDE
 .vscode/
 .idea/
+
+# Examples
+examples/
+
+# Docs
+docs/

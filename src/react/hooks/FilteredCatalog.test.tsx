@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { useReactiveValue } from './useReactiveValue'
-import { ReactiveEngine, Signal } from '../core'
+import { ReactiveEngine, Signal } from '../../core'
 
 interface Product {
   id: number

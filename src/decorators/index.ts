@@ -1,4 +1,3 @@
-export * from './createObserver'
 export * from './withCache'
 export * from './withDebounce'
 export * from './withLongPolling'

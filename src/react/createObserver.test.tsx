@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import React, { useEffect, useRef } from 'react';
-import { render, screen, act } from '@testing-library/react';
-import { ReactiveEngine } from '../core';
-import { createObserver } from './createObserver';
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import React, { useEffect, useRef } from 'react'
+import { render, screen, act } from '@testing-library/react'
+import { ReactiveEngine } from '../core/core'
+import { createObserver } from './createObserver'
 
 describe('HOC: observer', () => {
   let engine: ReactiveEngine;
