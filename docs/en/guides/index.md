@@ -11,6 +11,11 @@ next:
 
 The primary goal of the engine is to completely isolate business logic from the UI framework, reducing component re-renders to an absolute minimum.
 
+## Tree-Shaking & React-Free Core
+
+The package is built with bundle size optimization in mind and features full **tree-shaking** support out of the box. Thanks to strict entry-point separation at the `package.json` level, utilizing the core library (`@pravosleva/reactive-engine`) in Vanilla JS or headless environments is **completely isolated**. All React-specific adapters and dependencies reside exclusively within the `/react` subpath and will never be bundled into your application unless explicitly imported. Furthermore, `react` is marked as an optional peer dependency, ensuring a clean installation without cluttering packet manager logs in non-React environments.
+
+
 ## Key Features
 
 * **Instant Atomic Updates:** Components subscribe strictly to specific primitive signals (`Signal`) or computed properties (`Computed`) rather than a monolithic state object. A change in a single signal updates *only* the specific UI components that actually read it.
