@@ -1,4 +1,5 @@
 export * from './core'
+export { ReactiveEngine } from './core'
 export * from './types'
 export * from './AbstractService'
 export * from './BaseREServiceEnhanced'

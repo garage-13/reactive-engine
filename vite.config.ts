@@ -14,6 +14,12 @@ export default defineConfig({
       // Исключаем примеры из генерации деклараций типов основного билда
       exclude: ['examples/**/*'],
       cleanVueFileName: true,
+      // Принудительно заставляем плагин смотреть на корень исходников,
+      // чтобы структура .d.ts файлов идеально совпала со структурой .mjs файлов
+      tsconfigPath: './tsconfig.json',
+      compilerOptions: {
+        declarationMap: true, // Поможет IDE точнее находить методы при Ctrl+Клик
+      },
     }),
     react(),
   ],

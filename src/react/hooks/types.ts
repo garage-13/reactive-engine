@@ -1,4 +1,4 @@
-import { Signal, CleanupFn } from '../../core';
+import { CleanupFn } from '../../core';
 
 /**
  * Общий интерфейс-контракт для любого реактивного объекта библиотеки,
