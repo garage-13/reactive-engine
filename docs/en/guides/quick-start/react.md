@@ -34,7 +34,7 @@ export class Logic extends AbstractService {
 To subscribe to reactive changes, use the `useReactiveValue` hook. It extracts the raw value and subscribes the component to updates.
 
 ```tsx
-import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import { Logic } from './Logic'
 
 const engine = new ReactiveEngine()

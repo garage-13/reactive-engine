@@ -8,8 +8,8 @@ hero:
   tagline: Предсказуемый и быстрый граф реактивных вычислений
   actions:
     - theme: brand
-      text: Быстрый старт
-      link: /guides/quick-start
+      text: React
+      link: /guides/quick-start/react
     - theme: alt
       text: Описание
       link: /guides
@@ -18,7 +18,7 @@ hero:
       link: /decorators
     - theme: alt
       text: Хуки
-      link: /hooks
+      link: /react/hooks
     - theme: alt
       text: Примеры и сущности
       link: /examples

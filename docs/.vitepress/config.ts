@@ -30,9 +30,9 @@ export default defineConfig({
         // НАВИГАЦИЯ ДЛЯ РУССКОЙ ВЕРСИИ
         nav: [
           { text: 'Введение', link: '/guides' },
-          { text: 'Быстрый старт', link: '/guides/quick-start' },
+          { text: 'React', link: '/guides/quick-start/react' },
           { text: 'Декораторы', link: '/decorators/' },
-          { text: 'Хуки', link: '/hooks/' },
+          { text: 'Хуки', link: '/react/hooks/' },
           { text: 'Примеры', link: '/examples/' },
         ],
         // Боковое меню для русской версии
@@ -42,7 +42,7 @@ export default defineConfig({
               text: 'Руководство',
               items: [
                 { text: 'Введение', link: '/guides' },
-                { text: 'Быстрый старт', link: '/guides/quick-start' },
+                { text: 'React', link: '/guides/quick-start/react' },
                 { text: 'Философия движка', link: '/guides/philosophy' },
                 { text: 'Подробное описание', link: '/guides/introduction' },
               ]
@@ -60,13 +60,13 @@ export default defineConfig({
               ]
             }
           ],
-          '/hooks/': [
+          '/react/hooks/': [
             {
               text: 'Хуки (RU)',
               items: [
-                { text: 'Обзор', link: '/hooks/' },
-                { text: 'useReactiveSubscription', link: '/hooks/useReactiveSubscription' },
-                { text: 'useReactiveValue', link: '/hooks/useReactiveValue' },
+                { text: 'Обзор', link: '/react/hooks/' },
+                { text: 'useReactiveSubscription', link: '/react/hooks/useReactiveSubscription' },
+                { text: 'useReactiveValue', link: '/react/hooks/useReactiveValue' },
               ]
             }
           ],
@@ -139,7 +139,7 @@ export default defineConfig({
         // НАВИГАЦИЯ ДЛЯ АНГЛИЙСКОЙ ВЕРСИИ
         nav: [
           { text: 'Guides', link: '/en/guides' },
-          { text: 'Quick start', link: '/en/guides/quick-start' },
+          { text: 'React', link: '/en/guides/quick-start/react' },
           { text: 'Decorators', link: '/en/decorators/' },
         ],
         // Боковое меню для английской версии
@@ -149,7 +149,7 @@ export default defineConfig({
               text: 'Guide',
               items: [
                 { text: 'Guides', link: '/en/guides' },
-                { text: 'Quick start', link: '/en/guides/quick-start' },
+                { text: 'React', link: '/en/guides/quick-start/react' },
                 { text: 'Philosophy', link: '/en/guides/philosophy' },
                 { text: 'Introduction', link: '/guides/introduction' },
               ]

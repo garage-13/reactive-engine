@@ -8,8 +8,8 @@ hero:
   tagline: High-performance reactive state management and utils
   actions:
     - theme: brand
-      text: Quick start
-      link: /en/guides/quick-start
+      text: React
+      link: /en/guides/quick-start/react
     - theme: alt
       text: Core Description
       link: /en/guides

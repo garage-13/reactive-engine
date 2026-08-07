@@ -1,8 +1,8 @@
 ---
 layout: doc
 next:
-  text: 'Быстрый старт'
-  link: '/guides/quick-start'
+  text: 'Быстрый старт с React'
+  link: '/guides/quick-start/react'
 ---
 
 # Введение в Reactive Engine

@@ -34,7 +34,7 @@ export class Logic extends AbstractService {
 Для подписки на реактивные изменения используется хук `useReactiveValue`. Он извлекает чистое значение и подписывает компонент на обновления.
 
 ```tsx
-import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import { Logic } from './Logic'
 
 const engine = new ReactiveEngine()
