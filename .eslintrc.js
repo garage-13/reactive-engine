@@ -2,6 +2,14 @@ import importX from 'eslint-plugin-import-x'
 
 export default [
   {
+    // Глобальная настройка отступов для всех поддерживаемых файлов в проекте
+    files: ['**/*.{js,mjs,cjs,ts,tsx}'],
+    rules: {
+      // Задает строго 2 пробела для отступов
+      'indent': ['error', 2]
+    }
+  },
+  {
     // Правило применяется СТРОГО к файлам внутри src
     files: ['src/**/*.{ts,tsx}'],
     plugins: {
