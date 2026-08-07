@@ -1,6 +1,10 @@
 import { useState as useStateFromReact, useEffect as useEffectFromReact } from 'react'
 import { ReactiveEngine as OriginalReactiveEngine, CleanupFn } from '../core/core'
 
+/**
+ * Класс адаптера для интеграции реактивного движка с React.
+ * Наследует функциональность оригинального реактивного движка и предоставляет специализированные методы для работы с React.
+ */
 export class ReactiveEngine4React extends OriginalReactiveEngine {
   // Описываем строгие типы для адаптеров React, чтобы не ломать встроенные типы React.
   private reactAdapters: {
