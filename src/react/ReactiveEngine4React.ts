@@ -1,7 +1,7 @@
 import { useState as useStateFromReact, useEffect as useEffectFromReact } from 'react'
 import { CleanupFn, ReactiveEngine as __ReactiveEngine } from '../core'
 
-export class ReactiveEngine extends __ReactiveEngine {
+export class ReactiveEngine4React extends __ReactiveEngine {
   // Описываем строгие типы для адаптеров React, чтобы не ломать встроенные типы React.
   private reactAdapters: {
     useState: typeof useStateFromReact;

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useState, useEffect } from 'react'
 import { renderHook, act } from '@testing-library/react' // Нужен для теста метода engine.use
-import { ReactiveEngine } from './ReactiveEngine4React'
+import { ReactiveEngine4React as ReactiveEngine } from './ReactiveEngine4React'
 
 describe('ReactiveEngine (React)', () => {
   let engine: ReactiveEngine;
