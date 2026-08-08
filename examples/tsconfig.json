@@ -38,6 +38,9 @@
       "@pravosleva/reactive-engine/react": [
         "../src/react/index.ts"
       ],
+      "@pravosleva/reactive-engine/vue": [
+        "../src/vue/index.ts"
+      ],
       "@dist": [
         "../dist/index.js"
       ],

@@ -1,5 +1,6 @@
 import { defineConfig, UserConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
 import path from 'path'
 import type { PreRenderedChunk } from 'rollup'
@@ -8,28 +9,27 @@ export default defineConfig({
   base: "./",
   plugins: [
     dts({
-      // bundleTypes: true, // ВНИМАНИЕ: Для мульти-входа (multi-entry) эту опцию лучше отключить,
-      // иначе плагин попытается склеить типы ядра и реакта в один файл, что сломает пути.
       insertTypesEntry: true,
-      // Исключаем примеры из генерации деклараций типов основного билда
       exclude: ['examples/**/*'],
-      cleanVueFileName: true,
-      // Принудительно заставляем плагин смотреть на корень исходников,
-      // чтобы структура .d.ts файлов идеально совпала со структурой .mjs файлов
       tsconfigPath: './tsconfig.json',
+      // Отключаем интеграцию с vue-tsc, так как у нас в src/ только чистый TypeScript
+      // Это предотвратит автоматический поиск пакета @vue/language-core
       compilerOptions: {
-        declarationMap: true, // Поможет IDE точнее находить методы при Ctrl+Клик
-      },
+        // Указываем компилятору типов обрабатывать только стандартный TS
+        allowNonTsExtensions: false,
+      }
     }),
     react(),
+    vue(),
   ],
   resolve: {
-    dedupe: ["react", "react-dom"],
+    dedupe: ["react", "react-dom", "vue"],
     alias: {
       '~': path.resolve(__dirname, './examples'), // Ведет в папку examples в корне проекта
       '@src': path.resolve(__dirname, './src'),
       '@pravosleva/reactive-engine': path.resolve(__dirname, './src'),
-      '@pravosleva/reactive-engine/react': path.resolve(__dirname, './src'),
+      '@pravosleva/reactive-engine/react': path.resolve(__dirname, './src/react'),
+      '@pravosleva/reactive-engine/vue': path.resolve(__dirname, './src/vue'),
       '@dist': path.resolve(__dirname, './dist'),
     },
   },
@@ -39,13 +39,14 @@ export default defineConfig({
     lib: {
       entry: {
         index: path.resolve(__dirname, 'src/core/index.ts'),
-        'react/index': path.resolve(__dirname, 'src/react/index.ts')
+        'react/index': path.resolve(__dirname, 'src/react/index.ts'),
+        'vue/index': path.resolve(__dirname, 'src/vue/index.ts'),
       },
       name: "ReactiveEngineLib",
     },
     rollupOptions: {
-      // Исключаем react из финального бандла, чтобы не дублировать код
-      external: ["react", "react-dom"],
+      // Исключаем react, vue из финального бандла, чтобы не дублировать код
+      external: ["react", "react-dom", "vue"],
       output: [
         {
           format: 'es',

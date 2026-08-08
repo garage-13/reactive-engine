@@ -33,7 +33,7 @@ export const App = () => {
     <div className={clsx(baseClasses.stack4, baseClasses.appWrapper)}>
 
       <div className={baseClasses.stack0}>
-        <h2>0. Signal</h2>
+        <h2>(React) 0. Signal</h2>
         <div className={clsx(baseClasses.unitsWrapper)}>
           <CardModalWrapper
             title='Example 001'
@@ -51,7 +51,7 @@ export const App = () => {
       </div>
 
       <div className={baseClasses.stack0}>
-        <h2>1. Computed</h2>
+        <h2>(React) 1. Computed</h2>
         <div className={clsx(baseClasses.unitsWrapper)}>
           <CardModalWrapper
             title='Example 100'
@@ -105,7 +105,7 @@ export const App = () => {
       </div>
 
       <div className={baseClasses.stack0}>
-        <h2>2. Resource</h2>
+        <h2>(React) 2. Resource</h2>
         <div className={clsx(baseClasses.unitsWrapper)}>
           <CardModalWrapper
             title='Example 200'

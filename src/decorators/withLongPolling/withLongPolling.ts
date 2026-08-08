@@ -66,7 +66,7 @@ export const withLongPolling = <S, T>(
 
           setTimeout(() => {
             if (activeSessionId === currentSessionToken && !signal.aborted && !externalSignal?.aborted) {
-              onNextTick();
+              onNextTick?.();
             }
           }, delay);
 
@@ -79,7 +79,7 @@ export const withLongPolling = <S, T>(
           reject(error);
           const delayDuration = currentErrorDelay;
 
-          onError(delayDuration, () => {
+          if (typeof onError === 'function') onError(delayDuration, () => {
             if (activeSessionId === currentSessionToken) {
               currentErrorDelay = Math.min(currentErrorDelay * 2, errorMaxDelay);
             }
@@ -87,7 +87,7 @@ export const withLongPolling = <S, T>(
 
           setTimeout(() => {
             if (activeSessionId === currentSessionToken && !signal.aborted && !externalSignal?.aborted) {
-              onNextTick();
+              onNextTick?.();
             }
           }, delayDuration);
         }

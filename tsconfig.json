@@ -6,7 +6,10 @@
       ],
       "~/react/*": [
         "./src/react/*"
-      ]
+      ],
+      "~/vue": [
+        "../src/vue/*"
+      ],
     },
     "rootDir": "./src",
     "target": "ES2022",
