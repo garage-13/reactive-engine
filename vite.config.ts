@@ -41,12 +41,13 @@ export default defineConfig({
         index: path.resolve(__dirname, 'src/core/index.ts'),
         'react/index': path.resolve(__dirname, 'src/react/index.ts'),
         'vue/index': path.resolve(__dirname, 'src/vue/index.ts'),
+        'angular/index': path.resolve(__dirname, 'src/angular/index.ts'),
       },
       name: "ReactiveEngineLib",
     },
     rollupOptions: {
       // Исключаем react, vue из финального бандла, чтобы не дублировать код
-      external: ["react", "react-dom", "vue"],
+      external: ["react", "react-dom", "vue", "@angular/core"],
       output: [
         {
           format: 'es',

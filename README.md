@@ -2,8 +2,8 @@
 A lightweight, type-safe reactive engine built with TypeScript, featuring Dependency Injection and seamless React integration.
 
 ## Instruction
-- 🇬🇧 [In English](https://github.com/garage-13/reactive-engine/blob/main/docs/en/guides/index.md)
-- 🇷🇺 [In Russian](https://github.com/garage-13/reactive-engine/blob/main/docs/guides/index.md)
+- 🇬🇧 [In English](https://pravosleva.pro/reactive-engine/en)
+- 🇷🇺 [In Russian](https://pravosleva.pro/reactive-engine)
 
 **See also https://pravosleva.pro/reactive-engine**
 
@@ -12,11 +12,7 @@ A lightweight, type-safe reactive engine built with TypeScript, featuring Depend
 Install the package via your favorite package manager:
 
 ```bash
-npm install @pravosleva/reactive-engine
-# or
 yarn add @pravosleva/reactive-engine
-# or
-pnpm add @pravosleva/reactive-engine
 ```
 
 ```tsx
