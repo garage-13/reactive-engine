@@ -60,10 +60,20 @@ export default defineConfig({
               ]
             }
           ],
+          '/react/examples': [
+            {
+              // text: 'Примеры с React',
+              items: [
+                { text: 'Примеры с React', link: '/react/examples' },
+                { text: 'Обзор хуков', link: '/react/hooks/' },
+              ]
+            }
+          ],
           '/react/hooks/': [
             {
-              text: 'React хуки (RU)',
+              // text: 'React хуки',
               items: [
+                { text: 'Примеры с React', link: '/react/examples' },
                 { text: 'Обзор хуков', link: '/react/hooks/' },
                 { text: 'useReactiveSubscription', link: '/react/hooks/useReactiveSubscription' },
                 { text: 'useReactiveValue', link: '/react/hooks/useReactiveValue' },

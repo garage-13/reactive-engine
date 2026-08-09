@@ -12,6 +12,6 @@ features:
     link: /react/hooks
   - icon: 🧪
     title: Examples
-    details: Все примеры.
-    link: /examples
+    details: Примеры использования в React.
+    link: /react/examples
 ---
