@@ -62,7 +62,7 @@ import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 class Logic extends AbstractService {
   public counter = this.engine.signal<number>(0, 'example-01:signal:counter');
 
-  public inc() {
+  public inc = () => {
     this.counter.value += 1
   }
 }
@@ -78,7 +78,7 @@ export const Example001 = () => {
       <div>Signal example</div>
       <code>{counter}</code>
       <div className={baseClasses.catSection}>
-        <button onClick={() => logic.inc()}>+ INC</button>
+        <button onClick={logic.inc}>+ INC</button>
       </div>
     </div>
   )
