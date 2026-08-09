@@ -90,7 +90,7 @@ export const Example001 = () => {
 ```vue
 <script setup lang="ts">
 import { AbstractService } from '@pravosleva/reactive-engine'
-import { ReactiveEngine as ReactiveEngine4Vue } from '@pravosleva/reactive-engine/vue'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/vue'
 
 class CounterLogic extends AbstractService {
   public counter = this.engine.signal<number>(0, 'vue-example:counter');
@@ -100,7 +100,7 @@ class CounterLogic extends AbstractService {
   }
 }
 
-const engine = new ReactiveEngine4Vue()
+const engine = new ReactiveEngine()
 const logic = engine.inject(CounterLogic)
 const counter = engine.use(logic.counter)
 </script>
@@ -109,12 +109,11 @@ const counter = engine.use(logic.counter)
   <div>
     <div>Vue 3 Signal Example</div>
 
-    <!-- Убираем .value, доверяем автоматическому развертыванию Vue -->
     <code>{{ counter }}</code>
 
     <div>
       <button @click="logic.inc">
-        INC
+        + INC
       </button>
     </div>
   </div>
@@ -126,9 +125,8 @@ const counter = engine.use(logic.counter)
 ```ts
 import { Component } from '@angular/core'
 import { AbstractService } from '@pravosleva/reactive-engine'
-import { ReactiveEngine as ReactiveEngine4Angular } from '@pravosleva/reactive-engine/angular'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/angular'
 
-// 1. Описываем изолированную бизнес-логику (Ядро/Сервис) — код 1-в-1 как в React/Vue
 class CounterLogic extends AbstractService {
   public counter = this.engine.signal<number>(0, 'angular-example:counter');
 
@@ -140,29 +138,24 @@ class CounterLogic extends AbstractService {
 @Component({
   selector: 'app-counter-example',
   standalone: true,
-  // В шаблоне Angular Signals вызываются как функции: counter()
   template: `
-    <div class="unit stack2">
-      <div class="absoluteUnitLabel">Angular 16+ Signal Example</div>
+    <div>
+      <div>Angular 16+ Signal Example</div>
       <code>{{ counter() }}</code>
-      <div class="catSection">
-        <button (click)="logic.inc()" class="btn neonBtn neonBtn--primary neonBtn--outlined">
-          INC (Angular)
+      <div>
+        <button (click)="logic.inc()">
+          + INC
         </button>
       </div>
     </div>
   `,
-  styleUrls: ['./ui.common.module.scss', './ui.button.module.scss'] // Ваши SCSS стили
+  styleUrls: []
 })
 export class AngularCounterComponent {
-  // 2. Инициализируем Angular-версию движка
-  private engine = new ReactiveEngine4Angular();
+  private engine = new ReactiveEngine();
 
-  // 3. Внедряем сервис из DI-контейнера
   public logic = this.engine.inject(CounterLogic);
 
-  // 4. Превращаем сигнал ядра в нативный Angular Signal через метод .use()
-  // Метод inject(DestroyRef) под капотом use() отработает корректно, так как мы находимся в фазе инициализации класса
   public counter = this.engine.use(this.logic.counter);
 }
 ```
