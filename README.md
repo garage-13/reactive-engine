@@ -5,7 +5,6 @@ A lightweight, type-safe reactive engine built with TypeScript, featuring Depend
 - 🇬🇧 [In English](https://pravosleva.pro/reactive-engine/en)
 - 🇷🇺 [In Russian](https://pravosleva.pro/reactive-engine)
 
-
 ## 🎯 What Problems This Library Solves
 
 When building large-scale React applications, developers constantly run into architectural bottlenecks imposed by built-in state tools. `@pravosleva/reactive-engine` is designed to elegantly solve the following pain points:

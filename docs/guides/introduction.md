@@ -147,7 +147,7 @@ export const doubleComputed = engine.computed(
 ```tsx
 // Counter.tsx
 import React from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { useReactiveValue } from '@pravosleva/reactive-engine/react';
 import { counterSignal, doubleComputed } from '~/store';
 
 export const Counter = () => {
@@ -204,7 +204,7 @@ export const userDataResource = engine.resource(
 ```tsx
 // UserProfile.tsx
 import React from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { useReactiveValue } from '@pravosleva/reactive-engine/react';
 import { userIdSignal, tabSignal, userDataResource } from './apiStore';
 
 export const UserProfile = () => {
@@ -238,7 +238,7 @@ export const UserProfile = () => {
 
 ```tsx
 import React, { useRef } from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { useReactiveValue } from '@pravosleva/reactive-engine/react';
 import { engine } from '~/store'
 
 // Создаем три сигнала
@@ -285,7 +285,7 @@ export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated')
 ```tsx
 // AdvancedBatchDemo.tsx
 import React, { useRef } from 'react'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from '~/store'
 
 export const AdvancedBatchDemo = () => {
@@ -335,7 +335,7 @@ export const AdvancedBatchDemo = () => {
 
 ```ts
 // store.ts
-import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 
 export const engine = new ReactiveEngine()
 
@@ -370,7 +370,7 @@ export const filteredProductsComputed = engine.computed(
 ```tsx
 // CatalogDemo.tsx
 import React, { useRef } from 'react'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from '~/store'
 
 export const CatalogDemo = () => {
@@ -515,7 +515,7 @@ src/
 
 ```tsx
 import React from 'react'
-import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+import { useReactiveSubscription } from '@pravosleva/reactive-engine/react'
 import { counterSignal } from '~/store'
 
 export const LoggerButton = () => {
@@ -543,7 +543,7 @@ export const isMutedSignal = engine.signal(false, 'isMuted')
 ```tsx
 // AudioPlayer.tsx
 import React, { useRef } from 'react'
-import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+import { useReactiveSubscription } from '@pravosleva/reactive-engine/react'
 import { isMutedSignal } from '~/store'
 
 export const AudioPlayer = () => {
@@ -578,7 +578,7 @@ export const AudioPlayer = () => {
 #### Пример: Безопасное инлайн-вычисление без утечек памяти
 ```tsx
 import React, { useMemo } from 'react'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { engine, globalProductsSignal } from '~/store'
 
 export const FilteredCatalog = ({ category }: { category: string }) => {
@@ -600,38 +600,10 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 }
 ```
 
-### Прозрачная реактивность через `observer` (Аналог MobX)
-
-Если ваш компонент отображает множество сигналов или вы хотите избавиться от вызовов хуков в теле функций, используйте функцию высшего порядка `observer`. Она автоматически отслеживает, какие сигналы или вычисляемые свойства считываются внутри JSX во время рендера, и точечно подписывает компонент на их изменения.
-
-```tsx
-import React from 'react'
-import { createObserver } from '@pravosleva/reactive-engine'
-import { counterSignal, userSignal, engine } from '~/store'
-
-const observer = createObserver(engine)
-
-// Оборачиваем компонент в observer.
-// Теперь можно просто читать `.value` прямо в JSX — никаких хуков не требуется!
-export const ProfileDashboard = observer(() => {
-  return (
-    <div style={{ padding: 20, border: '1px solid #aaa' }}>
-      <h3>Пользователь: {userSignal.value.name}</h3>
-      <p>Значение счетчика: {counterSignal.value}</p>
-
-      <button onClick={() => counterSignal.value++}>Увеличить</button>
-      <button onClick={() => { userSignal.value = { name: 'Пётр' }; }}>
-        Сменить имя
-      </button>
-    </div>
-  )
-})
-```
-
 ### Еще один продвинутый способ оптимизации рендеринга
 ```tsx
 import React, { useRef } from 'react'
-import { createObserverComponent } from '@pravosleva/reactive-engine'
+import { createObserverComponent } from '@pravosleva/reactive-engine/react'
 import { engine } from '~/store'
 
 // Инициализируем компонент-контейнер из нашей фабрики
@@ -838,7 +810,7 @@ export const UserHeader = () => {
 ```tsx
 // 1. Инициализация (Связующий слой — provide)
 // Выполняется один раз при старте приложения
-import { ReactiveEngine } from '@pravosleva/reactive-engine';
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react';
 import { AuthService } from './services/AuthService';
 
 export const engine = new ReactiveEngine();
@@ -866,7 +838,7 @@ export class AuthService {
 // 3. Интерфейс (Отображение и реактивность — useReactiveValue)
 // React-компонент, который точечно подписывается на изменения
 import React from 'react';
-import { useReactiveValue } from '@pravosleva/reactive-engine';
+import { useReactiveValue } from '@pravosleva/reactive-engine/react';
 import { engine } from './index'; // Импортируем наш созданный инстанс движка
 import { AuthService } from './services/AuthService';
 
@@ -930,7 +902,7 @@ Redux использует обычные JS-объекты. Движок **Reac
 ## Экземпляр engine на примере, который я использую
 `~/utils/engine.ts`
 ```ts
-import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import { useState, useEffect } from 'react'
 
 // Создаем единственный экземпляр движка на все приложение

@@ -73,8 +73,6 @@ const cartService = engine.inject(CartService)
 // instantiates AuthService, provisions CartService, hooks them together, and returns the singleton.
 ```
 
----
-
 ## 🎯 What Problems This Library Solves
 
 When building large-scale React applications, developers constantly run into architectural bottlenecks imposed by built-in state tools. `@pravosleva/reactive-engine` is designed to elegantly solve the following pain points:
@@ -127,7 +125,7 @@ You can declare your reactive state in pure TypeScript/JavaScript files complete
 
 ```ts
 // store.ts
-import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 
 export const engine = new ReactiveEngine()
 
@@ -148,7 +146,7 @@ For React 18+, use the high-performance `useReactiveValue` hook (backed by `useS
 ```tsx
 // Counter.tsx
 import React from 'react'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { counterSignal, doubleComputed } from '~/store'
 
 export const Counter = () => {
@@ -205,7 +203,7 @@ Consuming this in a component remains clean and fully declarative:
 ```tsx
 // UserProfile.tsx
 import React from 'react'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { userIdSignal, tabSignal, userDataResource } from './apiStore'
 
 export const UserProfile = () => {
@@ -237,7 +235,7 @@ In the example below, clicking the button mutates three independent signals cons
 
 ```tsx
 import React, { useRef } from 'react'
-import { useReactiveValue, ReactiveEngine } from '@pravosleva/reactive-engine'
+import { useReactiveValue, ReactiveEngine } from '@pravosleva/reactive-engine/react'
 
 const engine = new ReactiveEngine()
 
@@ -285,7 +283,7 @@ export const lastUpdatedSignal = engine.signal<string>('', 'lastUpdated')
 ```tsx
 // AdvancedBatchDemo.tsx
 import React, { useRef } from 'react'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { isProcessingSignal, apiDataSignal, lastUpdatedSignal } from '~/store'
 
 export const AdvancedBatchDemo = () => {
@@ -369,7 +367,7 @@ export const filteredProductsComputed = engine.computed(
 ```tsx
 // CatalogDemo.tsx
 import React, { useRef } from 'react'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { searchSignal, categorySignal, maxPriceSignal, sortBySignal, filteredProductsComputed } from '~/store'
 
 export const CatalogDemo = () => {
@@ -467,7 +465,7 @@ The component below will not trigger any React re-renders when clicked, yet the 
 
 ```tsx
 import React from 'react'
-import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+import { useReactiveSubscription } from '@pravosleva/reactive-engine/react'
 import { counterSignal } from '~/store'
 
 export const LoggerButton = () => {
@@ -495,7 +493,7 @@ export const isMutedSignal = engine.signal(false, 'isMuted')
 ```tsx
 // AudioPlayer.tsx
 import React, { useRef } from 'react'
-import { useReactiveSubscription } from '@pravosleva/reactive-engine'
+import { useReactiveSubscription } from '@pravosleva/reactive-engine/react'
 import { isMutedSignal } from '~/store'
 
 export const AudioPlayer = () => {
@@ -529,7 +527,7 @@ Under the hood, the engine leverages modern JavaScript **`FinalizationRegistry`*
 
 ```tsx
 import React, { useMemo } from 'react'
-import { useReactiveValue } from '@pravosleva/reactive-engine'
+import { useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { engine, globalProductsSignal } from '~/store'
 
 export const FilteredCatalog = ({ category }: { category: string }) => {
@@ -551,38 +549,10 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 }
 ```
 
-### Transparent Reactivity via `observer` (MobX Style)
-
-If your component renders multiple signals or you prefer to eliminate hook boilerplate from your function bodies, leverage the `observer` High-Order Component (HOC). It automatically tracks which signals or derived computed properties are accessed during the JSX rendering cycle and micro-subscribes the component to those specific state updates.
-
-```tsx
-import React from 'react'
-import { createObserver } from '@pravosleva/reactive-engine'
-import { counterSignal, userSignal, engine } from '~/store'
-
-const observer = createObserver(engine)
-
-// Wrap your component with observer.
-// Now you can read `.value` directly inside your JSX—no hooks required!
-export const ProfileDashboard = observer(() => {
-  return (
-    <div style={{ display: 'flex', flexDirecyion: 'column', gap: '8px' }}>
-      <h3>User: {userSignal.value.name}</h3>
-      <p>Counter Value: {counterSignal.value}</p>
-
-      <button onClick={() => counterSignal.value++}>Increment</button>
-      <button onClick={() => { userSignal.value = { name: 'Peter' }; }}>
-        Change Name
-      </button>
-    </div>
-  )
-})
-```
-
 ### Another way for render optimization
 ```tsx
 import React, { useRef } from 'react'
-import { createObserverComponent } from '@pravosleva/reactive-engine'
+import { createObserverComponent } from '@pravosleva/reactive-engine/react'
 import { engine } from '~/store'
 
 // Instantiate the inline observer container component

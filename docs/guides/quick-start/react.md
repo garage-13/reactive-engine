@@ -1,5 +1,8 @@
 ---
 layout: doc
+prev:
+  text: React tools
+  link: '/react'
 next:
   text: 'Пример 001: Счетчик'
   link: '/examples/signal/001'

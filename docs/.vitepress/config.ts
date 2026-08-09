@@ -30,9 +30,8 @@ export default defineConfig({
         // НАВИГАЦИЯ ДЛЯ РУССКОЙ ВЕРСИИ
         nav: [
           { text: 'Введение', link: '/guides' },
-          { text: 'React', link: '/guides/quick-start/react' },
+          { text: 'Старт с React', link: '/guides/quick-start/react' },
           { text: 'Декораторы', link: '/decorators/' },
-          { text: 'Хуки', link: '/react/hooks/' },
           { text: 'Примеры', link: '/examples/' },
         ],
         // Боковое меню для русской версии
@@ -42,7 +41,7 @@ export default defineConfig({
               text: 'Руководство',
               items: [
                 { text: 'Введение', link: '/guides' },
-                { text: 'React', link: '/guides/quick-start/react' },
+                { text: 'Старт с React', link: '/guides/quick-start/react' },
                 { text: 'Философия движка', link: '/guides/philosophy' },
                 { text: 'Подробное описание', link: '/guides/introduction' },
               ]
@@ -64,7 +63,7 @@ export default defineConfig({
             {
               text: 'Хуки (RU)',
               items: [
-                { text: 'Обзор', link: '/react/hooks/' },
+                { text: 'Обзор хуков', link: '/react/hooks/' },
                 { text: 'useReactiveSubscription', link: '/react/hooks/useReactiveSubscription' },
                 { text: 'useReactiveValue', link: '/react/hooks/useReactiveValue' },
               ]
@@ -139,7 +138,7 @@ export default defineConfig({
         // НАВИГАЦИЯ ДЛЯ АНГЛИЙСКОЙ ВЕРСИИ
         nav: [
           { text: 'Guides', link: '/en/guides' },
-          { text: 'React', link: '/en/guides/quick-start/react' },
+          { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
           { text: 'Decorators', link: '/en/decorators/' },
         ],
         // Боковое меню для английской версии
@@ -149,7 +148,7 @@ export default defineConfig({
               text: 'Guide',
               items: [
                 { text: 'Guides', link: '/en/guides' },
-                { text: 'React', link: '/en/guides/quick-start/react' },
+                { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
                 { text: 'Philosophy', link: '/en/guides/philosophy' },
                 { text: 'Introduction', link: '/guides/introduction' },
               ]

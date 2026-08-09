@@ -6,8 +6,8 @@ hero:
   tagline: Выберите нужный для перехода к руководству.
 
 features:
-  - icon: 📦
+  - icon: 🪝
     title: React hooks
     details: Универсальные хуки.
-    # link: /react/hooks/useReactiveSubscription
+    link: /react/hooks
 ---
