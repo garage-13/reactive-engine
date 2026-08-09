@@ -549,66 +549,6 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 }
 ```
 
-### Another way for render optimization
-```tsx
-import React, { useRef } from 'react'
-import { createObserverComponent } from '@pravosleva/reactive-engine/react'
-import { engine } from '~/store'
-
-// Instantiate the inline observer container component
-const Observer = createObserverComponent(engine)
-
-// A rapidly changing signal (e.g., streaming over WebSockets)
-const livePriceSignal = engine.signal(100)
-
-export const MassiveDashboard = () => {
-  // Counter to track the parent component rendering cycles
-  const totalDashboardRenders = useRef(0)
-  totalDashboardRenders.current++
-
-  return (
-    <div style={{ padding: '20px', border: '1px solid #ccc' }}>
-      <h2>📊 Heavy Analytics Dashboard</h2>
-      <p>Total Dashboard Page Renders: {totalDashboardRenders.current}</p>
-
-      {/*
-        Expensive static layout or complex nested DOM architecture.
-        Thanks to the inline <Observer>, this whole block will NEVER
-        be re-evaluated when the price fluctuates!
-      */}
-      <div className="heavy-charts-and-tables">
-        <p>...10 heavy charting libraries and analytical tables render here...</p>
-      </div>
-
-      {/*
-        FINE-GRAINED INLINE REACTIVITY:
-        We isolate the signal consumer within the <Observer> container.
-        When livePriceSignal.value updates, ONLY the anonymous function
-        inside <Observer> triggers a micro-render, saving 99% of CPU runtime!
-      */}
-      <Observer>
-        {() => {
-          const innerCounter = useRef(0);
-          innerCounter.current++;
-          return (
-            <div style={{ background: '#f9f9f9', padding: '10px' }}>
-              <h3>📈 Live Ticker Price: (Current: ${livePriceSignal.value})</h3>
-              <p style={{ color: 'green' }}>
-                Micro-zone Isolated Renders: {innerCounter.current}
-              </p>
-            </div>
-          );
-        }}
-      </Observer>
-
-      <button onClick={() => { livePriceSignal.value += 5; }}>
-        Simulate Price Tick (+5$)
-      </button>
-    </div>
-  )
-}
-```
-
 ## ⚠️ Troubleshooting & Gotchas
 
 Because `@pravosleva/reactive-engine` relies on runtime dependency tracking via JavaScript Proxy and Signals, there are a few architectural rules you should follow to avoid hidden bugs:

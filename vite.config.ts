@@ -12,6 +12,7 @@ export default defineConfig({
       insertTypesEntry: true,
       exclude: ['examples/**/*'],
       tsconfigPath: './tsconfig.json',
+      // Говорим Vite НЕ вшивать код пакета внутрь дистрибутива вашей библиотеки
       // Отключаем интеграцию с vue-tsc, так как у нас в src/ только чистый TypeScript
       // Это предотвратит автоматический поиск пакета @vue/language-core
       compilerOptions: {
@@ -23,7 +24,7 @@ export default defineConfig({
     vue(),
   ],
   resolve: {
-    dedupe: ["react", "react-dom", "vue"],
+    dedupe: ['react', 'react-dom', 'vue'],
     alias: {
       '~': path.resolve(__dirname, './examples'), // Ведет в папку examples в корне проекта
       '@src': path.resolve(__dirname, './src'),
@@ -46,13 +47,14 @@ export default defineConfig({
       name: "ReactiveEngineLib",
     },
     rollupOptions: {
-      // Исключаем react, vue из финального бандла, чтобы не дублировать код
-      external: ["react", "react-dom", "vue", "@angular/core"],
+      // Исключаем react, vue (возможно, что-то еще) из финального бандла,
+      // 1. чтобы не дублировать код
+      // 2. чтобы клиент брал это из своих node_modules
+      external: ['react', 'react-dom', 'vue', '@angular/core'],
       output: [
         {
           format: 'es',
           exports: "named",
-          // Сохраняем структуру папок, предотвращая появление папки shared
           preserveModules: true,
           // Базовая папка, относительно которой строятся пути (чтобы в dist не было лишней вложенности src/)
           preserveModulesRoot: 'src',
@@ -76,31 +78,7 @@ export default defineConfig({
             return `${chunkInfo.name}.cjs`;
           }
         }
-      ] as any,
-      // {
-      //   // Принудительно генерируем чистый ESM/CJS без лишних оберток
-      //   interop: "auto",
-      //   // Обеспечивает корректную работу дефолтных экспортов в гибридных бандлах
-      //   exports: "named",
-      //   globals: {
-      //     react: "React",
-      //     "react-dom": "ReactDOM",
-      //   },
-      //   // Настройка нормальных расширений файлов (.mjs и .cjs)
-      //   entryFileNames: (chunkInfo: PreRenderedChunk, format: string) => {
-      //     return chunkInfo.name === 'index'
-      //       ? 'index.[format]'
-      //       : '[name].[format]'; // превратится в react/index.es.js -> переименуем через имя
-      //   },
-      //   // Чтобы расширения были именно .mjs и .cjs, как у вас сейчас:
-      //   chunkFileNames: '[name]-[hash].js',
-      //   assetFileNames: '[name].[ext]',
-      //   // Корректное переименование форматов под ваши текущие расширения
-      //   extmapping: {
-      //     es: 'mjs',
-      //     cjs: 'cjs'
-      //   }
-      // } as any, // Приведение к any убирает ошибку overload на объединении типов
+      ] as any
     },
   },
   server: {

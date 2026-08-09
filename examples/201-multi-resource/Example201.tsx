@@ -1,13 +1,19 @@
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/ui.button.module.scss'
 import clsx from 'clsx'
-import { useUserInfoService, observer, useSecondaryService } from './store'
+import { useUserInfoService, useSecondaryService } from './store'
+import { useReactiveValue as useR } from '@pravosleva/reactive-engine/react'
 
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
-export const Example201 = observer(() => {
-  const userInfo = useUserInfoService()
-  const secondaryService = useSecondaryService()
+export const Example201 = () => {
+  const _userInfo = useUserInfoService()
+  const personList = useR(_userInfo.personList)
+  const activePersonId = useR(_userInfo.activePersonId)
+  const apiState = useR(_userInfo.apiState)
+
+  const _secondaryService = useSecondaryService()
+  const secondaryApiState = useR(_secondaryService.apiState)
 
   return (
     <div
@@ -25,20 +31,22 @@ export const Example201 = observer(() => {
       </div>
       <code>{BASE_API_URL}</code>
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => userInfo.inc()} className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>Refresh account data</button>
+        <button onClick={_userInfo.inc} className={clsx(btnClasses.btn, btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}>
+          Refresh account data
+        </button>
         {
-          userInfo.personList.value.map((p) => (
+          personList.map((p) => (
             <button
               key={p.id}
-              onClick={() => userInfo.setActivePersonId(p.id)}
+              onClick={() => _userInfo.setActivePersonId(p.id)}
               className={
                 clsx(
                   btnClasses.btn,
                   btnClasses.neonBtn,
                   btnClasses['neonBtn--secondary'],
                   {
-                    [btnClasses['neonBtn--contained']]: !!userInfo.activePersonId.value && p.id === userInfo.activePersonId.value,
-                    [btnClasses['neonBtn--outlined']]: p.id !== userInfo.activePersonId.value,
+                    [btnClasses['neonBtn--contained']]: !!activePersonId && p.id === activePersonId,
+                    [btnClasses['neonBtn--outlined']]: p.id !== activePersonId,
                   },
                 )
               }
@@ -48,14 +56,14 @@ export const Example201 = observer(() => {
       </div>
       <div className={baseClasses.unitInternalWrapper}>
         <div className={baseClasses.stack2}>
-          <div>{userInfo.apiState.loading ? '🟡 loading...' : !!userInfo.apiState.data ? '🟢 ok' : !!userInfo.apiState.error ? `🔴 err | ${userInfo.apiState.error?.message || 'No error msg'}` : '⚪'}</div>
-          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data: userInfo.apiState.data }, null, 2)}</pre>
+          <div>{apiState.loading ? '🟡 loading...' : !!apiState.data ? '🟢 ok' : !!apiState.error ? `🔴 err | ${apiState.error?.message || 'No error msg'}` : '⚪'}</div>
+          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data: apiState.data }, null, 2)}</pre>
         </div>
         <div className={baseClasses.stack2}>
-          <div>{secondaryService.apiState.loading ? '🟡 loading...' : !!secondaryService.apiState.data ? '🟢 ok' : !!secondaryService.apiState.error ? `🔴 err | ${secondaryService.apiState.error?.message || 'No error msg'}` : '⚪'}</div>
-          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data: secondaryService.apiState.data }, null, 2)}</pre>
+          <div>{secondaryApiState.loading ? '🟡 loading...' : !!secondaryApiState.data ? '🟢 ok' : !!secondaryApiState.error ? `🔴 err | ${secondaryApiState.error?.message || 'No error msg'}` : '⚪'}</div>
+          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data: secondaryApiState.data }, null, 2)}</pre>
         </div>
       </div>
     </div>
   )
-})
+}

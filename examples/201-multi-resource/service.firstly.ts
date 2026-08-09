@@ -62,7 +62,7 @@ export class UserInfoService extends AbstractService {
     this.counter
   )
 
-  public inc() {
+  public inc = () => {
     this.resetActivePersonId() // NOTE: DERTY_MISTAKE 2/3 ✅ Correct way (variant 1)
     this.counter.value += 1
   }

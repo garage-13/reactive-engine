@@ -600,66 +600,6 @@ export const FilteredCatalog = ({ category }: { category: string }) => {
 }
 ```
 
-### Еще один продвинутый способ оптимизации рендеринга
-```tsx
-import React, { useRef } from 'react'
-import { createObserverComponent } from '@pravosleva/reactive-engine/react'
-import { engine } from '~/store'
-
-// Инициализируем компонент-контейнер из нашей фабрики
-const Observer = createObserverComponent(engine)
-
-// Сигнал, который меняется очень часто (например, каждую секунду по веб-сокету)
-const livePriceSignal = engine.signal(100)
-
-export const MassiveDashboard = () => {
-  // Счетчик рендеров всего ОГРОМНОГО компонента
-  const totalDashboardRenders = useRef(0)
-  totalDashboardRenders.current++
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <h2>📊 Тяжелая панель аналитики</h2>
-      <p>Рендеров всей страницы: {totalDashboardRenders.current}</p>
-
-      {/*
-        Тяжелый статический контент, который генерируется долго.
-        Благодаря инлайн-контейнеру <Observer>, этот кусок НИКОГДА
-        не будет перерисовываться при изменении цены!
-      */}
-      <div className="heavy-charts-and-tables">
-        <p>...Тут рендерятся 10 тяжелых графиков и таблиц...</p>
-      </div>
-
-      {/*
-        ТОЧЕЧНАЯ РЕАКТИВНОСТЬ:
-        Оборачиваем в <Observer> только ту микро-зону, которая зависит от сигнала.
-        При изменении livePriceSignal.value перерисовываться будет СТРОГО
-        анонимная функция внутри <Observer>, экономя 99% ресурсов процессора!
-      */}
-      <Observer>
-        {() => {
-          const innerCounter = useRef(0);
-          innerCounter.current++;
-          return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <h3>📈 Живой график цены (Текущая: ${livePriceSignal.value})</h3>
-              <p style={{ color: 'green' }}>
-                Рендеров этой микро-зоны: {innerCounter.current}
-              </p>
-            </div>
-          );
-        }}
-      </Observer>
-
-      <button onClick={() => { livePriceSignal.value += 5; }}>
-        Симулировать изменение цены (+5$)
-      </button>
-    </div>
-  )
-}
-```
-
 ## ⚠️ Возможные проблемы и их решение (Troubleshooting)
 
 Поскольку `@pravosleva/reactive-engine` выполняет отслеживание зависимостей «на лету» (runtime dependency tracking) через Proxy и сигналы, важно знать несколько правил, чтобы избежать скрытых багов:
