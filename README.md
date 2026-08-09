@@ -107,9 +107,7 @@ const counter = engine.use(logic.counter)
 <template>
   <div>
     <div>Vue 3 Signal Example</div>
-
     <code>{{ counter }}</code>
-
     <div>
       <button @click="logic.inc">
         + INC
