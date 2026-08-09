@@ -6,29 +6,40 @@ import { useReactiveValue0 } from '../useReactiveValue0'
 const runAutoCleanupTests = (hookName: string, hookFn: any) => {
   describe(`Авто-очистка под капотом: ${hookName}`, () => {
 
-    it('должен гарантированно вызывать метод .destroy() при размонтировании компонента', async () => {
-      // 1. Создаем изолированный мок-объект, имитирующий Computed/Signal
+    it('должен гарантированно вызывать метод .destroy() при размонтировании, ОДНАКО только для ленивых фабрик', async () => {
       const destroySpy = vi.fn()
       const mockReactiveItem = {
-        value: 'test_value',
-        subscribe: vi.fn(() => () => { }), // фейковая отписка
-        destroy: destroySpy // шпион, который мы проверяем
+        value: 'factory_computed',
+        subscribe: vi.fn(() => () => { }),
+        destroy: destroySpy
       }
 
-      // 2. Рендерим хук, передавая ему фабрику (как это будут делать коллеги)
+      // Передаем как фабрику () => mock
       const { unmount } = renderHook(() => hookFn(() => mockReactiveItem))
-
-      // Проверяем, что хук успешно вытащил начальное значение
-      // (это доказывает, что под капотом useSyncExternalStore связался с объектом)
-
-      // 3. Размонтируем компонент (имитируем уход пользователя со страницы)
       unmount()
 
-      // 4. Проверяем публичный контракт: хук ОБЯЗАН был вызвать метод destroy
-      // Используем vi.waitFor, так как эффекты очистки в React могут срабатывать асинхронно
       await vi.waitFor(() => {
         expect(destroySpy).toHaveBeenCalledTimes(1)
       })
+    })
+
+    it('КРИТИЧЕСКИЙ ТЕСТ: НЕ должен вызывать метод .destroy() для общих глобальных сигналов', async () => {
+      const globalDestroySpy = vi.fn()
+      const mockGlobalSignal = {
+        value: 'global_shared_state',
+        subscribe: vi.fn(() => () => { }),
+        destroy: globalDestroySpy // Этот метод НЕ должен быть вызван хуком!
+      }
+
+      // Передаем готовый сигнал напрямую, имитируя глобальный стор
+      const { unmount } = renderHook(() => hookFn(mockGlobalSignal))
+      unmount()
+
+      // Даем время эффектам пройти
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Проверяем железный контракт: глобальный стейт остался невредим!
+      expect(globalDestroySpy).not.toHaveBeenCalled()
     })
   })
 }
