@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "1.3.1-beta",
+  "version": "1.3.2-beta",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -17,32 +17,32 @@
     "state",
     "manager"
   ],
-  "main": "./dist/cjs/index.cjs",
-  "module": "./dist/esm/index.mjs",
-  "types": "./dist/esm/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "unpkg": "./dist/index.iife.js",
   "jsdelivr": "./dist/index.iife.js",
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/esm/index.d.ts",
-      "import": "./dist/esm/index.mjs",
-      "require": "./dist/cjs/index.cjs"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
     },
     "./react": {
-      "types": "./dist/esm/react/index.d.ts",
-      "import": "./dist/esm/react/index.mjs",
-      "require": "./dist/cjs/react/index.cjs"
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.mjs",
+      "require": "./dist/react/index.cjs"
     },
     "./vue": {
-      "types": "./dist/esm/vue/index.d.ts",
-      "import": "./dist/esm/vue/index.mjs",
-      "require": "./dist/cjs/vue/index.cjs"
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue/index.mjs",
+      "require": "./dist/vue/index.cjs"
     },
     "./angular": {
-      "types": "./dist/esm/angular/index.d.ts",
-      "import": "./dist/esm/angular/index.mjs",
-      "require": "./dist/cjs/angular/index.cjs"
+      "types": "./dist/angular/index.d.ts",
+      "import": "./dist/angular/index.mjs",
+      "require": "./dist/angular/index.cjs"
     }
   },
   "files": [

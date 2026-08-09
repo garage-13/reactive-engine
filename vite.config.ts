@@ -58,7 +58,6 @@ export default defineConfig({
           preserveModules: true,
           // Базовая папка, относительно которой строятся пути (чтобы в dist не было лишней вложенности src/)
           preserveModulesRoot: 'src',
-          dir: 'dist/esm',
           entryFileNames: (chunkInfo: PreRenderedChunk) => {
             // Если файл изначально из core/, убираем эту вложенность для сохранения обратной совместимости корневого импорта
             if (chunkInfo.name.startsWith('core/')) {
@@ -72,7 +71,6 @@ export default defineConfig({
           exports: "named",
           preserveModules: true,
           preserveModulesRoot: 'src',
-          dir: 'dist/cjs',
           entryFileNames: (chunkInfo: PreRenderedChunk) => {
             if (chunkInfo.name.startsWith('core/')) {
               return `${chunkInfo.name.replace('core/', '')}.cjs`;
