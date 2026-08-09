@@ -30,7 +30,7 @@ export default defineConfig({
         // НАВИГАЦИЯ ДЛЯ РУССКОЙ ВЕРСИИ
         nav: [
           { text: 'Введение', link: '/guides' },
-          { text: 'Старт с React', link: '/guides/quick-start/react' },
+          { text: 'React', link: '/react' },
           { text: 'Декораторы', link: '/decorators/' },
           { text: 'Примеры', link: '/examples/' },
         ],
@@ -41,9 +41,10 @@ export default defineConfig({
               text: 'Руководство',
               items: [
                 { text: 'Введение', link: '/guides' },
-                { text: 'Старт с React', link: '/guides/quick-start/react' },
+                { text: 'React', link: '/react' },
+                { text: 'Хуки для React', link: '/react/hooks' },
                 { text: 'Философия движка', link: '/guides/philosophy' },
-                { text: 'Подробное описание', link: '/guides/introduction' },
+                // { text: 'Подробное описание', link: '/guides/introduction' },
               ]
             }
           ],
@@ -61,7 +62,7 @@ export default defineConfig({
           ],
           '/react/hooks/': [
             {
-              text: 'Хуки (RU)',
+              text: 'React хуки (RU)',
               items: [
                 { text: 'Обзор хуков', link: '/react/hooks/' },
                 { text: 'useReactiveSubscription', link: '/react/hooks/useReactiveSubscription' },

@@ -10,4 +10,8 @@ features:
     title: React hooks
     details: Универсальные хуки.
     link: /react/hooks
+  - icon: 🧪
+    title: Examples
+    details: Все примеры.
+    link: /examples
 ---

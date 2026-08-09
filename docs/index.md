@@ -9,16 +9,13 @@ hero:
   actions:
     - theme: brand
       text: React
-      link: /guides/quick-start/react
+      link: /react
     - theme: alt
       text: Описание
       link: /guides
     - theme: alt
       text: Декраторы
       link: /decorators
-    - theme: alt
-      text: Хуки
-      link: /react/hooks
     - theme: alt
       text: Примеры и сущности
       link: /examples
