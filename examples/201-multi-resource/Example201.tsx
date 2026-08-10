@@ -10,7 +10,7 @@ export const Example201 = () => {
   const _userInfo = useUserInfoService()
   const personList = useR(_userInfo.personList)
   const activePersonId = useR(_userInfo.activePersonId)
-  const apiState = useR(_userInfo.apiState)
+  const firstlyState = useR(_userInfo.apiState)
 
   const _secondaryService = useSecondaryService()
   const secondaryApiState = useR(_secondaryService.apiState)
@@ -25,9 +25,9 @@ export const Example201 = () => {
     >
       <div
         className={baseClasses.absoluteUnitLabel}
-        title='Chain of Resources & observer'
+        title='Chain of Resources'
       >
-        Chain of Resources & observer
+        Chain of Resources
       </div>
       <code>{BASE_API_URL}</code>
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -56,8 +56,8 @@ export const Example201 = () => {
       </div>
       <div className={baseClasses.unitInternalWrapper}>
         <div className={baseClasses.stack2}>
-          <div>{apiState.loading ? '🟡 loading...' : !!apiState.data ? '🟢 ok' : !!apiState.error ? `🔴 err | ${apiState.error?.message || 'No error msg'}` : '⚪'}</div>
-          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data: apiState.data }, null, 2)}</pre>
+          <div>{firstlyState.loading ? '🟡 loading...' : !!firstlyState.data ? '🟢 ok' : !!firstlyState.error ? `🔴 err | ${firstlyState.error?.message || 'No error msg'}` : '⚪'}</div>
+          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data: firstlyState.data }, null, 2)}</pre>
         </div>
         <div className={baseClasses.stack2}>
           <div>{secondaryApiState.loading ? '🟡 loading...' : !!secondaryApiState.data ? '🟢 ok' : !!secondaryApiState.error ? `🔴 err | ${secondaryApiState.error?.message || 'No error msg'}` : '⚪'}</div>

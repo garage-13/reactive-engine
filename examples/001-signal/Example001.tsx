@@ -12,7 +12,13 @@ class Logic extends AbstractService {
   }
 }
 
-const engine = new ReactiveEngine()
+const engine = new ReactiveEngine({
+  logger: {
+    isEnabled: true, // Включаем логгер
+    traceTime: true, // Добавляем вывод таймингов по желанию
+    filter: /^angular:|^react:|^example:|^example-.*:signal:.*/ // Можно фильтровать только нужные логи
+  }
+})
 
 export const Example001 = () => {
   const logic = engine.inject(Logic)

@@ -1,72 +1,149 @@
-# Хук `useReactiveSubscription`
+# 🪝 Хук `useReactiveSubscription`
 
-Универсальный хук для подписки на изменения Signal, Computed или Resource.
+Универсальный хук React для организации **побочных эффектов**, реагирующих на изменения элементов реактивного графа (`Signal`, `Computed` или `Resource`) без принудительного рендеринга самого компонента.
 
-## Базовые примеры
+---
 
-### Пример создания реактивного объекта
-```js
-import React from 'react'
-import { useReactiveSubscription } from '@pravosleva/reactive-engine'
-import { ReactiveEngine } from './src/ReactiveEngine'
+## 💡 В чём отличие от `engine.use()` / `useReactiveValue()`?
 
-const PersonInfo = () => {
-  const engine = new ReactiveEngine();
-  const person = engine.reactive({ name: 'John', age: 30 })
+* **`engine.use(signal)`** — Подписывает компонент на изменения и **принудительно перерисовывает UI** (`triggerRef`), возвращая свежее значение в JSX-шаблон.
+* **`useReactiveSubscription(signal, callback)`** — Пассивно слушает изменения элемента. При срабатывании тика выполняется исключительно ваш изолированный `callback`. Компонент React при этом **НЕ заходит на повторный рендер**, что обеспечивает колоссальный буст производительности для фоновых операций.
 
-  // Подписываемся на изменения объекта
-  Object.keys(person).forEach(prop => {
-    useReactiveSubscription(engine.effect(() => {
-      console.log(`${prop} изменилось на ${person[prop]}`)
-    }), () => {})
-  })
+---
+
+## 🛠️ Примеры использования
+
+### 1. Фоновое логирование аналитики (Интеграция с `Computed`)
+
+Представьте сценарий: пользователь водит мышкой внутри зоны, сырые координаты троттлятся на этапе вычислений с помощью `withThrottleComputed`. Вам нужно отправлять данные в Яндекс.Метрику или Google Analytics при смене сектора экрана, но сам компонент React не должен перерисовываться ради фонового логирования.
+
+#### Код сервиса (`store.ts`)
+```typescript
+import { AbstractService, withThrottleComputed } from '@pravosleva/reactive-engine';
+
+export class AnalyticsService extends AbstractService {
+  public rawCoords = this.engine.signal({ x: 0, y: 0 }, 'analytics:coords:raw');
+
+  // Закомпутенный сигнал, определяющий текущую рабочую зону
+  public currentSector = withThrottleComputed(
+    this.engine,
+    () => (this.rawCoords.value.x < 300 ? 'Левый сектор' : 'Правый сектор'),
+    { limit: 500 },
+    'analytics:computed:sector'
+  );
+
+  public updateMouse(x: number, y: number) {
+    this.rawCoords.value = { x, y };
+  }
+}
+```
+
+#### Код компонента React
+```tsx
+import { useEffect } from 'react';
+import { ReactiveEngine, useReactiveSubscription } from '@pravosleva/reactive-engine/react';
+import { AnalyticsService } from './store';
+
+const engine = new ReactiveEngine({ logger: { isEnabled: true } });
+
+export const AnalyticsTracker = () => {
+  const service = engine.inject(AnalyticsService);
+
+  // NOTE: ПАССИВНАЯ ПОДПИСКА НА COMPUTED:
+  // При смене сектора (раз в 500мс) сработает этот коллбэк.
+  // Компонент AnalyticsTracker выполнит отправку на сервер,
+  // но сам НЕ зайдет на повторный рендер! UI остается максимально легким.
+  useReactiveSubscription(service.currentSector, (sector) => {
+    console.log(`[GA] Отправка аналитики: Пользователь перешел в ${sector}`);
+    // fakeApi.sendMetrics({ target: sector });
+  });
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    service.updateMouse(e.clientX, e.clientY);
+  };
+
+  return (
+    <div onMouseMove={handleMouseMove}>
+      <span>Зона отслеживания движений (Двигайте мышь)</span>
+    </div>
+  );
+};
+```
+
+---
+
+### 2. Всплывающие уведомления (Интеграция с `Resource`)
+
+Сценарий: в приложении выполняется асинхронный запрос на загрузку профиля чата или отправку сообщения. Нам необходимо отловить момент сбоя сети (`error`) или успешного завершения операции (`data`), чтобы показать пользователю всплывающий тост (Toast/Notification). Использование обычного `useEffect` привело бы к рассинхронизации фаз из-за асинхронного характера сети, а `useReactiveSubscription` отработает синхронно на финише микрозадачи.
+
+#### Код сервиса (`chat.service.ts`)
+```ts
+import { AbstractService } from '@pravosleva/reactive-engine';
+
+export class ChatService extends AbstractService {
+  public activeChatId = this.engine.signal<string | null>(null, 'chat:id');
+
+  // Асинхронный ресурс загрузки сообщений
+  public messagesResource = this.engine.resource(
+    async (chatId) => {
+      if (!chatId) return [];
+      const response = await fetch(`/api/chats/${chatId}/messages`);
+      if (!response.ok) throw new Error(`Ошибка сервера: ${response.status}`);
+      return response.json();
+    },
+    this.activeChatId,
+    'chat:resource:messages'
+  );
+
+  public selectChat(id: string) {
+    this.activeChatId.value = id;
+  }
+}
+```
+
+#### Код компонента React
+```tsx
+import { ReactiveEngine, useReactiveSubscription } from '@pravosleva/reactive-engine/react';
+import { ChatService } from './chat.service';
+import { toast } from 'your-favorite-toast-library'; // Фейковая библиотека тостов
+
+const engine = new ReactiveEngine({ logger: { isEnabled: true } });
+
+export const ChatNotificationsBridge = () => {
+  const chatService = engine.inject(ChatService);
+
+  // NOTE: СИНХРOННАЯ ПОДПИСКА НА СОСТОЯНИЕ РЕСУРСА (API STATE):
+  // Коллбэк получает объект ResourceState { data, loading, error, isRetrying }
+  // в тот самый миг, когда автомат состояний ресурса переходит в новую фазу.
+  useReactiveSubscription(chatService.messagesResource, (state) => {
+    // А. Перехватываем статус ошибки сети
+    if (state.error) {
+      toast.error(`Не удалось загрузить сообщения: ${state.error.message}`);
+    }
+
+    // Б. Перехватываем успешное завершение асинхронной операции
+    if (!state.loading && state.data && (state.data as any[]).length > 0) {
+      toast.success(`Чат успешно обновлен! Загружено сообщений: ${(state.data as any[]).length}`);
+    }
+  });
 
   return (
     <div>
-      <p>Имя: {person.name}</p>
-      <input type="text" value={person.name} onChange={(e) => person.name = e.target.value} />
-      <p>Возраст: {person.age}</p>
-      <input type="number" value={person.age} onChange={(e) => person.age = Number(e.target.value)} />
-    </div>
-  )
-}
-
-export default PersonInfo
-```
-
-### Использование хука `useReactiveSubscription` для управления подписками
-Этот хук используется, когда вам нужно отреагировать на изменение сигнала (например, вызвать уведомление или отправить метрику), но не нужно перерисовывать сам компонент.
-```tsx
-import React from 'react'
-import { counterSignal, doubleComputed } from './your-signals'
-import { useReactiveSubscription } from '@pravosleva/reactive-engine'
-
-export const LoggerComponent = () => {
-  // Подписываемся на обычный Signal
-  useReactiveSubscription(counterSignal, (value) => {
-    console.log(`Сигнал изменился! Новое значение: ${value}`)
-  })
-
-  // Хук универсален — он так же легко принимает Computed
-  useReactiveSubscription(doubleComputed, (value) => {
-    console.warn(`Вычисляемое значение теперь: ${value}`)
-  })
-
-  return (
-    <div style={{ border: '1px solid gray', padding: '10px' }}>
-      <h3>Компонент-логгер (не перерисовывается при клике)</h3>
-      <button onClick={() => counterSignal.value++}>
-        Увеличить счетчик
+      <button onClick={() => chatService.selectChat('room-42')}>
+        Открыть комнату №42
+      </button>
+      <button onClick={() => chatService.selectChat('corrupted-room-999')}>
+        Открыть сломанную комнату
       </button>
     </div>
-  )
-}
-
+  );
+};
 ```
 
-## Итоги тестирования
+---
 
-Тесты для хука `useReactiveSubscription` проверяют две важные вещи: правильный вызов коллбека при изменении сигнала и отсутствие лишних переподписок, если ссылка на коллбек обновилась (благодаря использованию `useRef`).
-### 🔍 Что важного в этих тестах?
-1. Использование `act()`: Все вызовы, которые приводят к изменению состояния или вызовам эффектов в среде тестирования React, оборачиваются в `act`.
-2. Проверка `rerender()`: С помощью этой функции мы эмулируем поведение, когда родительский компонент обновляется и прокидывает в хук новые инстансы функций или объектов. Это гарантирует, что оптимизация через `useRef` в коде вашего хука написана без багов.
+## 💎 Главные архитектурные преимущества
+
+1. **Гарантия отсутствия Tearing (Защита `useLayoutEffect`):** Внутренний механизм хука завязан на синхронный жизненный цикл до отрисовки кадров. Это гарантирует, что даже если данные из WebSocket или сети прилетят в микросекундный промежуток между рендером и Paint-фазой, ваш коллбэк **не пропустит ни одного асинхронного тика**.
+2. **Мгновенный Unmount в StrictMode:** В режиме разработки React StrictMode намеренно монтирует и размонтирует компоненты за долю секунды. Наш хук мгновенно вызывает деструктор отписки ядра, полностью исключая накопление паразитных «зомби-эффектов» и утечки оперативной памяти.
+3. **Безупречное логирование:** В логах вашего `ReactiveEngine` при срабатывании коллбэка этот подписчик отобразится под понятным системным именем фреймворка: `react:use:your-signal-name`, делая дерево реактивного графа прозрачным для анализа.

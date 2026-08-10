@@ -4,7 +4,13 @@ import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/re
 import { MapLogic } from './service.MapLogic'
 import clsx from 'clsx'
 
-const engine = new ReactiveEngine()
+const engine = new ReactiveEngine({
+  logger: {
+    isEnabled: true, // Включаем логгер
+    traceTime: true, // Добавляем вывод таймингов по желанию
+    filter: /^example-*/ // Можно фильтровать только нужные логи
+  }
+})
 
 export const MapExample = () => {
   // Инжектируем сервис логики, который управляет Leaflet и реактивным состоянием

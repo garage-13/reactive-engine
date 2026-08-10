@@ -21,7 +21,7 @@ class MapLogic extends AbstractService {
   // Стартовый bbox для Крыма (как в вашем curl-примере)
   public bbox = this.engine.signal<string>(
     '44.2097,33.2144,45.8785,34.9832',
-    'map:signal:bbox'
+    'example-204:map:signal:bbox'
   )
 
   // Ресурс автоматически реагирует на изменение bbox
@@ -42,7 +42,7 @@ class MapLogic extends AbstractService {
     },
     this.bbox,
     {
-      name: 'map:resource:fetch-stations',
+      name: 'example-204:map:resource:fetch-stations',
       validateBeforeFetch: (bboxValue) => !!bboxValue,
     }
   )
@@ -52,7 +52,13 @@ class MapLogic extends AbstractService {
   }
 }
 
-const engine = new ReactiveEngine()
+const engine = new ReactiveEngine({
+  logger: {
+    isEnabled: true, // Включаем логгер
+    traceTime: true, // Добавляем вывод таймингов по желанию
+    filter: /^example-*/ // Можно фильтровать только нужные логи
+  }
+})
 
 export const MapExample = () => {
   const logic = engine.inject(MapLogic)

@@ -55,6 +55,8 @@ export default defineConfig({
                 { text: 'Обзор', link: '/decorators/' },
                 { text: 'withCache', link: '/decorators/withCache' },
                 { text: 'withDebounce', link: '/decorators/withDebounce' },
+                { text: 'withThrottle', link: '/decorators/withThrottle' },
+                { text: 'withThrottleComputed', link: '/decorators/withThrottleComputed' },
                 { text: 'withThrottleAndCache', link: '/decorators/withThrottleAndCache' },
                 { text: 'withLongPolling', link: '/decorators/withLongPolling' }
               ]

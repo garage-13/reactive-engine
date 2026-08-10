@@ -59,7 +59,8 @@ export class UserInfoService extends AbstractService {
       );
       return res.json();
     },
-    this.counter
+    this.counter,
+    'example-201:resource:profileSearch'
   )
 
   public inc = () => {

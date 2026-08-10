@@ -12,6 +12,8 @@ export interface AngularUseOptions {
 }
 
 export class ReactiveEngine4Angular extends OriginalReactiveEngine {
+  protected override frameworkPrefix = 'angular';
+
   /**
    * Использование реактивного значения в Angular компоненте или сервисе.
    * Возвращает стандартный Angular Signal.
@@ -24,8 +26,11 @@ export class ReactiveEngine4Angular extends OriginalReactiveEngine {
     const angularSignal = signal<T>(item.value);
 
     // 2. Подписываемся на изменения сигнала вашего ядра
-    const unsubscribe = item.subscribe((newValue) => {
-      angularSignal.set(newValue); // Обновляем значение внутри Angular
+    const unsubscribe = item.subscribe(() => {
+      // Принудительно дергаем геттер .value, чтобы запустить Pull-вычисление ядра
+      // и получить свежие данные, попутно запустив профайлер логгера computed!
+      const freshValue = item.value;
+      angularSignal.set(freshValue);
     });
 
     // 3. Логика автоматической отписки через DestroyRef

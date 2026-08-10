@@ -15,7 +15,7 @@ export interface Station {
 }
 
 export class MapLogic extends AbstractService {
-  public bbox = this.createSignal<string>('44.2097,33.2144,45.8785,34.9832', 'map:signal:bbox')
+  public bbox = this.createSignal<string>('44.2097,33.2144,45.8785,34.9832', 'example-205:map:signal:bbox')
 
   public stationsResource = this.engine.resource(
     async (bboxValue, abortSignal) => {
@@ -32,7 +32,7 @@ export class MapLogic extends AbstractService {
     },
     this.bbox,
     {
-      name: 'map:resource:fetch-stations',
+      name: 'example-205:map:resource:fetch-stations',
       validateBeforeFetch: (bboxValue) => !!bboxValue,
     }
   )
@@ -71,7 +71,7 @@ export class MapLogic extends AbstractService {
       this.effectCleanup = this.engine.effect(() => {
         const stations = this.stationsResource.data
         this.renderMarkers(stations)
-      }, 'map:effect:sync-markers')
+      }, 'example-205:map:effect:sync-markers')
     } else {
       // Если эффект уже был создан ранее, просто принудительно синхронизируем текущее состояние
       this.renderMarkers(this.stationsResource.data)

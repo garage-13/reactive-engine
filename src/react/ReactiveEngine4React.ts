@@ -6,6 +6,8 @@ import { ReactiveEngine as OriginalReactiveEngine, CleanupFn } from '../core/cor
  * Наследует функциональность оригинального реактивного движка и предоставляет специализированные методы для работы с React.
  */
 export class ReactiveEngine4React extends OriginalReactiveEngine {
+  protected override frameworkPrefix = 'react';
+
   // Описываем строгие типы для адаптеров React, чтобы не ломать встроенные типы React.
   private reactAdapters: {
     useState: typeof useStateFromReact;

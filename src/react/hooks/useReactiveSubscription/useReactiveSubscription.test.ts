@@ -26,7 +26,7 @@ describe('useReactiveSubscription', () => {
   it('должен успешно подписываться на сигнал при монтировании', () => {
     const callback = vi.fn()
 
-    // Рендерим хук
+    // Рендерим хук (useLayoutEffect сработает синхронно благодаря окружению тестирования)
     renderHook(() => useReactiveSubscription(mockSignal, callback))
 
     // Проверяем, что метод subscribe у сигнала был вызван ровно 1 раз
@@ -76,10 +76,16 @@ describe('useReactiveSubscription', () => {
 
   it('должен отписываться от старого сигнала, если передан совершенно другой объект сигнала', () => {
     const callback = vi.fn()
+    const subscribers2 = new Set<(val: number) => void>()
 
     const mockSignal2 = {
       value: 100,
-      subscribe: vi.fn(() => () => { })
+      subscribe: vi.fn((cb: (val: number) => void) => {
+        subscribers2.add(cb)
+        return () => {
+          subscribers2.delete(cb)
+        }
+      })
     }
 
     const { rerender } = renderHook(
@@ -96,6 +102,7 @@ describe('useReactiveSubscription', () => {
     expect(subscribers.size).toBe(0)
     // На второй сигнал должна успешно сформироваться новая подписка
     expect(mockSignal2.subscribe).toHaveBeenCalledTimes(1)
+    expect(subscribers2.size).toBe(1)
   });
 
   it('должен вызывать деструктор подписки при размонтировании (unmount) компонента', () => {

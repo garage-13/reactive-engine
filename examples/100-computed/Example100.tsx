@@ -8,24 +8,31 @@ class Logic extends AbstractService {
   public counter = this.engine.signal<number>(0, 'example-100:signal:counter');
   public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-100:computed:counter');
 
-  public inc() {
+  public inc = () => {
     this.counter.value += 1
   }
 }
 
-const engine = new ReactiveEngine()
+const engine = new ReactiveEngine({
+  logger: {
+    isEnabled: true, // Включаем логгер
+    traceTime: true, // Добавляем вывод таймингов по желанию
+    filter: /^example-*/ // Можно фильтровать только нужные логи
+  }
+})
 
 export const Example100 = () => {
   const logic = engine.inject(Logic)
   const counter = engine.use(logic.counter)
+  const doubledCounter = engine.use(logic.doubledCounter)
 
   return (
     <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
       <div className={baseClasses.absoluteUnitLabel}>Computed</div>
-      <code>{counter} | x2 = {logic.doubledCounter.value}</code>
+      <code>{counter} | x2 = {doubledCounter}</code>
       <div className={baseClasses.catSection}>
         <button
-          onClick={() => logic.inc()}
+          onClick={logic.inc}
           className={clsx(btnClasses.neonBtn, btnClasses['neonBtn--primary'], btnClasses['neonBtn--outlined'])}
         >INC</button>
       </div>

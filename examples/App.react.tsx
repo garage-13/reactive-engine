@@ -11,6 +11,7 @@ import { Phaser2DExample as Example104 } from './104-computed-phaserjs'
 import { Kaboom2DExample as Example105 } from './105-computed-kaboomjs'
 import { HistoryStateExample as Example106 } from './106-computed-history-state'
 import { MultiStepFormExample as Example107 } from './107-multistep-logic-di-undo-cache'
+import { Example109 } from './109-computed-batching'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
 import { Example202 } from './202-resource-exponential-backoff'
@@ -23,7 +24,7 @@ import { MapExample as Example208 } from './208-resource-gdebenz-yandexmaps'
 import { MapExample as Example209 } from './209-resource-gdebenz-googlemaps'
 import { MapExample as Example210 } from './210-resource-gdebenz-mapbox'
 import { SearchExample as Example211 } from './211-resource-withDebounce'
-import { Throttle2DExample as Example212 } from './212-resource-withThrottle'
+import { Throttle2DExample as Example212 } from './212-resource-withThrottleComputed'
 import { ThrottleCacheExample as Example213 } from './213-resource-withThrottleAndCache'
 // import { LiveNotificationsExample as Example214 } from './214-long-polling-as-while'
 import { LiveNotificationsExample as Example215 } from './215-resource-withLongPolling'
@@ -101,6 +102,13 @@ export const App = () => {
           >
             <Example107 />
           </CardModalWrapper>
+
+          <CardModalWrapper
+            title='Example 109'
+            description='Microtask Cluster Show (Example 109)'
+          >
+            <Example109 />
+          </CardModalWrapper>
         </div>
       </div>
 
@@ -116,7 +124,7 @@ export const App = () => {
           <CardModalWrapper
             title='Example 201'
             footerText='Account data request for person list 👉 Person id should be selected 👉 Person data request'
-            description='Multi resource chaining example & observer hoc MobX like'
+            description='Multi resource chaining example'
             useTwoColumns
           >
             <Example201 />
@@ -185,7 +193,7 @@ export const App = () => {
           </CardModalWrapper>
           <CardModalWrapper
             title='Example 212'
-            description='withThrottle decorator'
+            description='withThrottleComputed decorator'
           >
             <Example212 />
           </CardModalWrapper>

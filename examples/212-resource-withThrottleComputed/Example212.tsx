@@ -4,13 +4,22 @@ import { Throttle2DLogic } from './service.Throttle2DLogic'
 import baseClasses from '~/ui.common.module.scss'
 import clsx from 'clsx'
 
-const engine = new ReactiveEngine()
+const engine = new ReactiveEngine({
+  logger: {
+    isEnabled: true, // Включаем логгер
+    traceTime: true, // Добавляем вывод таймингов по желанию
+    filter: /^example-212:*/ // Можно фильтровать только нужные логи
+  }
+})
 
 export const Throttle2DExample = () => {
   const logic = engine.inject(Throttle2DLogic)
 
   // Подписываемся на сырой сигнал координат и обработанный ресурс аналитики
-  const coords = engine.use(logic.coordsSignal)
+  // -- Будьте внимательны: Оцените разницу на что подписаться!
+  // ⛔ const coords = engine.use(logic.coordsSignal)
+  const coords = engine.use(logic.throttledCoords)
+  // --
   const { loading, data: analyticsResult } = useReactiveValue(logic.analyticsResource)
 
   // Перехват движения мыши внутри зоны
@@ -28,7 +37,7 @@ export const Throttle2DExample = () => {
       className={clsx(baseClasses.unit, baseClasses.stack2)}
       style={{ fontFamily: 'system-ui', width: '600px' }}
     >
-      <div className={baseClasses.absoluteUnitLabel}>Simple Throttle Mouse Tracking Demo</div>
+      <div className={baseClasses.absoluteUnitLabel}>Throttle Computed Mouse Tracking Demo</div>
 
       <div className={baseClasses.stack1}>
         {/* Индикаторы текущего состояния */}
