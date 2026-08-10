@@ -20,7 +20,7 @@ features:
     link: /decorators/withThrottle
   - icon: ⏳
     title: withThrottleComputed
-    details: Применяется в сценариях с высокой частотой генерации событий, когда нам важен непрерывный процесс изменений в динамике, но с жестким ограничением максимальной частоты вызовов.
+    details: Применяется на входе в реактивный граф для изоляции сырого спама данных.
     link: /decorators/withThrottleComputed
   - icon: ⏳
     title: withThrottleAndCache
