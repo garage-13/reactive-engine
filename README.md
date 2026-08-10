@@ -117,7 +117,7 @@ const counter = engine.use(logic.counter)
 </template>
 ```
 
-## Angular
+## Angular 16+
 
 ```ts
 import { Component } from '@angular/core'
