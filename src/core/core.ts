@@ -283,7 +283,7 @@ export class ReactiveEngine {
         // Переключаем текст под-бэджа, если это внутренний сигнал computed
         const typeLabel = isInternal ? 'COMPUTED_INTERNAL' : 'SIGNAL';
 
-        subBadgeText = ` | 🔄 Изменений ${isInternal ? 'кэша' : 'сигнала'}: ${currentCount}${isNoisy ? ' ⚠️ (high noise — обнаружен дребезг/спам значений!)' : ''
+        subBadgeText = ` 🔄 Изменений ${isInternal ? 'кэша' : 'сигнала'}: ${currentCount}${isNoisy ? ' ⚠️ (high noise — обнаружен дребезг/спам значений!)' : ''
           }`;
 
         if (isNoisy) {
@@ -324,7 +324,7 @@ export class ReactiveEngine {
             ? '{...}' // Для объектов выводим заглушку, защищая геттеры от JSON.stringify
             : String(rawValue);
 
-          subBadgeText = ` | 🧮 Значение: ${displayValue}`;
+          subBadgeText = ` 🧮 Значение: ${displayValue}`;
         } else if (currentDetail && 'duration' in currentDetail) {
           // Ваша стандартная рабочая логика тренда для оригинального события computed
           const currentDuration = parseFloat(currentDetail.duration);
@@ -334,17 +334,17 @@ export class ReactiveEngine {
               const diff = currentDuration - lastDuration;
               const percentChange = (diff / lastDuration) * 100;
               if (percentChange > 5) {
-                subBadgeText = ` | 🔴 Замедление: +${percentChange.toFixed(1)}% (${currentDetail.duration})`;
+                subBadgeText = ` 🔴 Замедление: +${percentChange.toFixed(1)}% (${currentDetail.duration})`;
                 subBadgeStyle = 'color: #e01e5a; font-weight: bold;';
               } else if (percentChange < -5) {
-                subBadgeText = ` | 🟢 Ускорение: ${percentChange.toFixed(1)}% (${currentDetail.duration})`;
+                subBadgeText = ` 🟢 Ускорение: ${percentChange.toFixed(1)}% (${currentDetail.duration})`;
                 subBadgeStyle = 'color: #42b883; font-weight: bold;';
               } else {
-                subBadgeText = ` | 🟢 Стабильно (${currentDetail.duration})`;
-                subBadgeStyle = 'color: #42b883; font-weight: normal;';
+                subBadgeText = ` 🟢 Стабильно (${currentDetail.duration})`;
+                subBadgeStyle = 'color: #42b883; font-weight: bold;';
               }
             } else {
-              subBadgeText = ` | ⚪ Первый расчет (${currentDetail.duration})`;
+              subBadgeText = ` ⚪ Первый расчет (${currentDetail.duration})`;
             }
             this.lastComputedDurations.set(name, currentDuration);
           }
@@ -355,13 +355,13 @@ export class ReactiveEngine {
         const currentCount = (this.effectExecutionCounts.get(name) || 0) + 1;
         this.effectExecutionCounts.set(name, currentCount);
         const isOverTriggered = currentCount > 30;
-        subBadgeText = ` | 🚀 Вызовов эффекта: ${currentCount}${isOverTriggered ? ' ⚠️ (heavy re-renders)' : ''}`;
+        subBadgeText = ` 🚀 Вызовов эффекта: ${currentCount}${isOverTriggered ? ' ⚠️ (heavy re-renders)' : ''}`;
         if (isOverTriggered) subBadgeStyle = 'color: #ff4a4a; font-weight: bold;';
         break;
       }
       case 'batch': {
         this.batchTickCounts += 1;
-        subBadgeText = ` | 📦 Номер транзакции: #${this.batchTickCounts}`;
+        subBadgeText = ` 📦 Номер транзакции: #${this.batchTickCounts}`;
         break;
       }
       case 'resource': {
@@ -369,10 +369,10 @@ export class ReactiveEngine {
 
         // Формируем динамический статус-маркер для заголовка
         if (resourceDetail.loading) {
-          subBadgeText = ' | ⏳ ЗАГРУЗКА (fetching...)';
+          subBadgeText = ' ⏳ ЗАГРУЗКА (fetching...)';
           subBadgeStyle = 'color: #d97706; font-weight: bold;'; // Оранжевый
         } else if (resourceDetail.error) {
-          subBadgeText = ` | 🔴 ОШИБКА: ${resourceDetail.error.message || 'Unknown Error'}`;
+          subBadgeText = ` 🔴 ОШИБКА: ${resourceDetail.error.message || 'Unknown Error'}`;
           subBadgeStyle = 'color: #ff4a4a; font-weight: bold;'; // Красный
         } else {
           // Данные успешно загружены
@@ -381,7 +381,7 @@ export class ReactiveEngine {
             ? '{...}'
             : String(rawData);
 
-          subBadgeText = ` | 🟢 УСПЕХ (data: ${displayData})`;
+          subBadgeText = ` 🟢 УСПЕХ (data: ${displayData})`;
           subBadgeStyle = 'color: #42b883; font-weight: bold;'; // Зеленый
         }
         break;
@@ -491,19 +491,6 @@ export class ReactiveEngine {
    *
    * @function flushLogs
    * @returns {void} Метод не возвращает значения, а только очищает внутренний буфер `pendingLogQueue`.
-   *
-   * @example
-   * ```typescript
-   * // Внутри шедулера ядра при срабатывании queueMicrotask:
-   * queueMicrotask(() => {
-   *   engine.flushLogs(); // Выводит сгруппированные логи сигналов и computed
-   *
-   *   const effects = Array.from(engine.pendingEffects);
-   *   engine.pendingEffects.clear();
-   *   engine.isBatching = false;
-   *   effects.forEach(e => e.run()); // Запуск отрисовки UI
-   * });
-   * ```
    */
   public flushLogs(): void {
     if (!this.loggerOptions?.isEnabled || this.pendingLogQueue.length === 0) return
@@ -613,18 +600,23 @@ export class ReactiveEngine {
     return {
       get value(): T {
         if (engine.activeEffect) {
-          subscribers.add(engine.activeEffect)
+          const currentEffect = engine.activeEffect;
 
-          const currentEffect = engine.activeEffect
-          currentEffect.cleanups.add(() => {
-            subscribers.delete(currentEffect) // При уничтожении эффекта сигнал забудет его
-          })
+          // Защита от раздувания памяти!
+          // Добавляем функцию очистки в cleanups СТРОГО один раз — при первой регистрации эффекта.
+          if (!subscribers.has(currentEffect)) {
+            subscribers.add(currentEffect);
+
+            currentEffect.cleanups.add(() => {
+              subscribers.delete(currentEffect); // При уничтожении эффекта сигнал забудет его
+            });
+          }
         }
 
-        return val
+        return val;
       },
       set value(newValue: T) {
-        if (val === newValue) return
+        if (val === newValue) return;
 
         // ВАЛИДАЦИЯ В RUNTIME
         if (options.validate) {
@@ -632,13 +624,13 @@ export class ReactiveEngine {
           if (result === false || typeof result === 'string') {
             const errorMsg = typeof result === 'string'
               ? result
-              : `[Validation Error]: Некорректное значение для сигнала "${name}"`
+              : `[Validation Error]: Некорректное значение для сигнала "${name}"`;
 
             console.error(`%c${errorMsg}`, "color: orange; font-weight: bold;", {
               received: newValue,
               current: val
-            })
-            return // Прерываем обновление, если данные не валидны
+            });
+            return; // Прерываем обновление, если данные не валидны
           }
         }
 
@@ -646,75 +638,49 @@ export class ReactiveEngine {
         val = newValue;
         engine.onSignalChange?.(name, newValue, old);
 
-        // Logger integration: Накапливаем данные об изменении сигнала в фоновую очередь.
-        // Метод engine.queueLog мы добавим в базовый класс ReactiveEngine на следующем шаге.
+        // Извлекаем текстовые метки подписчиков для логгера
         const subscriberLabels = Array.from(subscribers).map(
           (e) => e.label || 'unnamed_effect'
-        )
-
-        // СБОР НАСТОЯЩЕГО СТЕКА: Снимаем слепок ошибки для получения стека вызовов.
-        // Мы делаем это только если логгер включен, чтобы не тратить ресурсы зря.
-        let callStack: string | undefined = undefined;
-        if (engine.loggerOptions?.isEnabled) {
-          callStack = new Error().stack;
-        }
-
+        );
         engine.queueLog?.('signal', name, {
           from: old,
           to: newValue,
           subscribersCount: subscribers.size,
-          subscribers: subscriberLabels, // Для вывода меток логов
-        })
+          subscribers: subscriberLabels,
+        });
 
         // 1. Всегда добавляем подписчиков в очередь отложенных эффектов
-        subscribers.forEach(e => engine.pendingEffects.add(e))
+        subscribers.forEach(e => engine.pendingEffects.add(e));
 
-        // 2. Если очередь еще не запущена, планируем её автоматическое выполнение в микрозадачу
-        // Возвращаем каноничный шедулер в сеттер signal:
-        // if (!engine.isBatching) {
-        //   engine.isBatching = true;
-        //   queueMicrotask(() => {
-        //     engine.flushLogs?.();
-        //     const effects = Array.from(engine.pendingEffects);
-        //     engine.pendingEffects.clear();
-        //     engine.isBatching = false;
-        //     effects.forEach(e => e.run());
-        //   });
-        // }
-        // 2. Если очередь еще не запущена, планируем её автоматическое выполнение в микрозадачу
+        // 2. Планируем автоматическое выполнение транзакции ВСЕГДА!
+        // Теперь микрозадача гарантированно выполнится и зачистит буфер flushLogs,
+        // даже если у сигнала было 0 подписчиков.
         if (!engine.isBatching) {
           engine.isBatching = true;
 
           queueMicrotask(() => {
-            // Динамический каскадный цикл.
-            // Вместо Array.from() мы перебираем Set-множество вживую.
-            // Если во время вызова e.run() в pendingEffects допишутся новые каскадные эффекты,
-            // этот цикл for...of нативно продолжит идти по ним, пока не исчерпает весь граф!
+            // Динамический каскадный цикл (Push-домино)
             for (const effectObj of engine.pendingEffects) {
-              engine.pendingEffects.delete(effectObj); // Удаляем элемент перед запуском, предотвращая зацикливание
+              engine.pendingEffects.delete(effectObj);
               effectObj.run();
             }
-
-            // Гасим флаг батчинга строго после того, как ВСЕ эффекты и их каскады завершились
+            // Гасим флаг батчинга строго после того, как ВСЕ эффекты завершились
             engine.isBatching = false;
-
-            // 🌟 Вызываем flushLogs на самом финише, когда вся транзакция полностью стабилизировалась!
+            // Вызываем flushLogs на самом финише, когда вся транзакция полностью стабилизировалась
             engine.flushLogs?.();
           });
         }
-
       },
       subscribe(cb: (val: T) => void) {
-        // Чистая и безопасная подписка для React:
-        // Мы вызываем cb, но НЕ передаем туда аргументы, чтобы не ломать useSyncExternalStore
+        // Чистая и безопасная подписка для React/Vue/Angular адаптеров
         return engine.effect(
           () => {
-            cb(this.value)
+            cb(this.value);
           },
           `${engine.frameworkPrefix}:use:${name}`
-        )
+        );
       }
-    }
+    };
   }
 
   /**
@@ -851,13 +817,53 @@ export class ReactiveEngine {
   }
 
   /**
-   * Создание реактивного объекта (Proxy).
-   * @template T
+   * Создает глубокий реактивный объект (Proxy) на основе переданного целевого объекта или массива.
+   *
+   * В отличие от атомарных сигналов (`signal`), требующих ручного обращения через `.value`,
+   * метод `reactive` позволяет работать со сложными разветвленными структурами данных нативно,
+   * используя стандартный синтаксис JavaScript для чтения и прямой мутации свойств.
+   *
+   * ### Архитектурные особенности рантайма:
+   * 1. **Гранулярность подписок (Property-level Subscriptions):** Зависимости графа ядра трекаются
+   *    не для всего объекта целиком, а строго для конкретных ключей (`prop`). Если эффект или
+   *    компонент читает свойство `user.name`, он подписывается исключительно на этот ключ.
+   *    Изменение свойства `user.age` не вызовет его повторного выполнения.
+   * 2. **Глубокое проксирование (Deep Reactivity):** При обращении к вложенным объектам или массивам,
+   *    метод динамически и лениво оборачивает их в Proxy-структуры, автоматически формируя
+   *    понятные строковые пути для подсистемы логирования (например, `user.meta.role`).
+   * 3. **Иммунизация кэша (Proxy Mirroring Cache):** Все созданные Proxy зеркалируются во внутреннем
+   *    реестре `proxyCache`. Повторный вызов метода для одного и того же объекта вернет
+   *    уже существующий Proxy, предотвращая утечки памяти и дублирование подписок.
+   *
+   * ### Применение в оптимизации больших форм:
+   * Идеально подходит для тяжелых интерфейсов (динамические таблицы, анкеты из сотен полей),
+   * так как прямая мутация конкретного инпута изолирует поток изменений и избавляет от необходимости
+   * иммутабельного копирования всего стейта формы через оператор расширения (`...spread`).
+   *
+   * @template T - Тип целевого объекта, расширяющий базовый интерфейс `object`.
    * @function reactive
-   * @param {T} target - Целевой объект для проксирования.
-   * @param {string} [name] - Имя проксируемого объекта.
-   * @returns {T} - Реактивный объект.
-   * @source
+   * @param {T} target - Исходный объект или массив JavaScript для проксирования.
+   * @param {string} [name='reactive'] - Уникальное базовое имя объекта для трассировки и фильтрации в логгере.
+   * @returns {T} Глубоко проксированный реактивный объект типа `T`.
+   *
+   * @example
+   * ```typescript
+   * // 1. Инициализация в сервисе бизнес-логики:
+   * public form = this.engine.reactive({
+   *   user: { name: 'Иван', age: 25 }
+   * }, 'profile-form');
+   *
+   * // 2. Прямая мутация в экшене (Proxy перехватит тик и запустит атомарный батчинг):
+   * public updateAge() {
+   *   this.form.user.age += 1; // Автоматический лог: SIGNAL [profile-form.user.age]
+   * }
+   *
+   * // 3. Мост подписки для UI-компонентов:
+   * public uiBridge = this.engine.computed(() => ({
+   *   name: this.form.user.name,
+   *   age: this.form.user.age
+   * }));
+   * ```
    */
   public reactive<T extends object>(target: T, name: string = 'reactive'): T {
     if (this.proxyCache.has(target)) {

@@ -8,7 +8,6 @@ const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 class Logic extends AbstractService {
   public counter = this.engine.signal<number>(0, 'example-202:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-202:computed:counter');
   public apiState = this.engine.resource(
     async (counterValue, abortSignal) => {
       const res = await fetch(
@@ -28,7 +27,7 @@ class Logic extends AbstractService {
     this.counter,
     {
       name: 'example-202:resource:exp-backoff-exp',
-      retryCount: 4,
+      retryCount: 3,
       retryDelay: 1000,
       isExponentialBackoffEnabled: true,
       maxRetryDelay: 10000,
@@ -46,7 +45,13 @@ class Logic extends AbstractService {
   }
 }
 
-const engine = new ReactiveEngine()
+const engine = new ReactiveEngine({
+  logger: {
+    isEnabled: true, // Включаем логгер
+    traceTime: true, // Добавляем вывод таймингов по желанию
+    filter: /^example-202:*/ // Можно фильтровать только нужные логи
+  }
+})
 
 export const Example202 = () => {
   const logic = engine.inject(Logic)

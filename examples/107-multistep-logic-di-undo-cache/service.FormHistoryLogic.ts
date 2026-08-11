@@ -17,15 +17,15 @@ export interface HistoryAction {
 
 const STORAGE_KEY = 'app:form-history-cache'
 
-export class FormHistoryService extends AbstractService {
+export class FormHistoryLogic extends AbstractService {
   // Сигнал для накопления логов синхронизации бэкенда
-  public serverLogs = this.createSignal<string[]>([], 'history:signal:logs')
+  public serverLogs = this.createSignal<string[]>([], 'example-107:history:signal:logs')
 
   // Стек для реализации отката (Undo)
   private undoStack: HistoryAction[] = []
 
   // Сигнал-триггер для асинхронного ресурса отправки данных
-  private syncTrigger = this.createSignal<HistoryAction | null>(null, 'history:signal:sync-trigger')
+  private syncTrigger = this.createSignal<HistoryAction | null>(null, 'example-107:history:signal:sync-trigger')
 
   /**
    * Реактивный ресурс фейковой отправки действий пользователя на сервер.
@@ -52,8 +52,8 @@ export class FormHistoryService extends AbstractService {
     },
     this.syncTrigger,
     {
-      name: 'history:resource:sync',
-      validateBeforeFetch: (action) => !!action
+      name: 'example-107:history:resource:sync',
+      validateBeforeFetch: (action) => !!action ? true : `Нечего отправлять (received: ${String(action)})`
     }
   )
 

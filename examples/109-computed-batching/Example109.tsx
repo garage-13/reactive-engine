@@ -56,7 +56,7 @@ export const Example109 = () => {
     <div className={clsx(baseClasses.unit, baseClasses.stack2)} style={{ width: '650px' }}>
       <div className={baseClasses.absoluteUnitLabel}>Microtask Cluster Show (Example 109)</div>
 
-      <div className={baseClasses.stack1} style={{ fontFamily: 'monospace', fontSize: '13px' }}>
+      <div className={baseClasses.stack1} style={{ fontFamily: 'system-ui' }}>
         <div>🔢 Базовый сигнал: <span style={{ color: '#00b4d8' }}>{count}</span></div>
         <div>➡️ Шаг A (count + 10): <span>{valA}</span></div>
         <div>➡️ Шаг B (stepA * 2): <span>{valB}</span></div>

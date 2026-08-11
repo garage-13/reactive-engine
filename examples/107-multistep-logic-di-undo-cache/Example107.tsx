@@ -6,7 +6,13 @@ import { MultiStepFormLogic } from './service.MultiStepFormLogic'
 import { Input } from '~/shared/Input'
 import clsx from 'clsx'
 
-const engine = new ReactiveEngine()
+const engine = new ReactiveEngine({
+  logger: {
+    isEnabled: true, // Включаем логгер
+    traceTime: true, // Добавляем вывод таймингов по желанию
+    filter: /^example-107:*/ // Можно фильтровать только нужные логи
+  }
+})
 
 export const MultiStepFormExample = () => {
   const logic = engine.inject(MultiStepFormLogic)
@@ -19,6 +25,10 @@ export const MultiStepFormExample = () => {
 
   // 2. ПОДПИСКИ НА ИНФРАСТРУКТУРУ И СЕРВЕРНЫЕ ЛОГИ ИЗ ДОЧЕРНЕГО СЕРВИСА
   const serverLogs = engine.use(logic.history.serverLogs)
+  // useReactiveSubscription(logic.history.serverLogs, (val) => {
+  //   console.log('serverLogs udated!')
+  //   console.log(val)
+  // })
   const { loading: isSyncing } = useReactiveValue(logic.history.syncResource)
 
   // 3. ПОДПИСКИ НА COMPUTED ВАЛИДАТОРЫ

@@ -21,10 +21,7 @@ export class UserInfoService extends AbstractService {
   // --
 
   public counter = this.engine.signal<number>(0, 'example-201:UserInfoService:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-201:UserInfoService:computed:counter');
-
   public activePersonId = this.engine.signal<string | null>(null)
-
   public setActivePersonId = (val: string) => this.activePersonId.value = val
   private resetActivePersonId = () => this.activePersonId.value = null
 

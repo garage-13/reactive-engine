@@ -1,5 +1,5 @@
 import { AbstractService } from '@pravosleva/reactive-engine'
-import { FormHistoryService, FormStateSnapshot } from './service.FormHistoryService'
+import { FormHistoryLogic, FormStateSnapshot } from './service.FormHistoryLogic'
 
 const INITIAL_DEFAULT_STATE: FormStateSnapshot = {
   step: 1,
@@ -12,13 +12,13 @@ const INITIAL_DEFAULT_STATE: FormStateSnapshot = {
 
 export class MultiStepFormLogic extends AbstractService {
   /** Внедренный сервис истории через DI движка */
-  public history = this.engine.inject(FormHistoryService)
+  public history = this.engine.inject(FormHistoryLogic)
 
   // Базовые сигналы состояния формы (восстанавливаются из кэша истории)
-  public step = this.createSignal<number>(1, 'form:signal:step')
-  public username = this.createSignal<string>('', 'form:signal:username')
-  public email = this.createSignal<string>('', 'form:signal:email')
-  public agreeToTerms = this.createSignal<boolean>(false, 'form:signal:agree')
+  public step = this.createSignal<number>(1, 'example-107:form:signal:step')
+  public username = this.createSignal<string>('', 'example-107:form:signal:username')
+  public email = this.createSignal<string>('', 'example-107:form:signal:email')
+  public agreeToTerms = this.createSignal<boolean>(false, 'example-107:form:signal:agree')
 
   // Флаг блокировки записи в историю во время наката операции Undo
   private isApplyingHistory = false

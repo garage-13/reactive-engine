@@ -8,7 +8,6 @@ const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 class Logic extends AbstractService {
   public counter = this.engine.signal<number>(0, 'example-200:signal:counter');
-  public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-200:computed:counter');
   public apiState = this.engine.resource(
     async (counterValue, abortSignal) => {
       if (counterValue === 0)
@@ -39,7 +38,13 @@ class Logic extends AbstractService {
   }
 }
 
-const engine = new ReactiveEngine()
+const engine = new ReactiveEngine({
+  logger: {
+    isEnabled: true, // Включаем логгер
+    traceTime: true, // Добавляем вывод таймингов по желанию
+    filter: /^example-200:*/ // Можно фильтровать только нужные логи
+  }
+})
 
 export const Example200 = () => {
   const logic = engine.inject(Logic)

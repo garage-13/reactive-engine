@@ -12,6 +12,7 @@ import { Kaboom2DExample as Example105 } from './105-computed-kaboomjs'
 import { HistoryStateExample as Example106 } from './106-computed-history-state'
 import { MultiStepFormExample as Example107 } from './107-multistep-logic-di-undo-cache'
 import { Example109 } from './109-computed-batching'
+import { Example111 } from './111-reactive'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
 import { Example202 } from './202-resource-exponential-backoff'
@@ -102,12 +103,17 @@ export const App = () => {
           >
             <Example107 />
           </CardModalWrapper>
-
           <CardModalWrapper
             title='Example 109'
-            description='Microtask Cluster Show (Example 109)'
+            description='Microtask Cluster Show'
           >
             <Example109 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 111'
+            description='Reactive Proxy Object (for React only)'
+          >
+            <Example111 />
           </CardModalWrapper>
         </div>
       </div>
@@ -132,7 +138,7 @@ export const App = () => {
           <CardModalWrapper
             title='Example 202'
             description='Resource exponential backoff example (incorrect url)'
-            footerText='Incorrect url 👉 Retry x4 👉 HTTP error 404'
+            footerText='Incorrect url 👉 Retry x3 👉 HTTP error 404'
           >
             <Example202 />
           </CardModalWrapper>
