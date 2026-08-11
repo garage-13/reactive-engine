@@ -7,16 +7,8 @@ export class Throttle2DLogic extends AbstractService {
   // 1. Сырой сигнал мыши (спамит на каждый пиксель)
   public rawCoords = this.engine.signal({ x: 0, y: 0 }, 'example-212:signal:raw-coords');
 
-  // 2. Вычисляемый затроттленный сигнал (тикает строго 1 раз в 300мс)
-  public throttledCoords = withThrottleComputed(
-    this.engine,
-    () => this.coordsSignal.value,
-    { limit: 300 },
-    '[IS_OPTIMIZED=1]:example-212:computed:throttled-coords'
-  )
-
   /**
-   * 3.1 🚫 Альтернативный рабочий вариант
+   * 2.1 🚫 Альтернативный вариант (он тоже будет работать)
    * ☝️ НО НЕ для этого случая, когда оригинальный синал генерирует сотни изменений в секунду (спам),
    * т.к. чтение сырого сигнала требует неоправдано больше ресурсов для этого случая.
    * Реактивный ресурс, обёрнутый в декоратор withThrottle.
@@ -38,9 +30,16 @@ export class Throttle2DLogic extends AbstractService {
   // )
 
   /**
-   * 3.2 ✅ Ресурс слушает уже ЗАТРOТТЛЕННЫЙ сигнал.
+   * 2.2 ✅ Ресурс слушает уже ЗАТРOТТЛЕННЫЙ сигнал.
    * Он перейдет в статус loading ровно 1 раз в 300мс! Счетчик изменений будет равен 1!
    */
+  // Вычисляемый затроттленный сигнал (тикает строго 1 раз в 300мс)
+  public throttledCoords = withThrottleComputed(
+    this.engine,
+    () => this.coordsSignal.value,
+    { limit: 300 },
+    '[IS_OPTIMIZED=1]:example-212:computed:throttled-coords'
+  )
   public analyticsResource = this.engine.resource(
     async (coords) => {
       await new Promise((resolve) => setTimeout(resolve, 100));
