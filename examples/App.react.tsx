@@ -13,6 +13,7 @@ import { HistoryStateExample as Example106 } from './106-computed-history-state'
 import { MultiStepFormExample as Example107 } from './107-multistep-logic-di-undo-cache'
 import { Example109 } from './109-computed-batching'
 import { Example111 } from './111-reactive'
+import { Example112 } from './112-reactive-canvas'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
 import { Example202 } from './202-resource-exponential-backoff'
@@ -114,6 +115,12 @@ export const App = () => {
             description='Reactive Proxy Object (for React only)'
           >
             <Example111 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 112'
+            description='Real-time Canvas Telemetry (Proxy Object)'
+          >
+            <Example112 />
           </CardModalWrapper>
         </div>
       </div>
