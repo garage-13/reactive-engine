@@ -63,7 +63,7 @@ export const Example111 = () => {
   // Передаем готовый инстанс computed-моста в метод engine.use()
   const user = engine.use(logic.uiBridge)
 
-  // -- NOTE: Заметтьте, эти эффекты будут выполняться по необхдимости
+  // -- NOTE: Заметьте, эти эффекты будут выполняться по необхдимости
   useEffect(() => console.log(`React effect: user.name -> ${user.name}`), [user.name])
   useEffect(() => console.log(`React effect: user.age -> ${user.age}`), [user.age])
   useEffect(() => console.log(`React effect: user.role -> ${user.role}`), [user.role])
