@@ -30,22 +30,22 @@ export const Example112 = () => {
 
     return () => {
       if (disconnectPainter) disconnectPainter() // Останавливаем плавную волну Canvas
-      logic.destroy()                             // Останавливаем фоновый сбор и удаляем эффекты ядра
+      logic.destroy() // Останавливаем фоновый сбор и удаляем эффекты ядра
     }
   }, [logic])
 
   // Вычисляем цвет индикатора прогресса в зависимости от нагрузки на лимит
   const getProgressColor = (percent: number) => {
     if (percent > 80) return '#ff4a4a' // Критический жор памяти (Красный)
-    if (percent > 50) return 'orange'  // Повышенный расход (Оранжевый)
-    return '#42b883'                   // Норма (Зеленый)
+    if (percent > 50) return 'orange' // Повышенный расход (Оранжевый)
+    return '#42b883' // Норма (Зеленый)
   }
 
   return (
     <div className={clsx(baseClasses.unit, baseClasses.stack2)} style={{ width: '600px' }}>
       <div className={baseClasses.absoluteUnitLabel}>Real-time Canvas Telemetry (Proxy Object)</div>
 
-      {/* 🌟 ДЕТАЛЬНЫЙ МОНИТOРИНГ ЛИМИТОВ ПАМЯТИ: Полоса утилизации кучи */}
+      {/* ДЕТАЛЬНЫЙ МОНИТOРИНГ ЛИМИТОВ ПАМЯТИ: Полоса утилизации кучи */}
       <div style={{ background: '#1a1a24', padding: '10px', borderRadius: '8px', border: '1px solid #252530', fontSize: '12px', fontFamily: 'monospace' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#999' }}>
           <span>Утилизация лимита вкладки: <b style={{ color: getProgressColor(liveMetrics.memPercentage) }}>{liveMetrics.memPercentage}%</b></span>
@@ -85,7 +85,7 @@ export const Example112 = () => {
         />
       </div>
 
-      {/* 🌟 ПАНЕЛЬ УПРАВЛЕНИЯ СТРЕСС-ТЕСТАМИ */}
+      {/* ПАНЕЛЬ УПРАВЛЕНИЯ СТРЕСС-ТЕСТАМИ */}
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '0px' }}>
         <button
           onClick={logic.leakMemory}
