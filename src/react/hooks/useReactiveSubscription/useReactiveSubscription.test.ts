@@ -5,7 +5,7 @@ import { useReactiveSubscription } from './useReactiveSubscription'
 describe('useReactiveSubscription', () => {
   // Фейковый объект сигнала для изоляции тестов от самого ядра
   let mockSignal: { value: number; subscribe: any }
-  let subscribers: Set<(val: number) => void>;
+  let subscribers: Set<(val: number) => void>
 
   beforeEach(() => {
     subscribers = new Set()
@@ -14,7 +14,7 @@ describe('useReactiveSubscription', () => {
     mockSignal = {
       value: 10,
       subscribe: vi.fn((cb: (val: number) => void) => {
-        subscribers.add(cb);
+        subscribers.add(cb)
         // Возвращаем функцию отписки
         return () => {
           subscribers.delete(cb)
@@ -103,7 +103,7 @@ describe('useReactiveSubscription', () => {
     // На второй сигнал должна успешно сформироваться новая подписка
     expect(mockSignal2.subscribe).toHaveBeenCalledTimes(1)
     expect(subscribers2.size).toBe(1)
-  });
+  })
 
   it('должен вызывать деструктор подписки при размонтировании (unmount) компонента', () => {
     const callback = vi.fn()

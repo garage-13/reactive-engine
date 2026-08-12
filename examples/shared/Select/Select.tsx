@@ -1,5 +1,5 @@
-import React, { useId } from 'react';
-import styles from '../../ui.select.module.scss';
+import React, { useId } from 'react'
+import styles from '../../ui.select.module.scss'
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
@@ -19,11 +19,11 @@ export const Select: React.FC<SelectProps> = ({
   value,
   ...props
 }) => {
-  const defaultId = useId();
-  const selectId = id || defaultId;
+  const defaultId = useId()
+  const selectId = id || defaultId
 
   // Лейбл поднимается, если есть выбранное валидное значение
-  const hasValue = value !== undefined && value !== null && value !== '';
+  const hasValue = value !== undefined && value !== null && value !== ''
 
   // Сборка классов CSS-модулей
   const wrapperClasses = [
@@ -31,10 +31,10 @@ export const Select: React.FC<SelectProps> = ({
     styles[`neonSelect-wrapper--${colorType}`],
     styles[`neonSelect-wrapper--${variant}`],
     hasValue ? styles['has-value'] : '',
-  ].join(' ');
+  ].join(' ')
 
   // Динамический стиль для управления шириной контейнера
-  const wrapperStyle: React.CSSProperties = fullWidth ? { display: 'block', width: '100%' } : {};
+  const wrapperStyle: React.CSSProperties = fullWidth ? { display: 'block', width: '100%' } : {}
 
   return (
     <div className={wrapperClasses} style={wrapperStyle}>
@@ -52,5 +52,5 @@ export const Select: React.FC<SelectProps> = ({
         </label>
       )}
     </div>
-  );
-};
+  )
+}

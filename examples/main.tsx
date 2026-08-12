@@ -9,7 +9,7 @@ async function enableMocking() {
   if (import.meta.env.DEV) {
     const { worker } = await import('./mocks.msw/browser')
 
-    return worker.start();
+    return worker.start()
   }
 }
 
@@ -28,4 +28,4 @@ enableMocking().then(() => {
 
   // 2. Рендерим Vue через изолированный бутстраппер
   initVueApp('vue-app')
-});
+})

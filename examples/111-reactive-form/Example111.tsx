@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/ui.button.module.scss'
 import { AbstractService } from '@pravosleva/reactive-engine'
@@ -23,7 +23,7 @@ class UserProfileLogic extends AbstractService {
       age: 25,
       role: 'Разработчик'
     }
-  }, 'example-111:user');
+  }, 'example-111:user')
 
   // Выносим computed-мост на уровень сервиса.
   // Теперь это полноценный инстанс Computed, соответствующий контракту ядра фреймворка!
@@ -32,19 +32,19 @@ class UserProfileLogic extends AbstractService {
     name: this.user.name,
     age: this.user.meta.age,
     role: this.user.meta.role
-  }), 'example-111:computed:ui-bridge');
+  }), 'example-111:computed:ui-bridge')
 
   // Мутируем свойства напрямую
   public updateName = (newName: string) => {
-    this.user.name = newName;
+    this.user.name = newName
   }
 
   public celebrateBirthday = () => {
-    this.user.meta.age += 1;
+    this.user.meta.age += 1
   }
 
   public changeRole = (newRole: string) => {
-    this.user.meta.role = newRole;
+    this.user.meta.role = newRole
   }
 }
 
@@ -58,10 +58,10 @@ const engine = new ReactiveEngine({
 })
 
 export const Example111 = () => {
-  const logic = engine.inject(UserProfileLogic);
+  const logic = engine.inject(UserProfileLogic)
 
   // Передаем готовый инстанс computed-моста в метод engine.use()
-  const user = engine.use(logic.uiBridge);
+  const user = engine.use(logic.uiBridge)
 
   // -- NOTE: Заметтьте, эти эффекты будут выполняться по необхдимости
   useEffect(() => console.log(`React effect: user.name -> ${user.name}`), [user.name])
@@ -69,9 +69,21 @@ export const Example111 = () => {
   useEffect(() => console.log(`React effect: user.role -> ${user.role}`), [user.role])
   // --
 
+  // Увеличивается синхронно на каждый кадр выполнения функции React
+  const renderCountRef = useRef(0)
+  renderCountRef.current += 1
+
   return (
     <div className={clsx(baseClasses.unit, baseClasses.stack2)}>
       <div className={baseClasses.absoluteUnitLabel}>Reactive Proxy Object</div>
+
+      {/* ПАНЕЛЬ ТЕЛЕМЕТРИИ REAСT: Выводим количество чистых рендеров */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1a1a24', padding: '6px 12px', borderRadius: '8px', border: '1px solid #252530', fontSize: 'small', fontFamily: 'monospace' }}>
+        <span style={{ color: '#aaa' }}>Телеметрия UI-слоя</span>
+        <span style={{ color: '#42b883', fontWeight: 'bold' }}>
+          Рендеров компонента: <span style={{ color: '#00b4d8', fontSize: '13px' }}>{renderCountRef.current}</span>
+        </span>
+      </div>
 
       {/* Вывод реактивных данных прокси */}
       <div className={baseClasses.stack1} style={{ fontFamily: 'system-ui' }}>

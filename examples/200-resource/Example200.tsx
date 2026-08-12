@@ -7,7 +7,7 @@ import clsx from 'clsx'
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 class Logic extends AbstractService {
-  public counter = this.engine.signal<number>(0, 'example-200:signal:counter');
+  public counter = this.engine.signal<number>(0, 'example-200:signal:counter')
   public apiState = this.engine.resource(
     async (counterValue, abortSignal) => {
       if (counterValue === 0)

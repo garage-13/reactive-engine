@@ -4,11 +4,11 @@ import { ReactiveEngine as ReactiveEngine4Angular } from '@pravosleva/reactive-e
 
 // 1. Описываем изолированную бизнес-логику (Ядро/Сервис) — код 1-в-1 как в React/Vue
 class CounterLogic extends AbstractService {
-  public counter = this.engine.signal<number>(0, 'angular-example:counter');
+  public counter = this.engine.signal<number>(0, 'angular-example:counter')
 
   public inc = () => {
-    this.counter.value += 1;
-  };
+    this.counter.value += 1
+  }
 }
 
 @Component({
@@ -30,12 +30,12 @@ class CounterLogic extends AbstractService {
 })
 export class AngularCounterComponent {
   // 2. Инициализируем Angular-версию движка
-  private engine = new ReactiveEngine4Angular();
+  private engine = new ReactiveEngine4Angular()
 
   // 3. Внедряем сервис из DI-контейнера
-  public logic = this.engine.inject(CounterLogic);
+  public logic = this.engine.inject(CounterLogic)
 
   // 4. Превращаем сигнал ядра в нативный Angular Signal через метод .use()
   // Метод inject(DestroyRef) под капотом use() отработает корректно, так как мы находимся в фазе инициализации класса
-  public counter = this.engine.use(this.logic.counter);
+  public counter = this.engine.use(this.logic.counter)
 }

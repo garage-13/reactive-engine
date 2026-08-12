@@ -157,8 +157,8 @@ export class MapLogic extends AbstractService {
 
   public destroyMap = () => {
     if (this.debounceTimer) clearTimeout(this.debounceTimer)
-    if (this.effectCleanup) { this.effectCleanup(); this.effectCleanup = null; }
-    if (this.cityEffectCleanup) { this.cityEffectCleanup(); this.cityEffectCleanup = null; }
+    if (this.effectCleanup) { this.effectCleanup(); this.effectCleanup = null }
+    if (this.cityEffectCleanup) { this.cityEffectCleanup(); this.cityEffectCleanup = null }
     if (this.map) {
       this.map.destroy()
     }

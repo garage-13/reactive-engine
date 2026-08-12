@@ -1,9 +1,9 @@
-import { ReactiveEngine } from './core';
+import { ReactiveEngine } from './core'
 
 export abstract class AbstractService {
   constructor(protected engine: ReactiveEngine) {
     // Вызываем метод инициализации, который можно переопределить в наследниках
-    this.onInit();
+    this.onInit()
   }
 
   // NOTE: Полезные хелперы для сокращения кода
@@ -11,15 +11,15 @@ export abstract class AbstractService {
     return this.engine.signal(val, {
       name,
       validate: (v) => typeof v === 'number' && !isNaN(v)
-    });
+    })
   }
 
   protected createComputed<T>(fn: () => T) {
-    return this.engine.computed(fn);
+    return this.engine.computed(fn)
   }
 
   protected createSignal<T>(val: T, name?: string) {
-    return this.engine.signal(val, name);
+    return this.engine.signal(val, name)
   }
 
   // NOTE: Жизненный цикл: вызывается сразу после создания сервиса.

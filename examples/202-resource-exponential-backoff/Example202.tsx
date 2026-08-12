@@ -7,7 +7,7 @@ import clsx from 'clsx'
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 class Logic extends AbstractService {
-  public counter = this.engine.signal<number>(0, 'example-202:signal:counter');
+  public counter = this.engine.signal<number>(0, 'example-202:signal:counter')
   public apiState = this.engine.resource(
     async (counterValue, abortSignal) => {
       const res = await fetch(
@@ -33,9 +33,9 @@ class Logic extends AbstractService {
       maxRetryDelay: 10000,
       validateBeforeFetch: (counterValue) => {
         if (counterValue === 0) {
-          return `Not started (pre-validation before fetch) for count value ${counterValue}`;
+          return `Not started (pre-validation before fetch) for count value ${counterValue}`
         }
-        return true;
+        return true
       },
     }
   )

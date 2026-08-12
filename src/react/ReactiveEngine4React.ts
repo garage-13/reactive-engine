@@ -6,7 +6,7 @@ import { ReactiveEngine as OriginalReactiveEngine, CleanupFn } from '../core/cor
  * Наследует функциональность оригинального реактивного движка и предоставляет специализированные методы для работы с React.
  */
 export class ReactiveEngine4React extends OriginalReactiveEngine {
-  protected override frameworkPrefix = 'react';
+  protected override frameworkPrefix = 'react'
 
   // Описываем строгие типы для адаптеров React, чтобы не ломать встроенные типы React.
   private reactAdapters: {
@@ -15,7 +15,7 @@ export class ReactiveEngine4React extends OriginalReactiveEngine {
   } = {
       useState: useStateFromReact,
       useEffect: useEffectFromReact,
-    };
+    }
 
   /**
    * Установка адаптеров React.
@@ -29,7 +29,7 @@ export class ReactiveEngine4React extends OriginalReactiveEngine {
     useState: typeof useStateFromReact,
     useEffect: typeof useEffectFromReact
   ): void {
-    this.reactAdapters = { useState, useEffect };
+    this.reactAdapters = { useState, useEffect }
   }
 
   /**
@@ -42,7 +42,7 @@ export class ReactiveEngine4React extends OriginalReactiveEngine {
    */
   public use<T>(item: { value: T; subscribe: (cb: (v: T) => void) => CleanupFn }): T {
     if (!this.reactAdapters) {
-      throw new Error("[React Error]: Адаптеры React не установлены. Вызовите engine.setReactAdapters(useState, useEffect).");
+      throw new Error("[React Error]: Адаптеры React не установлены. Вызовите engine.setReactAdapters(useState, useEffect).")
     }
 
     // NOTE: (защита) проверяем, что нам передали объект сигнала
@@ -51,19 +51,19 @@ export class ReactiveEngine4React extends OriginalReactiveEngine {
         [Reactive Error]: engine.use() получил некорректный объект!
         Скорее всего, вы пытаетесь подписаться на свойство сервиса, которое не было инициализировано.
         Проверьте, что в классе написано: public mySignal = this.engine.signal(...)
-      `;
-      console.error(errorMsg, { item });
-      throw new Error(errorMsg);
+      `
+      console.error(errorMsg, { item })
+      throw new Error(errorMsg)
     }
-    const [val, setVal] = this.reactAdapters.useState(item.value);
+    const [val, setVal] = this.reactAdapters.useState(item.value)
 
     this.reactAdapters.useEffect(
       () => {
-        return item.subscribe(setVal);
+        return item.subscribe(setVal)
       },
       [item]
-    );
+    )
 
-    return val;
+    return val
   }
 }

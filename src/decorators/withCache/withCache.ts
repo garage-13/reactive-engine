@@ -18,32 +18,32 @@ export const withCache = <S, T>(
   fetcher: (source: S, signal: AbortSignal) => Promise<T>,
   options: CacheOptions = {}
 ) => {
-  const ttl = options.ttl ?? 5 * 60 * 1000; // Дефолтный TTL: 5 минут
-  const cache = new Map<string, CacheEntry<T>>();
+  const ttl = options.ttl ?? 5 * 60 * 1000 // Дефолтный TTL: 5 минут
+  const cache = new Map<string, CacheEntry<T>>()
 
   return async (source: S, signal: AbortSignal): Promise<T> => {
     // 1. Генерируем уникальный ключ на основе зависимостей (массива или объекта)
     const cacheKey = typeof source === 'object' && source !== null
       ? JSON.stringify(source)
-      : String(source);
+      : String(source)
 
-    const now = Date.now();
-    const cached = cache.get(cacheKey);
+    const now = Date.now()
+    const cached = cache.get(cacheKey)
 
     // 2. Проверяем, есть ли валидный (не устаревший) кэш
     if (cached && (now - cached.timestamp < ttl)) {
-      return cached.data;
+      return cached.data
     }
 
     // 3. Если кэша нет или он устарел — делаем реальный сетевой запрос
-    const freshData = await fetcher(source, signal);
+    const freshData = await fetcher(source, signal)
 
     // 4. Сохраняем свежие данные и метку времени в кэш
     cache.set(cacheKey, {
       data: freshData,
       timestamp: Date.now() // берем актуальное время после завершения запроса
-    });
+    })
 
-    return freshData;
-  };
-};
+    return freshData
+  }
+}

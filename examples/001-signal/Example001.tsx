@@ -5,7 +5,7 @@ import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import clsx from 'clsx'
 
 class Logic extends AbstractService {
-  public counter = this.engine.signal<number>(0, 'example-001:signal:counter');
+  public counter = this.engine.signal<number>(0, 'example-001:signal:counter')
 
   public inc = () => {
     this.counter.value += 1

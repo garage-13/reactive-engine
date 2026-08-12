@@ -1,0 +1,48 @@
+{
+  "editor.tabSize": 2,
+  "workbench.settings.applyToAllProfiles": [
+    "editor.tabSize"
+  ],
+  "editor.detectIndentation": false,
+  "files.exclude": {
+    "**/.git": false
+  },
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  // Включаем автоматическое исправление ошибок ESLint при сохранении файла
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  // Разрешаем глобальное форматирование при сохранении для сторонних файлов (например, .json, .html, .css)...
+  "editor.formatOnSave": true,
+  // ...НО для всех разновидностей JavaScript и TypeScript файлов отключаем встроенный форматировщик,
+  // чтобы управление форматированием полностью перешло к вашему eslint.config.js
+  "[javascript]": {
+    "editor.formatOnSave": false
+  },
+  "[javascriptreact]": {
+    "editor.formatOnSave": false
+  },
+  "[typescript]": {
+    "editor.formatOnSave": false
+  },
+  "[typescriptreact]": {
+    "editor.formatOnSave": false
+  },
+  "gitHistory.details.author.enabled": true,
+  "gitHistory.details.date.enabled": true,
+  "gitHistory.details.hash.enabled": false,
+  "gitHistory.details.hash.length": 7,
+  "diffEditor.ignoreTrimWhitespace": false,
+  "workbench.colorTheme": "Dark Modern",
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.ts": "${capture}.js, ${capture}.typegen.ts",
+    "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts",
+    "*.jsx": "${capture}.js",
+    "*.tsx": "${capture}.ts, ${capture}.typegen.ts",
+    "tsconfig.json": "tsconfig.*.json",
+    "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb, bun.lock",
+    "*.mts": "${capture}.typegen.ts",
+    "*.cts": "${capture}.typegen.ts"
+  }
+}

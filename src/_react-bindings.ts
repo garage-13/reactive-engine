@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { ReactiveEngine } from './react'; // Путь к вашему ядру
-import { Signal, Computed, Resource } from './core';
+import { useState, useEffect } from 'react'
+import { ReactiveEngine } from './react' // Путь к вашему ядру
+import { Signal, Computed, Resource } from './core'
 
 /* NOTE
 Вместо того чтобы заставлять пользователя каждый раз писать engine.use(mySignal),
@@ -8,24 +8,24 @@ import { Signal, Computed, Resource } from './core';
 */
 
 // 1. Создаем единый экземпляр движка для приложения
-export const engine = new ReactiveEngine();
+export const engine = new ReactiveEngine()
 
 // 2. Сразу инициализируем адаптеры, чтобы пользователю не нужно было делать это вручную
-engine.setReactAdapters(useState, useEffect);
+engine.setReactAdapters(useState, useEffect)
 
 /**
  * Хук для получения текущего значения Signal и его авто-обновления в React.
  */
 export function useSignal<T>(signal: Signal<T>): T {
   // Используем ваш встроенный проверенный метод
-  return engine.use(signal);
+  return engine.use(signal)
 }
 
 /**
  * Хук для получения значения вычисляемого свойства Computed.
  */
 export function useComputed<T>(computed: Computed<T>): T {
-  return engine.use(computed);
+  return engine.use(computed)
 }
 
 /**
@@ -34,5 +34,5 @@ export function useComputed<T>(computed: Computed<T>): T {
  */
 export function useResource<T>(resource: Resource<T>) {
   // Передаем весь объект resource, так как у него есть свойство value со структурой ResourceState
-  return engine.use(resource);
+  return engine.use(resource)
 }

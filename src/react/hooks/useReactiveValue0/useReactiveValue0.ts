@@ -51,21 +51,21 @@ type ReactiveInput<T> = ObservableItem<T> | (() => ObservableItem<T>)
  * ```
  */
 export const useReactiveValue0 = <T>(input: ReactiveInput<T>): T => {
-  const isFactory = typeof input === 'function';
+  const isFactory = typeof input === 'function'
 
   // NOTE: СТАБИЛИЗАЦИЯ ИНПУТА: защищает от бесконечных циклов при инлайн-стрелочных фабриках
-  const factoryRef = useRef(input);
+  const factoryRef = useRef(input)
   useEffect(() => {
-    factoryRef.current = input;
-  }, [input]);
+    factoryRef.current = input
+  }, [input])
 
   // Вычисляем элемент строго 1 раз при монтировании, либо при смене ссылки на готовый сигнал
   const reactiveItem = useMemo(() => {
     if (typeof input === 'function') {
-      return input(); // Ленивый вызов фабрики ровно один раз за жизнь компонента
+      return input() // Ленивый вызов фабрики ровно один раз за жизнь компонента
     }
-    return input;
-  }, [isFactory ? undefined : input]); // Игнорируем ссылки инлайн-функций
+    return input
+  }, [isFactory ? undefined : input]) // Игнорируем ссылки инлайн-функций
 
   const [state, setState] = useState<T>(reactiveItem.value)
   const setStateRef = useRef(setState)
@@ -79,7 +79,7 @@ export const useReactiveValue0 = <T>(input: ReactiveInput<T>): T => {
   // Если между фазой рендера и выполнением useEffect значение в ядре библиотеки успело измениться,
   // мы синхронно подтягиваем актуальный стейт, исключая "слепые пятна" и мерцание UI.
   if (state !== reactiveItem.value) {
-    setState(reactiveItem.value);
+    setState(reactiveItem.value)
   }
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export const useReactiveValue0 = <T>(input: ReactiveInput<T>): T => {
     })
 
     return () => {
-      unsubscribe();
+      unsubscribe()
 
       // NOTE: БЕЗОПАСНАЯ ОЧИСТКА ПАМЯТИ:
       // Метод .destroy() вызывается СТРОГО если объект был порожден локальной фабрикой.

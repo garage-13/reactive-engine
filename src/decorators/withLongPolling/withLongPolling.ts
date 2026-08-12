@@ -37,76 +37,76 @@ export const withLongPolling = <S, T>(
     delay = 500,
     errorInitialDelay = 2000,
     errorMaxDelay = 8000
-  } = options;
+  } = options
 
-  let currentErrorDelay = errorInitialDelay;
-  let currentSessionToken = 0;
+  let currentErrorDelay = errorInitialDelay
+  let currentSessionToken = 0
 
   return (source: S, signal: AbortSignal): Promise<T> => {
-    const activeSessionId = ++currentSessionToken;
+    const activeSessionId = ++currentSessionToken
 
     return new Promise<T>((resolve, reject) => {
 
       const poll = async () => {
         if (signal.aborted || externalSignal?.aborted) {
-          reject(new DOMException('Aborted by long polling lifecycle', 'AbortError'));
-          return;
+          reject(new DOMException('Aborted by long polling lifecycle', 'AbortError'))
+          return
         }
 
         try {
-          const data = await fetcher(source, signal);
-          currentErrorDelay = errorInitialDelay;
+          const data = await fetcher(source, signal)
+          currentErrorDelay = errorInitialDelay
 
           if (signal.aborted || externalSignal?.aborted) {
-            reject(new DOMException('Aborted by long polling lifecycle', 'AbortError'));
-            return;
+            reject(new DOMException('Aborted by long polling lifecycle', 'AbortError'))
+            return
           }
 
-          resolve(data);
+          resolve(data)
 
           setTimeout(() => {
             if (activeSessionId === currentSessionToken && !signal.aborted && !externalSignal?.aborted) {
-              onNextTick?.();
+              onNextTick?.()
             }
-          }, delay);
+          }, delay)
 
         } catch (error) {
           if (error instanceof DOMException && error.name === 'AbortError') {
-            reject(error);
-            return;
+            reject(error)
+            return
           }
 
-          reject(error);
-          const delayDuration = currentErrorDelay;
+          reject(error)
+          const delayDuration = currentErrorDelay
 
           if (typeof onError === 'function') onError(delayDuration, () => {
             if (activeSessionId === currentSessionToken) {
-              currentErrorDelay = Math.min(currentErrorDelay * 2, errorMaxDelay);
+              currentErrorDelay = Math.min(currentErrorDelay * 2, errorMaxDelay)
             }
-          });
+          })
 
           setTimeout(() => {
             if (activeSessionId === currentSessionToken && !signal.aborted && !externalSignal?.aborted) {
-              onNextTick?.();
+              onNextTick?.()
             }
-          }, delayDuration);
+          }, delayDuration)
         }
-      };
+      }
 
       const forceKillTimer = () => {
-        reject(new DOMException('Aborted by lifecycle event', 'AbortError'));
-      };
+        reject(new DOMException('Aborted by lifecycle event', 'AbortError'))
+      }
 
-      signal.addEventListener('abort', forceKillTimer);
+      signal.addEventListener('abort', forceKillTimer)
       if (externalSignal) {
-        externalSignal.addEventListener('abort', forceKillTimer);
+        externalSignal.addEventListener('abort', forceKillTimer)
       }
 
       if (signal.aborted || externalSignal?.aborted) {
-        return forceKillTimer();
+        return forceKillTimer()
       }
 
-      poll();
-    });
-  };
-};
+      poll()
+    })
+  }
+}

@@ -1,6 +1,3 @@
-/* eslint-disable no-continue */
-/* eslint-disable no-restricted-syntax */
-
 export const mutateObject = <T extends Record<string, unknown>>({
   target,
   source,
@@ -11,21 +8,21 @@ export const mutateObject = <T extends Record<string, unknown>>({
   removeIfUndefined?: boolean;
 }): T => {
   // Для обхода ограничения дженерика на запись используем Record<string, unknown>
-  const targetObj: Record<string, unknown> = target;
+  const targetObj: Record<string, unknown> = target
 
   for (const key in source) {
-    if (!Object.prototype.hasOwnProperty.call(source, key)) { continue; }
+    if (!Object.prototype.hasOwnProperty.call(source, key)) { continue }
 
-    const sourceValue = source[key];
-    const targetValue = targetObj[key];
+    const sourceValue = source[key]
+    const targetValue = targetObj[key]
 
     if (Array.isArray(sourceValue)) {
       // 1. Обработка массивов
       if (Array.isArray(targetValue)) {
         // Объединяем массивы и убираем дубликаты
-        targetObj[key] = Array.from(new Set([...targetValue, ...sourceValue]));
+        targetObj[key] = Array.from(new Set([...targetValue, ...sourceValue]))
       } else {
-        targetObj[key] = sourceValue;
+        targetObj[key] = sourceValue
       }
     } else if (sourceValue !== null && typeof sourceValue === 'object') {
       // 2. Обработка объектов (рекурсия)
@@ -34,23 +31,23 @@ export const mutateObject = <T extends Record<string, unknown>>({
           target: targetValue as Record<string, unknown>, // Приведение к базовому типу для рекурсии
           source: sourceValue as Record<string, unknown>,
           removeIfUndefined
-        });
+        })
       } else {
-        targetObj[key] = sourceValue;
+        targetObj[key] = sourceValue
       }
     } else {
       // 3. Примитивы
-      targetObj[key] = sourceValue;
+      targetObj[key] = sourceValue
     }
   }
 
   if (removeIfUndefined) {
     for (const key in targetObj) {
       if (Object.prototype.hasOwnProperty.call(targetObj, key) && !(key in source)) {
-        delete targetObj[key];
+        delete targetObj[key]
       }
     }
   }
 
-  return target;
-};
+  return target
+}

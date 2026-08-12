@@ -36,7 +36,7 @@ const runAutoCleanupTests = (hookName: string, hookFn: any) => {
       unmount()
 
       // Даем время эффектам пройти
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50))
 
       // Проверяем железный контракт: глобальный стейт остался невредим!
       expect(globalDestroySpy).not.toHaveBeenCalled()

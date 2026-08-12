@@ -1,11 +1,11 @@
 
-/* eslint-disable no-restricted-syntax */
+ 
 
-import { NSDMS } from './types';
-import { mutateObject } from './mutateObject';
-import { getNestedValue } from './getNestedValue';
-import { setNestedValueImmutable } from './setNestedValueImmutable';
-import { getRandomInteger } from './getRandomInteger';
+import { NSDMS } from './types'
+import { mutateObject } from './mutateObject'
+import { getNestedValue } from './getNestedValue'
+import { setNestedValueImmutable } from './setNestedValueImmutable'
+import { getRandomInteger } from './getRandomInteger'
 
 interface NestedValueParams {
   obj: Record<string, unknown>;
@@ -30,10 +30,10 @@ export const applyItemsMutationScenarios = <T extends { Items: Record<string, un
     target: result,
     source: { data: { Items: [] } },
     removeIfUndefined: false,
-  });
+  })
 
   // NOTE: 2. Итерация по сценариям
-  const items = result.data?.Items;
+  const items = result.data?.Items
   if (Array.isArray(items)) {
     for (const scenarioItem of mutations) {
       if (
@@ -46,31 +46,31 @@ export const applyItemsMutationScenarios = <T extends { Items: Record<string, un
           const value = getNestedValue({
             obj: e,
             path: scenarioItem.targetSensorKeyPath,
-          } as NestedValueParams);
-          return value === scenarioItem.targetSensorKeyValue;
-        });
+          } as NestedValueParams)
+          return value === scenarioItem.targetSensorKeyValue
+        })
 
         if (targetIndex !== -1) {
           // Создаем поверхностную копию элемента (убран @ts-ignore)
-          const mutatedItem = { ...items[targetIndex] };
+          const mutatedItem = { ...items[targetIndex] }
 
           switch (scenarioItem.targetActionCode) {
-            case NSDMS.ETargetMutationCode.SET_RANDOM_INT:
-              setNestedValueImmutable({
-                obj: mutatedItem,
-                path: scenarioItem.targetMutationPath,
-                value: getRandomInteger({ min: 1000, max: 9999 }),
-              } as SetNestedValueParams);
-              break;
-            default:
-              break;
+          case NSDMS.ETargetMutationCode.SET_RANDOM_INT:
+            setNestedValueImmutable({
+              obj: mutatedItem,
+              path: scenarioItem.targetMutationPath,
+              value: getRandomInteger({ min: 1000, max: 9999 }),
+            } as SetNestedValueParams)
+            break
+          default:
+            break
           }
 
           // Записываем измененный элемент обратно в массив
-          items[targetIndex] = mutatedItem;
+          items[targetIndex] = mutatedItem
         }
       }
     }
   }
-};
+}
 

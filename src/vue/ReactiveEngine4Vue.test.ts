@@ -4,7 +4,7 @@ import { ReactiveEngine4Vue } from './ReactiveEngine4Vue'
 import { AbstractService } from '../core'
 
 class TestService extends AbstractService {
-  public counter = this.engine.signal<number>(0, 'test:vue:counter');
+  public counter = this.engine.signal<number>(0, 'test:vue:counter')
 
   public inc = () => {
     this.counter.value += 1

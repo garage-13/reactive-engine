@@ -1,4 +1,4 @@
-import { ResourceOptions, ResourceState, SignalOptions } from './types';
+import { ResourceOptions, ResourceState, SignalOptions } from './types'
 import { getExtractedValues } from '../utils'
 
 /**
@@ -175,38 +175,38 @@ export interface LogDetailMap {
  * @class
  */
 export class ReactiveEngine {
-  protected frameworkPrefix = 'core';
-  private activeEffect: IEffect | null = null;
-  private isBatching = false;
-  private pendingEffects = new Set<IEffect>();
+  protected frameworkPrefix = 'core'
+  private activeEffect: IEffect | null = null
+  private isBatching = false
+  private pendingEffects = new Set<IEffect>()
 
   // В контейнерах DI вместо any используем unknown. Это заставит методы inject/provide
   // явно приводить типы через дженерики <T>, защищая от рантайм-ошибок.
-  private services = new Map<Token<unknown>, unknown>();
-  private factories = new Map<Token<unknown>, Factory<unknown>>();
+  private services = new Map<Token<unknown>, unknown>()
+  private factories = new Map<Token<unknown>, Factory<unknown>>()
 
   // Объект-ключ мапится на объект-прокси. Здесь идеально подходит тип object.
-  private proxyCache = new WeakMap<object, object>();
-  private allEffects = new Set<IEffect>();
+  private proxyCache = new WeakMap<object, object>()
+  private allEffects = new Set<IEffect>()
 
   // Logger
-  private loggerOptions?: EngineLoggerOptions;
+  private loggerOptions?: EngineLoggerOptions
   private pendingLogQueue: Array<{
     [K in keyof LogDetailMap]: {
       type: K;
       name: string;
       detail: LogDetailMap[K];
     }
-  }[keyof LogDetailMap]> = [];
-  private lastTransactionDuration: number | null = null;
+  }[keyof LogDetailMap]> = []
+  private lastTransactionDuration: number | null = null
   // Хранилища точечной аналитки:
-  private signalMutationCounts = new Map<string, number>(); // Имя сигнала -> Кол-во мутаций
-  private lastComputedDurations = new Map<string, number>(); // Имя computed -> Время прошлого расчета
-  private effectExecutionCounts = new Map<string, number>(); // Имя эффекта -> Кол-во запусков
-  private batchTickCounts = 0; // Глобальный счетчик транзакций ядра
+  private signalMutationCounts = new Map<string, number>() // Имя сигнала -> Кол-во мутаций
+  private lastComputedDurations = new Map<string, number>() // Имя computed -> Время прошлого расчета
+  private effectExecutionCounts = new Map<string, number>() // Имя эффекта -> Кол-во запусков
+  private batchTickCounts = 0 // Глобальный счетчик транзакций ядра
 
   constructor(options?: ReactiveEngineOptions) {
-    this.loggerOptions = options?.logger;
+    this.loggerOptions = options?.logger
   }
 
   /**
@@ -230,7 +230,7 @@ export class ReactiveEngine {
     name: string,
     detail: LogDetailMap[K]
   ): void {
-    if (!this.loggerOptions?.isEnabled) return;
+    if (!this.loggerOptions?.isEnabled) return
 
     // Фильтрацию производим уже по очищенному имени
     if (this.loggerOptions.filter) {
@@ -252,142 +252,142 @@ export class ReactiveEngine {
     let subBadgeStyle = 'color: #aaa; font-weight: normal;'
 
     switch (type) {
-      case 'signal': {
-        // Проверяем, является ли сигнал внутренним служебным сигналом ядра
-        const isInternal = getExtractedValues({
-          tested: [name],
-          expectedKey: 'CORE_INTERNAL_SIGNAL',
-          valueType: 'number'
-        })?.[0] === '1';
+    case 'signal': {
+      // Проверяем, является ли сигнал внутренним служебным сигналом ядра
+      const isInternal = getExtractedValues({
+        tested: [name],
+        expectedKey: 'CORE_INTERNAL_SIGNAL',
+        valueType: 'number'
+      })?.[0] === '1'
 
-        // (?) Чистим имя от метаданных для красивого вывода в консоль
-        const displayName = name // name.replace(/\[CORE_INTERNAL_SIGNAL=1\]:/g, '');
+      // (?) Чистим имя от метаданных для красивого вывода в консоль
+      const displayName = name // name.replace(/\[CORE_INTERNAL_SIGNAL=1\]:/g, '');
 
-        const currentCount = (this.signalMutationCounts.get(displayName) || 0) + 1;
-        this.signalMutationCounts.set(displayName, currentCount);
+      const currentCount = (this.signalMutationCounts.get(displayName) || 0) + 1
+      this.signalMutationCounts.set(displayName, currentCount)
 
-        const signalDetail = detail as SignalLogDetail;
-        const isFullyOptimized = signalDetail.subscribers && signalDetail.subscribers.length > 0
-          ? signalDetail.subscribers.every((sub) => {
-            if (!sub) return false;
-            return getExtractedValues({
-              tested: [sub],
-              expectedKey: 'IS_OPTIMIZED',
-              valueType: 'number',
-            })?.[0] === '1';
-          })
-          : false;
+      const signalDetail = detail as SignalLogDetail
+      const isFullyOptimized = signalDetail.subscribers && signalDetail.subscribers.length > 0
+        ? signalDetail.subscribers.every((sub) => {
+          if (!sub) return false
+          return getExtractedValues({
+            tested: [sub],
+            expectedKey: 'IS_OPTIMIZED',
+            valueType: 'number',
+          })?.[0] === '1'
+        })
+        : false
 
-        const isNoisy = currentCount > 50;
+      const isNoisy = currentCount > 50
 
-        // Переключаем текст под-бэджа, если это внутренний сигнал computed
-        const typeLabel = isInternal ? 'COMPUTED_INTERNAL' : 'SIGNAL';
+      // Переключаем текст под-бэджа, если это внутренний сигнал computed
+      const typeLabel = isInternal ? 'COMPUTED_INTERNAL' : 'SIGNAL'
 
-        subBadgeText = ` 🔄 Изменений ${isInternal ? 'кэша' : 'сигнала'}: ${currentCount}${isNoisy ? ' ⚠️ (high noise — обнаружен дребезг/спам значений!)' : ''
-          }`;
+      subBadgeText = ` 🔄 Изменений ${isInternal ? 'кэша' : 'сигнала'}: ${currentCount}${isNoisy ? ' ⚠️ (high noise — обнаружен дребезг/спам значений!)' : ''
+      }`
 
-        if (isNoisy) {
-          subBadgeStyle = 'color: orange; font-weight: bold;';
-          if (!isFullyOptimized) {
-            (detail as any).__performance_advice__ = {
-              issue: `Сигнал [${displayName}] обновляется слишком часто (${currentCount} раз за такт). Это приводит к избыточным ререндерам UI.`,
-              solution: `Оберните чтение этого сигнала в декоратор сжатия потока данных 'withThrottleComputed'`,
-              example: `public throttled = withThrottleComputed(this.engine, () => this.yourSignalName.value, { limit: 300 });`
-            };
+      if (isNoisy) {
+        subBadgeStyle = 'color: orange; font-weight: bold;'
+        if (!isFullyOptimized) {
+          (detail as any).__performance_advice__ = {
+            issue: `Сигнал [${displayName}] обновляется слишком часто (${currentCount} раз за такт). Это приводит к избыточным ререндерам UI.`,
+            solution: `Оберните чтение этого сигнала в декоратор сжатия потока данных 'withThrottleComputed'`,
+            example: `public throttled = withThrottleComputed(this.engine, () => this.yourSignalName.value, { limit: 300 });`
           }
         }
-
-        // Переопределяем параметры вывода console.groupCollapsed локально
-        console.groupCollapsed(
-          `%c${typeLabel}%c [${displayName}]%c${subBadgeText}`,
-          isInternal ? 'background: #42b883; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;' : badgeColors[type],
-          'color: #aaa; font-weight: bold;',
-          subBadgeStyle
-        );
-        console.log('Данные (Payload):', detail);
-        if (this.loggerOptions.traceTime && typeof performance !== 'undefined') {
-          console.log('Тайминг рантайма:', `${performance.now().toFixed(2)} ms`);
-        }
-        console.groupEnd();
-
-        return; // Прерываем дефолтный вывод, так как мы отрендерили сигнал со специальным бэджем!
       }
-      case 'computed': {
-        // Даже если это был сигнал, мы берем детали вычислений
-        const currentDetail = detail as any;
 
-        // Безопасно извлекаем значение для заголовка бэджа.
-        // Читаем .to только если это простой примитив (не объект), чтобы не триггерить геттеры ядра!
-        if (currentDetail && 'to' in currentDetail) {
-          const rawValue = currentDetail.to;
-          const displayValue = typeof rawValue === 'object' && rawValue !== null
-            ? '{...}' // Для объектов выводим заглушку, защищая геттеры от JSON.stringify
-            : String(rawValue);
+      // Переопределяем параметры вывода console.groupCollapsed локально
+      console.groupCollapsed(
+        `%c${typeLabel}%c [${displayName}]%c${subBadgeText}`,
+        isInternal ? 'background: #42b883; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;' : badgeColors[type],
+        'color: #aaa; font-weight: bold;',
+        subBadgeStyle
+      )
+      console.log('Данные (Payload):', detail)
+      if (this.loggerOptions.traceTime && typeof performance !== 'undefined') {
+        console.log('Тайминг рантайма:', `${performance.now().toFixed(2)} ms`)
+      }
+      console.groupEnd()
 
-          subBadgeText = ` 🧮 Значение: ${displayValue}`;
-        } else if (currentDetail && 'duration' in currentDetail) {
-          // Ваша стандартная рабочая логика тренда для оригинального события computed
-          const currentDuration = parseFloat(currentDetail.duration);
-          if (!isNaN(currentDuration)) {
-            const lastDuration = this.lastComputedDurations.get(name);
-            if (lastDuration !== undefined && lastDuration > 0) {
-              const diff = currentDuration - lastDuration;
-              const percentChange = (diff / lastDuration) * 100;
-              if (percentChange > 5) {
-                subBadgeText = ` 🔴 Замедление: +${percentChange.toFixed(1)}% (${currentDetail.duration})`;
-                subBadgeStyle = 'color: #e01e5a; font-weight: bold;';
-              } else if (percentChange < -5) {
-                subBadgeText = ` 🟢 Ускорение: ${percentChange.toFixed(1)}% (${currentDetail.duration})`;
-                subBadgeStyle = 'color: #42b883; font-weight: bold;';
-              } else {
-                subBadgeText = ` 🟢 Стабильно (${currentDetail.duration})`;
-                subBadgeStyle = 'color: #42b883; font-weight: bold;';
-              }
+      return // Прерываем дефолтный вывод, так как мы отрендерили сигнал со специальным бэджем!
+    }
+    case 'computed': {
+      // Даже если это был сигнал, мы берем детали вычислений
+      const currentDetail = detail as any
+
+      // Безопасно извлекаем значение для заголовка бэджа.
+      // Читаем .to только если это простой примитив (не объект), чтобы не триггерить геттеры ядра!
+      if (currentDetail && 'to' in currentDetail) {
+        const rawValue = currentDetail.to
+        const displayValue = typeof rawValue === 'object' && rawValue !== null
+          ? '{...}' // Для объектов выводим заглушку, защищая геттеры от JSON.stringify
+          : String(rawValue)
+
+        subBadgeText = ` 🧮 Значение: ${displayValue}`
+      } else if (currentDetail && 'duration' in currentDetail) {
+        // Ваша стандартная рабочая логика тренда для оригинального события computed
+        const currentDuration = parseFloat(currentDetail.duration)
+        if (!isNaN(currentDuration)) {
+          const lastDuration = this.lastComputedDurations.get(name)
+          if (lastDuration !== undefined && lastDuration > 0) {
+            const diff = currentDuration - lastDuration
+            const percentChange = (diff / lastDuration) * 100
+            if (percentChange > 5) {
+              subBadgeText = ` 🔴 Замедление: +${percentChange.toFixed(1)}% (${currentDetail.duration})`
+              subBadgeStyle = 'color: #e01e5a; font-weight: bold;'
+            } else if (percentChange < -5) {
+              subBadgeText = ` 🟢 Ускорение: ${percentChange.toFixed(1)}% (${currentDetail.duration})`
+              subBadgeStyle = 'color: #42b883; font-weight: bold;'
             } else {
-              subBadgeText = ` ⚪ Первый расчет (${currentDetail.duration})`;
+              subBadgeText = ` 🟢 Стабильно (${currentDetail.duration})`
+              subBadgeStyle = 'color: #42b883; font-weight: bold;'
             }
-            this.lastComputedDurations.set(name, currentDuration);
+          } else {
+            subBadgeText = ` ⚪ Первый расчет (${currentDetail.duration})`
           }
+          this.lastComputedDurations.set(name, currentDuration)
         }
-        break;
       }
-      case 'effect': {
-        const currentCount = (this.effectExecutionCounts.get(name) || 0) + 1;
-        this.effectExecutionCounts.set(name, currentCount);
-        const isOverTriggered = currentCount > 30;
-        subBadgeText = ` 🚀 Вызовов эффекта: ${currentCount}${isOverTriggered ? ' ⚠️ (heavy re-renders)' : ''}`;
-        if (isOverTriggered) subBadgeStyle = 'color: #ff4a4a; font-weight: bold;';
-        break;
-      }
-      case 'batch': {
-        this.batchTickCounts += 1;
-        subBadgeText = ` 📦 Номер транзакции: #${this.batchTickCounts}`;
-        break;
-      }
-      case 'resource': {
-        const resourceDetail = detail as ResourceLogDetail;
+      break
+    }
+    case 'effect': {
+      const currentCount = (this.effectExecutionCounts.get(name) || 0) + 1
+      this.effectExecutionCounts.set(name, currentCount)
+      const isOverTriggered = currentCount > 30
+      subBadgeText = ` 🚀 Вызовов эффекта: ${currentCount}${isOverTriggered ? ' ⚠️ (heavy re-renders)' : ''}`
+      if (isOverTriggered) subBadgeStyle = 'color: #ff4a4a; font-weight: bold;'
+      break
+    }
+    case 'batch': {
+      this.batchTickCounts += 1
+      subBadgeText = ` 📦 Номер транзакции: #${this.batchTickCounts}`
+      break
+    }
+    case 'resource': {
+      const resourceDetail = detail as ResourceLogDetail
 
-        // Формируем динамический статус-маркер для заголовка
-        if (resourceDetail.loading) {
-          subBadgeText = ' ⏳ ЗАГРУЗКА (fetching...)';
-          subBadgeStyle = 'color: #d97706; font-weight: bold;'; // Оранжевый
-        } else if (resourceDetail.error) {
-          subBadgeText = ` 🔴 ОШИБКА: ${resourceDetail.error.message || 'Unknown Error'}`;
-          subBadgeStyle = 'color: #ff4a4a; font-weight: bold;'; // Красный
-        } else {
-          // Данные успешно загружены
-          const rawData = resourceDetail.data;
-          const displayData = typeof rawData === 'object' && rawData !== null
-            ? '{...}'
-            : String(rawData);
+      // Формируем динамический статус-маркер для заголовка
+      if (resourceDetail.loading) {
+        subBadgeText = ' ⏳ ЗАГРУЗКА (fetching...)'
+        subBadgeStyle = 'color: #d97706; font-weight: bold;' // Оранжевый
+      } else if (resourceDetail.error) {
+        subBadgeText = ` 🔴 ОШИБКА: ${resourceDetail.error.message || 'Unknown Error'}`
+        subBadgeStyle = 'color: #ff4a4a; font-weight: bold;' // Красный
+      } else {
+        // Данные успешно загружены
+        const rawData = resourceDetail.data
+        const displayData = typeof rawData === 'object' && rawData !== null
+          ? '{...}'
+          : String(rawData)
 
-          subBadgeText = ` 🟢 УСПЕХ (data: ${displayData})`;
-          subBadgeStyle = 'color: #42b883; font-weight: bold;'; // Зеленый
-        }
-        break;
+        subBadgeText = ` 🟢 УСПЕХ (data: ${displayData})`
+        subBadgeStyle = 'color: #42b883; font-weight: bold;' // Зеленый
       }
-      default:
-        break;
+      break
+    }
+    default:
+      break
     }
 
     // Выводим красивый свернутый заголовок под-элемента с аналитикой
@@ -408,7 +408,7 @@ export class ReactiveEngine {
    * Коллбек для уведомления об изменении сигнала.
    * Использование unknown вместо any гарантирует безопасную работу с типами prev/next.
    */
-  public onSignalChange?: (name: string, next: unknown, prev: unknown) => void;
+  public onSignalChange?: (name: string, next: unknown, prev: unknown) => void
 
   /**
    * DI: Регистрация зависимости.
@@ -436,14 +436,14 @@ export class ReactiveEngine {
    */
   public inject<T>(token: Token<T>): T {
     if (!token) {
-      throw new Error(`[DI Error]: Вы пытаетесь внедрить пустой токен (undefined/null). Проверьте импорты.`);
+      throw new Error(`[DI Error]: Вы пытаетесь внедрить пустой токен (undefined/null). Проверьте импорты.`)
     }
 
     // Приводим токен к базовому типу Token<unknown> для совместимости с Map
-    const targetToken = token as Token<unknown>;
+    const targetToken = token as Token<unknown>
 
     if (this.services.has(targetToken)) {
-      return this.services.get(targetToken) as T;
+      return this.services.get(targetToken) as T
     }
 
     try {
@@ -500,12 +500,12 @@ export class ReactiveEngine {
 
     if (this.loggerOptions.filter) {
       try {
-        let regex: RegExp;
+        let regex: RegExp
         if (this.loggerOptions.filter instanceof RegExp) {
-          regex = this.loggerOptions.filter;
+          regex = this.loggerOptions.filter
         } else {
           const cleanStr = this.loggerOptions.filter.replace(/^\/|\/$/g, '')
-          regex = new RegExp(cleanStr);
+          regex = new RegExp(cleanStr)
         }
         logsToRender = logsToRender.filter(item => regex.test(item.name))
       } catch (e) {
@@ -589,98 +589,98 @@ export class ReactiveEngine {
    * @source
    */
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
-    const engine = this;
-    let val = initialValue;
-    const subscribers = new Set<IEffect>();
+    const engine = this
+    let val = initialValue
+    const subscribers = new Set<IEffect>()
     const options = typeof optionsOrName === 'string'
       ? { name: optionsOrName }
-      : optionsOrName || {};
-    const name = options.name || 'unnamed_signal';
+      : optionsOrName || {}
+    const name = options.name || 'unnamed_signal'
 
     return {
       get value(): T {
         if (engine.activeEffect) {
-          const currentEffect = engine.activeEffect;
+          const currentEffect = engine.activeEffect
 
           // Защита от раздувания памяти!
           // Добавляем функцию очистки в cleanups СТРОГО один раз — при первой регистрации эффекта.
           if (!subscribers.has(currentEffect)) {
-            subscribers.add(currentEffect);
+            subscribers.add(currentEffect)
 
             currentEffect.cleanups.add(() => {
-              subscribers.delete(currentEffect); // При уничтожении эффекта сигнал забудет его
-            });
+              subscribers.delete(currentEffect) // При уничтожении эффекта сигнал забудет его
+            })
           }
         }
 
-        return val;
+        return val
       },
       set value(newValue: T) {
-        if (val === newValue) return;
+        if (val === newValue) return
 
         // ВАЛИДАЦИЯ В RUNTIME
         if (options.validate) {
-          const result = options.validate(newValue);
+          const result = options.validate(newValue)
           if (result === false || typeof result === 'string') {
             const errorMsg = typeof result === 'string'
               ? result
-              : `[Validation Error]: Некорректное значение для сигнала "${name}"`;
+              : `[Validation Error]: Некорректное значение для сигнала "${name}"`
 
             console.error(`%c${errorMsg}`, "color: orange; font-weight: bold;", {
               received: newValue,
               current: val
-            });
-            return; // Прерываем обновление, если данные не валидны
+            })
+            return // Прерываем обновление, если данные не валидны
           }
         }
 
-        const old = val;
-        val = newValue;
-        engine.onSignalChange?.(name, newValue, old);
+        const old = val
+        val = newValue
+        engine.onSignalChange?.(name, newValue, old)
 
         // Извлекаем текстовые метки подписчиков для логгера
         const subscriberLabels = Array.from(subscribers).map(
           (e) => e.label || 'unnamed_effect'
-        );
+        )
         engine.queueLog?.('signal', name, {
           from: old,
           to: newValue,
           subscribersCount: subscribers.size,
           subscribers: subscriberLabels,
-        });
+        })
 
         // 1. Всегда добавляем подписчиков в очередь отложенных эффектов
-        subscribers.forEach(e => engine.pendingEffects.add(e));
+        subscribers.forEach(e => engine.pendingEffects.add(e))
 
         // 2. Планируем автоматическое выполнение транзакции ВСЕГДА!
         // Теперь микрозадача гарантированно выполнится и зачистит буфер flushLogs,
         // даже если у сигнала было 0 подписчиков.
         if (!engine.isBatching) {
-          engine.isBatching = true;
+          engine.isBatching = true
 
           queueMicrotask(() => {
             // Динамический каскадный цикл (Push-домино)
             for (const effectObj of engine.pendingEffects) {
-              engine.pendingEffects.delete(effectObj);
-              effectObj.run();
+              engine.pendingEffects.delete(effectObj)
+              effectObj.run()
             }
             // Гасим флаг батчинга строго после того, как ВСЕ эффекты завершились
-            engine.isBatching = false;
+            engine.isBatching = false
             // Вызываем flushLogs на самом финише, когда вся транзакция полностью стабилизировалась
-            engine.flushLogs?.();
-          });
+            engine.flushLogs?.()
+          })
         }
       },
       subscribe(cb: (val: T) => void) {
         // Чистая и безопасная подписка для React/Vue/Angular адаптеров
         return engine.effect(
           () => {
-            cb(this.value);
+            cb(this.value)
           },
           `${engine.frameworkPrefix}:use:${name}`
-        );
+        )
       }
-    };
+    }
   }
 
   /**
@@ -727,7 +727,7 @@ export class ReactiveEngine {
     (cleanupFn) => {
       cleanupFn() // Вызовется автоматически, когда сборщик мусора удалит computedInstance
     }
-  );
+  )
 
   /**
    * Создание вычисляемого значения.
@@ -765,28 +765,28 @@ export class ReactiveEngine {
       // Благодаря этому, когда меняется count -> step-A синхронно просыпается в микрозадаче,
       // меняет свой sig.value -> этот сигнал мгновенно будит step-B, который уже добавлен
       // в pendingEffects текущей транзакции!
-      cachedValue = fn();
-      isDirty = false;
+      cachedValue = fn()
+      isDirty = false
 
-      const startTime = typeof performance !== 'undefined' ? performance.now() : 0;
-      const durationStr = startTime ? `0.010ms` : 'N/A'; // Пассивный замер для логгера
+      const startTime = typeof performance !== 'undefined' ? performance.now() : 0
+      const durationStr = startTime ? `0.010ms` : 'N/A' // Пассивный замер для логгера
 
       if (typeof engine.queueLog === 'function') {
         engine.queueLog('computed', name, {
           value: cachedValue,
           duration: durationStr
-        });
+        })
       }
 
       // Пушим значение. Сеттер сигнала подхватит следующий шаг,
       // так как флаг isBatching удерживается шедулером!
-      (sig as any).value = cachedValue;
-    }, `[IS_OPTIMIZED=1]:${name}`);
+      (sig as any).value = cachedValue
+    }, `[IS_OPTIMIZED=1]:${name}`)
 
     const effectObj = Array.from(this.allEffects)[this.allEffects.size - 1]
 
     const performCleanup = () => {
-      unsubscribeEffect();
+      unsubscribeEffect()
       if (effectObj) {
         engine.allEffects.delete(effectObj)
       }
@@ -798,11 +798,11 @@ export class ReactiveEngine {
         // Если кто-то читает .value вручную вне эффектов фреймворка,
         // и флаг грязен — производим ленивый Pull-расчет
         if (isDirty) {
-          cachedValue = fn();
+          cachedValue = fn()
           isDirty = false;
-          (sig as any).value = cachedValue;
+          (sig as any).value = cachedValue
         }
-        return sig.value;
+        return sig.value
       },
       subscribe: (cb: (val: T) => void) => sig.subscribe(cb),
       destroy() {
@@ -869,7 +869,7 @@ export class ReactiveEngine {
     if (this.proxyCache.has(target)) {
       return this.proxyCache.get(target) as T
     }
-    const engine = this;
+    const engine = this
     const propsSubscribers = new Map<string | symbol, Set<IEffect>>()
 
     const proxy = new Proxy(target, {
@@ -881,7 +881,7 @@ export class ReactiveEngine {
         const value = Reflect.get(obj, prop, receiver)
         return (value !== null && typeof value === 'object')
           ? engine.reactive(value, `${name}.${String(prop)}`)
-          : value;
+          : value
       },
       set(obj, prop, value, receiver) {
         const old = Reflect.get(obj, prop, receiver)
@@ -894,9 +894,9 @@ export class ReactiveEngine {
             engine.isBatching ? engine.pendingEffects.add(e) : e.run()
           )
         }
-        return true;
+        return true
       }
-    });
+    })
     this.proxyCache.set(target, proxy)
     return proxy
   }
@@ -935,7 +935,7 @@ export class ReactiveEngine {
       }, ms)
 
       const onAbort = () => {
-        clearTimeout(timeoutId); // СИНХРОННО УБИВАЕТ ТАЙМЕР. В Vitest это заставит таймер исчезнуть из очереди прокрутки
+        clearTimeout(timeoutId) // СИНХРОННО УБИВАЕТ ТАЙМЕР. В Vitest это заставит таймер исчезнуть из очереди прокрутки
         reject(new DOMException('Aborted', 'AbortError'))
       }
 
@@ -1005,7 +1005,7 @@ export class ReactiveEngine {
     source?: { value: S },
     optionsOrName?: string | ResourceOptions<T, S>,
   ): Resource<T> {
-    const isOptionsObject = optionsOrName && typeof optionsOrName === 'object';
+    const isOptionsObject = optionsOrName && typeof optionsOrName === 'object'
     const signalName = isOptionsObject
       ? (optionsOrName as ResourceOptions<T, S>).name
       : (optionsOrName as string) || 'unnamed_resource'
@@ -1015,8 +1015,8 @@ export class ReactiveEngine {
       : {}
 
     const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true
-    const responseValidate = options.responseValidate;
-    const validateBeforeFetch = options.validateBeforeFetch;
+    const responseValidate = options.responseValidate
+    const validateBeforeFetch = options.validateBeforeFetch
 
     const retryCount = options.retryCount ?? 0
     const baseDelay = options.retryDelay ?? 1000
@@ -1032,7 +1032,7 @@ export class ReactiveEngine {
 
     // Внутренний метод для безопасного обновления стейта и отправки лога
     const updateResourceState = (nextState: ResourceState<T>) => {
-      (state as any).value = nextState;
+      (state as any).value = nextState
 
       // Logger Trigger for Resource: Передаем чистое signalName, чтобы заголовок в консоли оставался аккуратным
       if (typeof this.queueLog === 'function') {
@@ -1041,15 +1041,49 @@ export class ReactiveEngine {
           data: nextState.data,
           error: nextState.error,
           isRetrying: nextState.isRetrying
-        });
+        })
       }
-    };
+    }
 
     const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
       if (effectSignal.aborted) return
 
+      // const isValid = options.validateBeforeFetch ? options.validateBeforeFetch(sValue) : true;
+
+      /**
+       * 🧐 WIP_CORE: Есть два пути, ни один не будет ошибкой, если разкомментировать код ниже. Чуть бозже добавлю опци для более тонкой отладки ядра.
+       *
+       * - АКТИВНО: Разделяем мирную блокировку (false) и боевую ошибку (string): работать будет идеально, но без логов, связанных с пре-валидацией
+       * - НЕАКТИВНО: Более очевидное логирование процессов пре-валидации (выставление ошибок и мониторинг разработчиком)
+      */
+      // --
+      // if (isValid === false) {
+      //   // Если валидатор вернул строго false — мы тихо блокируем старт фетчера,
+      //   // переводя ресурс в состояние ПОКОЯ (loading: false, error: null).
+      //   // Это полностью ликвидирует генерацию ложных ошибок при монтировании!
+      //   state.value = {
+      //     loading: false,
+      //     data: null,
+      //     error: null, // 🟢 ФИКС: Ошибки нет! Стейт стабилен.
+      //     isRetrying: false
+      //   };
+      //   return;
+      // }
+      // if (typeof isValid === 'string') {
+      //   // Если валидатор вернул строку — это боевая декларативная ошибка валидации формы.
+      //   // Здесь мы честно переводим ресурс в стейт ошибки, как и требовалось ранее.
+      //   state.value = {
+      //     loading: false,
+      //     data: null,
+      //     error: new Error(isValid),
+      //     isRetrying: false
+      //   };
+      //   return;
+      // }
+      // --
+
       if (validateBeforeFetch) {
-        const preValidationResult = validateBeforeFetch(sValue);
+        const preValidationResult = validateBeforeFetch(sValue)
         if (preValidationResult === false || typeof preValidationResult === 'string') {
           if (effectSignal.aborted) return
           const errorMsg = typeof preValidationResult === 'string'
@@ -1086,7 +1120,7 @@ export class ReactiveEngine {
           }
 
           if (responseValidate) {
-            const validationResult = responseValidate(data);
+            const validationResult = responseValidate(data)
             if (validationResult === false || typeof validationResult === 'string') {
               if (effectSignal.aborted) return
               const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed'
@@ -1129,7 +1163,7 @@ export class ReactiveEngine {
 
             // Фиксация финальной ошибки
             updateResourceState({ data: null, loading: false, error: finalError, isRetrying: false })
-            return;
+            return
           } else {
             if (effectSignal.aborted) return
 
@@ -1141,19 +1175,19 @@ export class ReactiveEngine {
             // Безопасное обновление статуса ретрая с логгированием фазы повтора
             updateResourceState({ data: state.value.data, loading: true, error: null, isRetrying: true })
 
-            const logReason = isTimeout ? 'таймауту' : 'ошибке сети';
+            const logReason = isTimeout ? 'таймауту' : 'ошибке сети'
             console.warn(`[Resource Retry] "${signalName}" сбой по ${logReason}. Попытка ${attempt + 1}/${retryCount + 1}...`)
 
             try {
               await this.delay(currentDelay, effectSignal)
-              if (effectSignal.aborted) return;
+              if (effectSignal.aborted) return
             } catch (delayError) {
               return
             }
           }
         }
       }
-    };
+    }
 
     let activeEffectController: AbortController | null = null
 
@@ -1170,11 +1204,11 @@ export class ReactiveEngine {
     }, '[dev]')
 
     return {
-      get data() { return state.value.data; },
-      get loading() { return state.value.loading; },
-      get error() { return state.value.error; },
-      get isRetrying() { return state.value.isRetrying; },
-      get value() { return state.value; },
+      get data() { return state.value.data },
+      get loading() { return state.value.loading },
+      get error() { return state.value.error },
+      get isRetrying() { return state.value.isRetrying },
+      get value() { return state.value },
       refetch: () => {
         activeEffectController?.abort()
         activeEffectController = new AbortController()
@@ -1194,7 +1228,7 @@ export class ReactiveEngine {
    */
   public untrack<T>(fn: () => T): T {
     const prev = this.activeEffect
-    this.activeEffect = null; // Временно "забываем" про активный эффект
+    this.activeEffect = null // Временно "забываем" про активный эффект
     try {
       return fn()
     } finally {

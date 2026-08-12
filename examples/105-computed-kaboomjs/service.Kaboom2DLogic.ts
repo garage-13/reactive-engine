@@ -203,8 +203,8 @@ export class Kaboom2DLogic extends AbstractService {
   public destroyKaboom = () => {
     this.cleanupEffects()
 
-    if (this.resizeObserver) { this.resizeObserver.disconnect(); this.resizeObserver = null; }
-    if (this.resizeThrottleTimeout) { clearTimeout(this.resizeThrottleTimeout); this.resizeThrottleTimeout = null; }
+    if (this.resizeObserver) { this.resizeObserver.disconnect(); this.resizeObserver = null }
+    if (this.resizeThrottleTimeout) { clearTimeout(this.resizeThrottleTimeout); this.resizeThrottleTimeout = null }
 
     if (this.k) {
       // Полностью уничтожаем контекст игры и удаляем сгенерированные canvas-элементы

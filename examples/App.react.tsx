@@ -12,8 +12,10 @@ import { Kaboom2DExample as Example105 } from './105-computed-kaboomjs'
 import { HistoryStateExample as Example106 } from './106-computed-history-state'
 import { MultiStepFormExample as Example107 } from './107-multistep-logic-di-undo-cache'
 import { Example109 } from './109-computed-batching'
-import { Example111 } from './111-reactive'
+import { Example111 } from './111-reactive-form'
 import { Example112 } from './112-reactive-canvas'
+import { Example113 } from './113-reactive-form-2'
+// import { Example114 } from './114-signal-form-3'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
 import { Example202 } from './202-resource-exponential-backoff'
@@ -122,6 +124,18 @@ export const App = () => {
           >
             <Example112 />
           </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 113'
+            description='Reactive File Metadata Metadata System'
+          >
+            <Example113 />
+          </CardModalWrapper>
+          {/* <CardModalWrapper
+            title='Example 114'
+            description='Pure Signals State-Machine Form'
+          >
+            <Example114 />
+          </CardModalWrapper> */}
         </div>
       </div>
 

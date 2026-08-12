@@ -1,4 +1,4 @@
-import { ReactiveEngine } from './core';
+import { ReactiveEngine } from './core'
 
 export abstract class BaseREServiceEnhanced {
   constructor(protected engine: ReactiveEngine) {

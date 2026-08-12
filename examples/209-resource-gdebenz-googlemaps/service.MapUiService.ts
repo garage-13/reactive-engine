@@ -20,14 +20,14 @@ export class MapUiService extends AbstractService {
   }
 
   public createHeaderDiv(station: Station): HTMLDivElement {
-    const headerDiv = document.createElement('div');
-    headerDiv.style.display = 'flex';
-    headerDiv.style.alignItems = 'center';
-    headerDiv.style.gap = '8px';
+    const headerDiv = document.createElement('div')
+    headerDiv.style.display = 'flex'
+    headerDiv.style.alignItems = 'center'
+    headerDiv.style.gap = '8px'
     headerDiv.innerHTML = `
       <span style="font-size: 16px;">⛽</span>
       <span style="color: inherit; font-weight: bold;">${station.title || station.name}</span>
-    `;
+    `
     headerDiv.style.marginBottom = '8px'
     return headerDiv
   }

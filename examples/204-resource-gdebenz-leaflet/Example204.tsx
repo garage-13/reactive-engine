@@ -108,7 +108,7 @@ export const MapExample = () => {
 
         logic.updateBbox(bboxString)
       }, 300) // Задержка, пока пользователь не перестанет двигать карту
-    };
+    }
 
     map.on('moveend', handleMapMoveEnd)
 

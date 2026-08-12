@@ -30,7 +30,7 @@ vi.mock('@angular/core', async (importOriginal) => {
 
 // 1. Создаем мок-сервис для тестирования ядра
 class TestService extends AbstractService {
-  public counter = this.engine.signal<number>(0, 'test:angular:counter');
+  public counter = this.engine.signal<number>(0, 'test:angular:counter')
 
   public inc = () => {
     this.counter.value += 1
@@ -40,8 +40,8 @@ class TestService extends AbstractService {
 describe('ReactiveEngine4Angular', () => {
   // Хелпер для прокачки асинхронной очереди микротасок Angular Signals
   const flushAngularEffects = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  };
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  }
 
   it('должен корректно обновлять Angular Signal при изменении сигнала ядра', async () => {
     const engine = new ReactiveEngine4Angular()
@@ -100,7 +100,7 @@ describe('ReactiveEngine4Angular', () => {
     // запишет замыкание отписки внутрь onDestroySpy.cb
     engine.use(service.counter)
 
-    expect(service.counter.subscribe).toHaveBeenCalled();
+    expect(service.counter.subscribe).toHaveBeenCalled()
 
     // Имитируем уничтожение компонента Angular фреймворком (вызов хука DestroyRef)
     onDestroySpy.cb()

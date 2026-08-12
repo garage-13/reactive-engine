@@ -37,10 +37,10 @@ export const withThrottleAndCache = <S, T>(
     const cacheKey = getCacheKey(source)
 
     const onAbort = () => {
-      if (throttleTimeoutId) { clearTimeout(throttleTimeoutId); throttleTimeoutId = null; }
+      if (throttleTimeoutId) { clearTimeout(throttleTimeoutId); throttleTimeoutId = null }
       if (lastSavedReject) {
         lastSavedReject(new DOMException('Aborted by signal', 'AbortError'))
-        lastSavedResolve = null; lastSavedReject = null;
+        lastSavedResolve = null; lastSavedReject = null
       }
     }
 
@@ -59,10 +59,10 @@ export const withThrottleAndCache = <S, T>(
     }
 
     if (remainingTime <= 0) {
-      if (throttleTimeoutId) { clearTimeout(throttleTimeoutId); throttleTimeoutId = null; }
+      if (throttleTimeoutId) { clearTimeout(throttleTimeoutId); throttleTimeoutId = null }
       if (lastSavedReject) {
         lastSavedReject(new DOMException('Aborted due to newer direct execution', 'AbortError'))
-        lastSavedResolve = null; lastSavedReject = null;
+        lastSavedResolve = null; lastSavedReject = null
       }
       lastExecutionTime = now
       return executeWithCache(source, signal)
@@ -89,7 +89,7 @@ export const withThrottleAndCache = <S, T>(
           const savedReject = lastSavedReject!
           const savedSignal = lastSavedSignal!
 
-          lastSavedSource = null; lastSavedResolve = null; lastSavedReject = null; lastSavedSignal = null;
+          lastSavedSource = null; lastSavedResolve = null; lastSavedReject = null; lastSavedSignal = null
           savedSignal.removeEventListener('abort', onAbort)
 
           try {

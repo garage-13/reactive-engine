@@ -7,29 +7,29 @@ import clsx from 'clsx'
 // 1. Описываем каскадную бизнес-логику для демонстрации батчинга
 class ClusterLogic extends AbstractService {
   // Базовый источник данных
-  public count = this.engine.signal<number>(1, 'example-109:signal:count');
+  public count = this.engine.signal<number>(1, 'example-109:signal:count')
 
   // Цепочка вычислений по принципу "Домино"
   // Каждое следующее свойство реактивно зависит от предыдущего computed!
   public computedA = this.engine.computed<number>(() => {
-    return this.count.value + 10;
-  }, 'example-109:computed:step-A');
+    return this.count.value + 10
+  }, 'example-109:computed:step-A')
 
   public computedB = this.engine.computed<number>(() => {
-    return this.computedA.value * 2;
-  }, 'example-109:computed:step-B');
+    return this.computedA.value * 2
+  }, 'example-109:computed:step-B')
 
   public computedC = this.engine.computed<number>(() => {
-    return this.computedB.value - 5;
-  }, 'example-109:computed:step-C');
+    return this.computedB.value - 5
+  }, 'example-109:computed:step-C')
 
   public computedD = this.engine.computed<string>(() => {
-    return this.computedC.value % 2 === 0 ? 'Четное' : 'Нечетное';
-  }, 'example-109:computed:step-D');
+    return this.computedC.value % 2 === 0 ? 'Четное' : 'Нечетное'
+  }, 'example-109:computed:step-D')
 
   // Экшен, совершающий ОДНО синхронное изменение, запускающее каскад
   public triggerClusterTick = () => {
-    this.count.value += 1;
+    this.count.value += 1
   }
 }
 

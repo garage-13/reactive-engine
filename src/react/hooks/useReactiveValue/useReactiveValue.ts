@@ -49,23 +49,23 @@ type ReactiveInput<T> = ObservableItem<T> | (() => ObservableItem<T>)
  * ```
  */
 export const useReactiveValue = <T>(input: ReactiveInput<T>): T => {
-  const isFactory = typeof input === 'function';
+  const isFactory = typeof input === 'function'
 
   // NOTE: СТАБИЛИЗАЦИЯ ФАБРИКИ: Сохраняем ссылку на функцию в ref,
   // чтобы не перезапускать вычисления, если разработчик передал инлайн-стрелочную функцию.
-  const factoryRef = useRef(input);
+  const factoryRef = useRef(input)
   useEffect(() => {
-    factoryRef.current = input;
-  }, [input]);
+    factoryRef.current = input
+  }, [input])
 
   // Вычисляем элемент строго один раз при инициализации, либо при изменении стабильной ссылки на готовый сигнал
   const reactiveItem = useMemo(() => {
     if (typeof input === 'function') {
       // Вызываем фабрику только при первом проходе
-      return input();
+      return input()
     }
-    return input; // Если передан готовый сигнал/ресурс — используем его напрямую
-  }, [isFactory ? undefined : input]); // Стабильный массив зависимостей для фабрик!
+    return input // Если передан готовый сигнал/ресурс — используем его напрямую
+  }, [isFactory ? undefined : input]) // Стабильный массив зависимостей для фабрик!
 
   const subscribe = useCallback(
     (reactCallback: () => void) => {
@@ -84,7 +84,7 @@ export const useReactiveValue = <T>(input: ReactiveInput<T>): T => {
   useEffect(() => {
     return () => {
       if (isFactory && reactiveItem && typeof reactiveItem.destroy === 'function') {
-        reactiveItem.destroy();
+        reactiveItem.destroy()
       }
     }
   }, [reactiveItem, isFactory])

@@ -39,11 +39,11 @@ export class GoogleMapsLoaderService extends BaseREService {
       // Создаем глобальный коллбэк, который вызовет Google Maps после загрузки
       const callbackName = '__googleMapsInitCallback'
         ; (window as any)[callbackName] = () => {
-          this.isLoaded = true
-          this.loadError.value = null
-          resolve()
-          delete (window as any)[callbackName]
-        }
+        this.isLoaded = true
+        this.loadError.value = null
+        resolve()
+        delete (window as any)[callbackName]
+      }
 
       const script = document.createElement('script')
       // Используем современный URL загрузки с указанием коллбэка

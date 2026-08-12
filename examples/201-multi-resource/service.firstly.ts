@@ -20,7 +20,7 @@ export class UserInfoService extends AbstractService {
   // }
   // --
 
-  public counter = this.engine.signal<number>(0, 'example-201:UserInfoService:signal:counter');
+  public counter = this.engine.signal<number>(0, 'example-201:UserInfoService:signal:counter')
   public activePersonId = this.engine.signal<string | null>(null)
   public setActivePersonId = (val: string) => this.activePersonId.value = val
   private resetActivePersonId = () => this.activePersonId.value = null
@@ -53,8 +53,8 @@ export class UserInfoService extends AbstractService {
           ].join('&')
         ].join(''),
         { signal: abortSignal }
-      );
-      return res.json();
+      )
+      return res.json()
     },
     this.counter,
     'example-201:resource:profileSearch'

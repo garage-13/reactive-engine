@@ -10,7 +10,7 @@ type TQuery = {
 }
 
 const paramsProcessHOC = ({ requestUrl, initialResponse }: { requestUrl: string, initialResponse: any }) => {
-  const url = new URL(requestUrl);
+  const url = new URL(requestUrl)
   const result = { ...initialResponse, message: 'Hello from ~/mocks.msw/handlers.ts' }
   const _addDataRaw = url.searchParams.get('_addData')
   const _makeScenarioRaw = url.searchParams.get('_makeScenario')
@@ -56,7 +56,7 @@ const paramsProcessHOC = ({ requestUrl, initialResponse }: { requestUrl: string,
   }
 
   return { finalData: result, delayMs } // 🌟 Возвращаем и данные, и время задержки
-};
+}
 
 // 🌟 Сделали резолвер асинхронным
 const specialApiResolver: HttpResponseResolver<TQuery, never, NSDMS.TBaseResponseData> = async ({
@@ -64,106 +64,107 @@ const specialApiResolver: HttpResponseResolver<TQuery, never, NSDMS.TBaseRespons
   params: _params,
   cookies: _cookies,
 }) => {
-  const clientOrigin = request.headers.get('origin') || getUrlOrigin(request.url);
+  const clientOrigin = request.headers.get('origin') || getUrlOrigin(request.url)
 
   // 🌟 Извлекаем delayMs для всех методов, чтобы можно было задерживать OPTIONS/GET/POST одинаково
-  const url = new URL(request.url);
-  const _responseDelayRaw = url.searchParams.get('_responseDelay');
-  const delayMs = _responseDelayRaw ? parseInt(_responseDelayRaw, 10) : 0;
+  const url = new URL(request.url)
+  const _responseDelayRaw = url.searchParams.get('_responseDelay')
+  const delayMs = _responseDelayRaw ? parseInt(_responseDelayRaw, 10) : 0
 
   // 🌟 Применяем задержку на самом верхнем уровне резолвера (если передана)
   if (!isNaN(delayMs) && delayMs > 0) {
-    await delay(delayMs);
+    await delay(delayMs)
   }
 
   switch (request.method) {
-    case 'OPTIONS':
-      return new HttpResponse(null, {
-        status: 204,
-        headers: getSpecificHeaders(clientOrigin),
-      });
-    case 'GET': {
-      switch (true) {
-        case getMatched({ pattern: '*/profile/search', testedUrl: request.url }):
-        case getMatched({ pattern: '*/profile/accessPolicies', testedUrl: request.url }):
-        case getMatched({ pattern: '*/policy', testedUrl: request.url }):
-        case getMatched({ pattern: '*/menu', testedUrl: request.url }):
-        case getMatched({ pattern: '*/notifications/count', testedUrl: request.url }):
-        case getMatched({ pattern: '*/dataProcessingAgreement/exists', testedUrl: request.url }):
-        case getMatched({ pattern: '*/dataProcessingAgreement', testedUrl: request.url }):
-        case getMatched({ pattern: '*/onlineChat/data', testedUrl: request.url }):
-        case getMatched({ pattern: '*/request/administrative/topics', testedUrl: request.url }):
-        case getMatched({ pattern: '*/onlineChat/data', testedUrl: request.url }):
-        case getMatched({ pattern: '*/notifications/count', testedUrl: request.url }): {
-          const { finalData } = paramsProcessHOC({
-            requestUrl: request.url,
-            initialResponse: { ok: true },
-          })
-          return HttpResponse.json(finalData, { status: 200, headers: getSpecificHeaders(clientOrigin) })
-        }
-        default:
-          return passthrough()
-      }
-    }
-    case 'POST': {
-      switch (true) {
-        case getMatched({ pattern: '*/authentication/oldLkdms/frame/syncToken/generate', testedUrl: request.url }):
-        case getMatched({ pattern: '*/profile/child/add', testedUrl: request.url }):
-        case getMatched({ pattern: '*/request/administrative', testedUrl: request.url }):
-        case getMatched({ pattern: '*/notifications/viewed', testedUrl: request.url }): {
-          const { finalData } = paramsProcessHOC({
-            requestUrl: request.url,
-            initialResponse: { ok: true },
-          });
-          return HttpResponse.json(finalData, { status: 200, headers: getSpecificHeaders(clientOrigin) });
-        }
-        default:
-          return passthrough();
-      }
+  case 'OPTIONS':
+    return new HttpResponse(null, {
+      status: 204,
+      headers: getSpecificHeaders(clientOrigin),
+    })
+  case 'GET': {
+    switch (true) {
+    case getMatched({ pattern: '*/profile/search', testedUrl: request.url }):
+    case getMatched({ pattern: '*/profile/accessPolicies', testedUrl: request.url }):
+    case getMatched({ pattern: '*/policy', testedUrl: request.url }):
+    case getMatched({ pattern: '*/menu', testedUrl: request.url }):
+    case getMatched({ pattern: '*/notifications/count', testedUrl: request.url }):
+    case getMatched({ pattern: '*/dataProcessingAgreement/exists', testedUrl: request.url }):
+    case getMatched({ pattern: '*/dataProcessingAgreement', testedUrl: request.url }):
+    case getMatched({ pattern: '*/onlineChat/data', testedUrl: request.url }):
+    case getMatched({ pattern: '*/request/administrative/topics', testedUrl: request.url }):
+    case getMatched({ pattern: '*/onlineChat/data', testedUrl: request.url }):
+    case getMatched({ pattern: '*/notifications/count', testedUrl: request.url }): {
+      const { finalData } = paramsProcessHOC({
+        requestUrl: request.url,
+        initialResponse: { ok: true },
+      })
+      return HttpResponse.json(finalData, { status: 200, headers: getSpecificHeaders(clientOrigin) })
     }
     default:
-      return passthrough();
+      return passthrough()
+    }
+  }
+  case 'POST': {
+    switch (true) {
+    case getMatched({ pattern: '*/authentication/oldLkdms/frame/syncToken/generate', testedUrl: request.url }):
+    case getMatched({ pattern: '*/profile/child/add', testedUrl: request.url }):
+    case getMatched({ pattern: '*/request/administrative', testedUrl: request.url }):
+    case getMatched({ pattern: '*/notifications/viewed', testedUrl: request.url }):
+    case getMatched({ pattern: '*/tmp_file', testedUrl: request.url }): {
+      const { finalData } = paramsProcessHOC({
+        requestUrl: request.url,
+        initialResponse: { ok: true },
+      })
+      return HttpResponse.json(finalData, { status: 200, headers: getSpecificHeaders(clientOrigin) })
+    }
+    default:
+      return passthrough()
+    }
+  }
+  default:
+    return passthrough()
   }
 }
 
-// 🌟 Сделали резолвер асинхронным
+// Резолвер асинхронный
 const coreApiResolver: HttpResponseResolver = async ({ request, params: _params, cookies: _cookies }): Promise<any> => {
   const origin = getUrlOrigin(request.url)
 
-  // 🌟 Добавляем поддержку задержки и во второй резолвер
-  const url = new URL(request.url);
-  const _responseDelayRaw = url.searchParams.get('_responseDelay');
-  const delayMs = _responseDelayRaw ? parseInt(_responseDelayRaw, 10) : 0;
+  // Добавлена поддержка задержки и во второй резолвер
+  const url = new URL(request.url)
+  const _responseDelayRaw = url.searchParams.get('_responseDelay')
+  const delayMs = _responseDelayRaw ? parseInt(_responseDelayRaw, 10) : 0
 
   if (!isNaN(delayMs) && delayMs > 0) {
-    await delay(delayMs);
+    await delay(delayMs)
   }
 
   switch (request.method) {
-    case 'OPTIONS':
-      return new HttpResponse(null, {
-        status: 204,
-        headers: getSpecificHeaders(origin),
-      })
-    case 'GET': {
-      switch (true) {
-        // case getMatched({ pattern: '*/user/findByGUID', testedUrl: request.url }):
-        //   return HttpResponse.json(findByGUID, { status: 200, headers: getSpecificHeaders(origin) });
-        default:
-          return passthrough()
-      }
-    }
-    case 'POST':
-      switch (true) {
-        case getMatched({ pattern: '*/logger/sendLog', testedUrl: request.url }):
-          return HttpResponse.json({ message: 'Log is sent', code: '200' }, { status: 204, headers: getSpecificHeaders(origin) })
-        default:
-          return passthrough()
-      }
+  case 'OPTIONS':
+    return new HttpResponse(null, {
+      status: 204,
+      headers: getSpecificHeaders(origin),
+    })
+  case 'GET': {
+    switch (true) {
+    // case getMatched({ pattern: '*/user/findByGUID', testedUrl: request.url }):
+    //   return HttpResponse.json(findByGUID, { status: 200, headers: getSpecificHeaders(origin) });
     default:
       return passthrough()
+    }
   }
-};
+  case 'POST':
+    switch (true) {
+    case getMatched({ pattern: '*/logger/sendLog', testedUrl: request.url }):
+      return HttpResponse.json({ message: 'Log is sent', code: '200' }, { status: 204, headers: getSpecificHeaders(origin) })
+    default:
+      return passthrough()
+    }
+  default:
+    return passthrough()
+  }
+}
 
 const coreApiHack = http.all(
   'http://local.core.ru:8080/*',

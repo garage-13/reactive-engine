@@ -12,4 +12,4 @@ export const getSpecificHeaders = (origin: string): HeadersInit => ({
   // 4. Опционально: позволяем браузеру кэшировать preflight-ответ на 10 минут -> 600,
   // чтобы он не спамил OPTIONS-запросами при каждом fetch
   // 'Access-Control-Max-Age': '600',
-});
+})

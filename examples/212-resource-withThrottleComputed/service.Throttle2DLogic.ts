@@ -5,7 +5,7 @@ export class Throttle2DLogic extends AbstractService {
   public coordsSignal = this.createSignal<{ x: number; y: number }>({ x: 0, y: 0 }, 'example-212:signal:coords')
 
   // 1. Сырой сигнал мыши (спамит на каждый пиксель)
-  public rawCoords = this.engine.signal({ x: 0, y: 0 }, 'example-212:signal:raw-coords');
+  public rawCoords = this.engine.signal({ x: 0, y: 0 }, 'example-212:signal:raw-coords')
 
   /**
    * 2.1 🚫 Альтернативный вариант (он тоже будет работать)
@@ -42,13 +42,13 @@ export class Throttle2DLogic extends AbstractService {
   )
   public analyticsResource = this.engine.resource(
     async (coords) => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const sector = coords.x < 200 ? 'Левый сектор' : 'Правый сектор';
-      return `Аналитика GPU: [${sector}] для точки X: ${coords.x}, Y: ${coords.y}`;
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      const sector = coords.x < 200 ? 'Левый сектор' : 'Правый сектор'
+      return `Аналитика GPU: [${sector}] для точки X: ${coords.x}, Y: ${coords.y}`
     },
     this.throttledCoords,
     'example-212:resource:analytics'
-  );
+  )
 
   /**
    * Экшен обновления координат из UI

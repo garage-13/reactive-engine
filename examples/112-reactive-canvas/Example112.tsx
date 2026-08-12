@@ -14,32 +14,32 @@ const engine = new ReactiveEngine({
 })
 
 export const Example112 = () => {
-  const logic = engine.inject(TelemetryLogic);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const logic = engine.inject(TelemetryLogic)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   // Подписываемся на расширенный computed-мост
-  const liveMetrics = engine.use(logic.uiBridge);
+  const liveMetrics = engine.use(logic.uiBridge)
 
   useEffect(() => {
-    logic.startMonitoring();
+    logic.startMonitoring()
 
-    let disconnectPainter: (() => void) | null = null;
+    let disconnectPainter: (() => void) | null = null
     if (canvasRef.current) {
-      disconnectPainter = logic.connectCanvasPainter(canvasRef.current);
+      disconnectPainter = logic.connectCanvasPainter(canvasRef.current)
     }
 
     return () => {
-      if (disconnectPainter) disconnectPainter(); // Останавливаем плавную волну Canvas
-      logic.destroy();                             // Останавливаем фоновый сбор и удаляем эффекты ядра
-    };
-  }, [logic]);
+      if (disconnectPainter) disconnectPainter() // Останавливаем плавную волну Canvas
+      logic.destroy()                             // Останавливаем фоновый сбор и удаляем эффекты ядра
+    }
+  }, [logic])
 
   // Вычисляем цвет индикатора прогресса в зависимости от нагрузки на лимит
   const getProgressColor = (percent: number) => {
-    if (percent > 80) return '#ff4a4a'; // Критический жор памяти (Красный)
-    if (percent > 50) return 'orange';  // Повышенный расход (Оранжевый)
-    return '#42b883';                   // Норма (Зеленый)
-  };
+    if (percent > 80) return '#ff4a4a' // Критический жор памяти (Красный)
+    if (percent > 50) return 'orange'  // Повышенный расход (Оранжевый)
+    return '#42b883'                   // Норма (Зеленый)
+  }
 
   return (
     <div className={clsx(baseClasses.unit, baseClasses.stack2)} style={{ width: '600px' }}>
