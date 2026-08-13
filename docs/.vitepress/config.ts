@@ -108,6 +108,9 @@ export default defineConfig({
               items: [
                 // { text: 'Все примеры и сущности', link: '/examples' },
                 { text: '100: Удвоенный счетчик', link: '/examples/computed/100' },
+                { text: '115: Связывание инстансов (3)', link: '/examples/computed/115' },
+                { text: '116: Связывание инстансов (2)', link: '/examples/computed/116' },
+                { text: '117: Связывание инстансов (1)', link: '/examples/computed/117' },
               ]
             }
           ],
