@@ -2,6 +2,8 @@ import { shallowRef, onUnmounted, getCurrentInstance, getCurrentScope, onScopeDi
 import { ReactiveEngine as OriginalReactiveEngine, type CleanupFn } from '../core/core'
 
 export class ReactiveEngine4Vue extends OriginalReactiveEngine {
+  protected override frameworkPrefix = 'vue'
+
   /**
    * Использование реактивного значения в Vue компоненте или EffectScope.
    * Нативно поддерживает сигналы (Push) и ленивые вычисляемые свойства (Pull).
@@ -13,7 +15,7 @@ export class ReactiveEngine4Vue extends OriginalReactiveEngine {
     // Подписываемся на изменения реактивного элемента ядра
     const unsubscribe = item.subscribe((newValue) => {
       state.value = newValue // Обновляем Vue-реактивную переменную
-      triggerRef(state) // 👈 ПРИНУДИТЕЛЬНО заставляем Vue перерисовать шаблон
+      triggerRef(state) // ПРИНУДИТЕЛЬНО заставляем Vue перерисовать шаблон
     })
 
     // Автоматическое управление жизненным циклом подписок во Vue
