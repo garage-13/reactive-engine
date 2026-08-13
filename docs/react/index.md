@@ -6,6 +6,10 @@ hero:
   tagline: Выберите нужный для перехода к руководству.
 
 features:
+  - icon: 🚀
+    title: Quick Start
+    details: Быстрый старт.
+    link: /guides/quick-start/react
   - icon: 🪝
     title: React hooks
     details: Универсальные хуки.
