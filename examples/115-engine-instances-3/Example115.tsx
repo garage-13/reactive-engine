@@ -6,8 +6,20 @@ import { HostGlobalService, WidgetInternalService } from './services'
 import clsx from 'clsx'
 
 // 🌟 Создаем два АБСОЛЮТНО независимых государства в памяти
-const hostEngine = new ReactiveEngine({ logger: { isEnabled: true, filter: /^host:.*/ } })
-const widgetEngine = new ReactiveEngine({ logger: { isEnabled: true, filter: /^widget:.*/ } })
+const hostEngine = new ReactiveEngine({
+  logger: {
+    isEnabled: true,
+    filter: /^host:.*/,
+    instanceName: 'example-115 (host)',
+  }
+})
+const widgetEngine = new ReactiveEngine({
+  logger: {
+    isEnabled: true,
+    filter: /^widget:.*/,
+    instanceName: 'example-115 (widget)',
+  }
+})
 
 export const Example115 = () => {
   // Инжектируем синглтоны в их родные инстансы движков

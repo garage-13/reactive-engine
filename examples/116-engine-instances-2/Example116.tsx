@@ -1,4 +1,3 @@
-// src/examples/example-116/Example116.tsx
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/ui.button.module.scss'
 import { hostEngine, widgetEngine, hostLogic, widgetLogic } from './service.Example116'

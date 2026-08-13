@@ -1,14 +1,23 @@
-// src/examples/example-117/service.Example117.ts
 import { AbstractService } from '@pravosleva/reactive-engine'
 import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 
 // 1. Инициализируем два абсолютно независимых инстанса реактивного ядра из ветки /react
 export const hostEngine = new ReactiveEngine({
-  logger: { isEnabled: true, traceTime: false, filter: /^host:.*/ }
+  logger: {
+    isEnabled: false,
+    traceTime: false,
+    filter: /^host:.*/,
+    instanceName: 'example-117 (host)',
+  }
 })
 
 export const widgetEngine = new ReactiveEngine({
-  logger: { isEnabled: true, traceTime: false, filter: /^widget:.*/ }
+  logger: {
+    isEnabled: false,
+    traceTime: false,
+    filter: /^widget:.*/,
+    instanceName: 'example-117 (widget)',
+  }
 })
 
 // 2. Описываем Глобальный сервис хост-приложения (Engine 1)
@@ -28,7 +37,7 @@ export class WidgetInternalService extends AbstractService {
   // Вычисляемое свойство виджета
   public widgetStatus = this.engine.computed(() => {
     return `[Виджет v117 для ${this.currentTargetUser.value}]. Локальных кликов: ${this.widgetLocalCounter.value}`
-  }, 'widget:computed:status [IS_OPTIMIZED=1]')
+  }, 'widget:computed:status')
 
   public incLocal() {
     this.widgetLocalCounter.value += 1

@@ -18,7 +18,7 @@ export class WidgetInternalService extends AbstractService {
   // Тяжелый локальный компутед виджета
   public widgetStatus = this.engine.computed(() => {
     return `[Виджет работает для ${this.currentTargetUser.value}]. Локальных кликов: ${this.widgetLocalCounter.value}`
-  }, 'widget:computed:status [IS_OPTIMIZED=1]')
+  }, 'widget:computed:status')
 
   public incLocal() {
     this.widgetLocalCounter.value += 1

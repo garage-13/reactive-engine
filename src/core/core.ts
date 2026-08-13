@@ -92,6 +92,8 @@ export interface Resource<T> extends ResourceState<T> {
 }
 
 export interface EngineLoggerOptions {
+  /** Наименование инстанса движка */
+  instanceName?: string;
   /** Включить детальное логгирование в консоль */
   isEnabled: boolean;
   /** Выводить время выполнения с точностью до микросекунд (performance.now) */
@@ -283,8 +285,7 @@ export class ReactiveEngine {
       // Переключаем текст под-бэджа, если это внутренний сигнал computed
       const typeLabel = isInternal ? 'COMPUTED_INTERNAL' : 'SIGNAL'
 
-      subBadgeText = ` 🔄 Изменений ${isInternal ? 'кэша' : 'сигнала'}: ${currentCount}${isNoisy ? ' ⚠️ (high noise — обнаружен дребезг/спам значений!)' : ''
-      }`
+      subBadgeText = ` 🔄 Изменений ${isInternal ? 'кэша' : 'сигнала'}: ${currentCount}${isNoisy ? ' ⚠️ (high noise — обнаружен дребезг/спам значений!)' : ''}`
 
       if (isNoisy) {
         subBadgeStyle = 'color: orange; font-weight: bold;'
@@ -567,7 +568,7 @@ export class ReactiveEngine {
     // %c №2 - Серый текст с размером батча и чистым временем выполнения (ms)
     // %c №3 - Динамический цветной индикатор тренда (Красный/Зеленый) с процентами
     console.groupCollapsed(
-      `%cREACTIVE TRANSACTION%c Microtask Tick (Size: ${logsToRender.length}${durationText})%c${trendText}`,
+      `%cREACTIVE TRANSACTION${!!this.loggerOptions.instanceName ? ` ${this.loggerOptions.instanceName}` : ''}%c Microtask Tick (Size: ${logsToRender.length}${durationText})%c${trendText}`,
       'background: #7952b3; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
       'color: #aaa; font-weight: normal;',
       trendStyle
