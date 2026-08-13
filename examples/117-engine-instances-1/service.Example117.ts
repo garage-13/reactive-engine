@@ -39,16 +39,9 @@ export class WidgetInternalService extends AbstractService {
 export const hostLogic = hostEngine.inject(HostGlobalService)
 export const widgetLogic = widgetEngine.inject(WidgetInternalService)
 
-// 🌟 ЧИСТЫЙ JS-МОСТ СИНХРОНИЗАЦИИ (Способ 1):
+// ЧИСТЫЙ JS-МОСТ СИНХРОНИЗАЦИИ (Способ 1):
 // Мы подписываемся напрямую на мутации сигнала Первого движка (Engine 1).
-// Метод .subscribe() возвращает событие изменений. Эта связь вечна и изолирована
-// в слое данных, обходя планировщик фоновых эффектов и рендеринг React!
-// hostLogic.activeUserId.subscribe((event) => {
-//   // Напрямую и синхронно пушим новое значение во Второй изолированный движок (Engine 2)
-//   widgetLogic.currentTargetUser.value = event.to
-// })
-// 🌟 ИСПРАВЛЕННЫЙ И ТИПOБЕЗОПАСНЫЙ JS-МОСТ (Способ 1):
-// Метод .subscribe() у сигналов вашего ядра поставляет напрямую новое значение (строку).
+// Метод .subscribe() у сигналов ядра поставляет напрямую новое значение (строку).
 hostLogic.activeUserId.subscribe((nextUserId) => {
   // Напрямую и синхронно пушем новое строковое значение во Второй движок
   widgetLogic.currentTargetUser.value = nextUserId
