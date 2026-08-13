@@ -354,8 +354,15 @@ export class ReactiveEngine {
     case 'effect': {
       const currentCount = (this.effectExecutionCounts.get(name) || 0) + 1
       this.effectExecutionCounts.set(name, currentCount)
+
       const isOverTriggered = currentCount > 30
-      subBadgeText = ` 🚀 Вызовов эффекта: ${currentCount}${isOverTriggered ? ' ⚠️ (heavy re-renders)' : ''}`
+      const currentDetail = detail as any
+      const durationStr = currentDetail && 'duration' in currentDetail ? ` (${currentDetail.duration})` : ''
+
+      // Выводим статус стабильности и длительность в заголовок бэджа по аналогии с computed
+      subBadgeText = ` 🟢 Стабильно${durationStr} | 🚀 Вызовов: ${currentCount}${isOverTriggered ? ' ⚠️ (heavy re-renders)' : ''}`
+      subBadgeStyle = 'color: #42b883; font-weight: bold;'
+
       if (isOverTriggered) subBadgeStyle = 'color: #ff4a4a; font-weight: bold;'
       break
     }
@@ -693,6 +700,10 @@ export class ReactiveEngine {
    */
   public effect(fn: EffectFn, label?: string): CleanupFn {
     const engine = this
+    // Теперь он жестко изолирован в памяти для данного инстанса эффекта,
+    // никогда не потеряет контекст и гарантированно станет false после первого тика!
+    // Эта переменная она полностью блокирует ложные «холостые» логи при инициализации (монтировании) эффекта
+    let isFirstRun = true
     const effectObj: IEffect = {
       label, // Запоминаем имя эффекта для профайлера/логов
       cleanups: new Set(),
@@ -701,11 +712,37 @@ export class ReactiveEngine {
         this.cleanups.clear()
         const prev = engine.activeEffect
         engine.activeEffect = this
+        // Замер производительности эффекта:
+        const startTime = performance.now()
         engine.safeRun(this, () => {
           const cleanup = fn()
           if (typeof cleanup === 'function') this.cleanups.add(cleanup)
         })
+
         engine.activeEffect = prev
+
+        // Logger integretion (Читаем флаг из замыкания):
+        // Логируем только если это боевой перезапуск (isFirstRun === false)
+        const duration = performance.now() - startTime
+        if (!isFirstRun && engine.loggerOptions?.isEnabled) {
+          const filter = engine.loggerOptions.filter
+
+          if (!filter || (filter instanceof RegExp && !!this.label && filter.test(this.label))) {
+            if (typeof engine.queueLog === 'function') {
+              engine.queueLog('effect', this.label || 'unnamed-efect-0', {
+                name: this.label || 'unnamed-efect-0', // Ключ для фильтрации во flushLogs
+                type: 'effect', // Ключ для switch/case в методе log()
+                detail: {
+                  status: 'stable',
+                  duration: `${duration.toFixed(3)}ms`,
+                  timestamp: startTime
+                }
+              })
+            }
+          }
+        }
+        // После первого прохода снимаем флаг
+        isFirstRun = false
       }
     }
     this.allEffects.add(effectObj)

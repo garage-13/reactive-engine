@@ -6,7 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
-## - 2026-08-11
+## [1.5.3-beta] - 2026-08-13
+
+### Добавлено
+* **Патч ядра: Полное логирование и трассировка эффектов (`effect`)**
+  * Внедрена нативная интеграция метода `engine.effect` в глобальную систему батчинга логов `REACTIVE TRANSACTION`.
+  * Добавлен замер производительности выполнения эффектов через `performance.now()` с выводом точного хронометража (`duration`) в консоль DevTools.
+  * Реализован автоматический инкремент счетчика боевых вызовов эффекта (`🚀 Вызовов: N`) с выводом предупреждения `heavy re-renders` в случае обнаружения циклического дребезга или спама значений (более 30 вызовов за такт).
+  * В метод `this.log()` добавлен бэдж `🟩 EFFECT` для сквозного визуального аудита реактивного графа.
+  * Флаг `isFirstRun` инкапсулирован в замыкание метода `effect` для изоляции контекста `this` и бесшумной блокировки холостых «стартовых» логов при сборке первичных зависимостей.
+
+### Исправлено
+* **Устранение RegExp-ловушки фильтрации во `flushLogs`**
+  * Исправлен системный контракт передачи аргументов в `engine.queueLog` внутри метода `effect`. Имя эффекта теперь строго мапится в свойство `name`, что гарантирует стопроцентное прохождение лога через регулярные выражения фильтра логгера (`loggerOptions.filter`).
+  * Устранено аварийное падение (Silent Exception) функции `console.groupCollapsed` из-за отсутствия предопределенного CSS-стиля для типа `'effect'` в справочнике `badgeColors`.
+
+## [1.5.1-beta] - 2026-08-11
 
 ### Added
 - **Property-level advice for `signal`**: Integrated an intelligent runtime performance linter inside `log()` method. If a signal detects a mutation frequency of over 50 ticks per microtask thread, it evaluates current listeners using `getExtractedValues()`. If any unoptimized UI element is bound without specific protection metadata, it automatically injects a tailored `__performance_advice__` payload with ready-to-copy solutions directly into the expanded console group.
@@ -17,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
-## - 2026-08-10
+## [1.4.3-beta] - 2026-08-10
 
 ### Added
 - **`withThrottleComputed` Decorator**: Engineered a specialized, synchronous, highly optimized reactive stream decorator for throttling heavy cascade computations (`engine.computed`). Crucial for compressing hyper-frequent upstream inputs (such as cursor tracking `onMouseMove`, window scroll, or input debouncing) down to discrete intervals before values propagate deeper into components.
@@ -29,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
-## - 2026-08-08
+## [1.4.1-beta] - 2026-08-08
 
 ### Added
 - **Core Microtask Logger Subsystem**: Designed and integrated a feature-rich, high-density transactional engine profiler operated natively on microtask boundaries (`queueMicrotask`).
