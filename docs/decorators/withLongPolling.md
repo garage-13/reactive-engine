@@ -1,7 +1,7 @@
 <!-- Вставляем README как живой текст (символы @ и ../../.. работают одинаково) -->
 <!--@include: ../../src/decorators/withLongPolling/README.md-->
 
-## Пример 215: Отправка логов по действиям пользователя
+## Пример 215: Отправка логов по действиям пользователя в интерфейсе
 
 https://github.com/garage-13/reactive-engine/tree/main/examples/215-resource-withLongPolling
 
