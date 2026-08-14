@@ -61,9 +61,9 @@ export default defineConfig({
           entryFileNames: (chunkInfo: PreRenderedChunk) => {
             // Если файл изначально из core/, убираем эту вложенность для сохранения обратной совместимости корневого импорта
             if (chunkInfo.name.startsWith('core/')) {
-              return `${chunkInfo.name.replace('core/', '')}.mjs`;
+              return `${chunkInfo.name.replace('core/', '')}.mjs`
             }
-            return `${chunkInfo.name}.mjs`;
+            return `${chunkInfo.name}.mjs`
           }
         },
         {
@@ -73,9 +73,9 @@ export default defineConfig({
           preserveModulesRoot: 'src',
           entryFileNames: (chunkInfo: PreRenderedChunk) => {
             if (chunkInfo.name.startsWith('core/')) {
-              return `${chunkInfo.name.replace('core/', '')}.cjs`;
+              return `${chunkInfo.name.replace('core/', '')}.cjs`
             }
-            return `${chunkInfo.name}.cjs`;
+            return `${chunkInfo.name}.cjs`
           }
         }
       ] as any
@@ -97,4 +97,4 @@ export default defineConfig({
       },
     }
   },
-} satisfies UserConfig);
+} satisfies UserConfig)
