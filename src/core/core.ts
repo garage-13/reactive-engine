@@ -100,6 +100,8 @@ export interface EngineLoggerOptions {
   traceTime?: boolean;
   /** Фильтровать логи по имени сигнала (поддерживает RegExp или строку) */
   filter?: RegExp | string;
+  /** Показывать внутренние системные логи ядра (сигналы кэша, эффекты computed) */
+  isCoreOptimizationDebugEnabled?: boolean;
 }
 
 export interface ReactiveEngineOptions {
@@ -233,6 +235,19 @@ export class ReactiveEngine {
     detail: LogDetailMap[K]
   ): void {
     if (!this.loggerOptions?.isEnabled) return
+
+    if (!this.loggerOptions?.isCoreOptimizationDebugEnabled) {
+      // Детектим внутренний сигнал кэша
+      const isInternalSignal = getExtractedValues({
+        expectedKey: 'CORE_INTERNAL_SIGNAL', tested: [name], valueType: 'number'
+      })?.[0] === '1'
+      // Детектим внутренний эффект оптимизации компута по маркеру в имени
+      const isInternalEffect = getExtractedValues({
+        expectedKey: 'CORE_INTERNAL_EFFECT', tested: [name], valueType: 'number'
+      })?.[0] === '1'
+      // Если это сервисный лог, а отладка оптимизации выключена — тихо выходим!
+      if (isInternalSignal || isInternalEffect) return
+    }
 
     // Фильтрацию производим уже по очищенному имени
     if (this.loggerOptions.filter) {
@@ -819,7 +834,7 @@ export class ReactiveEngine {
       // Пушим значение. Сеттер сигнала подхватит следующий шаг,
       // так как флаг isBatching удерживается шедулером!
       (sig as any).value = cachedValue
-    }, `[IS_OPTIMIZED=1]:${name}`)
+    }, `[CORE_INTERNAL_EFFECT=1]:${name}`)
 
     const effectObj = Array.from(this.allEffects)[this.allEffects.size - 1]
 
