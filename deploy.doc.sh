@@ -59,6 +59,11 @@ export VITE_GA4_KEY="$VITE_GA4_KEY_VALUE"
 echo '--> Building documentation... 🛠️'
 yarn docs:build
 
+# -- Копирование UMD-бандла внутрь дистрибутива документации перед деплоем
+# Передаем 3 аргумента: назначение (первый), копируемые файлы (остальные)
+bash ./_aux.copy-artifacts.sh "./docs/.vitepress/dist" "./dist/reactive-engine.umd.js" "./dist/reactive-engine.umd.js.map"
+# --
+
 # Валидация сборки
 if [ ! -d "docs/.vitepress/dist" ] || [ -z "$(ls -A docs/.vitepress/dist)" ]; then
     echo "ERROR: Build folder 'docs/.vitepress/dist' is missing or empty! Deploy aborted." >&2

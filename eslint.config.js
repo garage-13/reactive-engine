@@ -3,6 +3,17 @@ import tsParser from '@typescript-eslint/parser'
 // import tsPlugin from '@typescript-eslint/eslint-plugin' // 1. Импортируем плагин
 
 export default [
+  // Глобальные исключения
+  // Этот объект обязан идти первым и содержать ТОЛЬКО ключ ignores.
+  // Теперь ESLint никогда не зайдет в дистрибутив пакета, кэш и артефакты сборки!
+  {
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'build/**',
+      '**/*.umd.js'
+    ]
+  },
   {
     // Глобальная настройка отступов для всех поддерживаемых файлов в проекте
     files: ['**/*.{js,mjs,cjs,ts,tsx}'],

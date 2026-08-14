@@ -20,8 +20,8 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "unpkg": "./dist/index.iife.js",
-  "jsdelivr": "./dist/index.iife.js",
+  "unpkg": "./dist/reactive-engine.umd.js",
+  "jsdelivr": "./dist/reactive-engine.umd.js",
   "type": "module",
   "exports": {
     ".": {
@@ -51,7 +51,9 @@
   "scripts": {
     "dev": "vite build --watch",
     "start": "vite --host --open",
-    "build": "vite build",
+    "build:modules": "vite build",
+    "build:umd": "vite build --config vite.config.umd.ts",
+    "build": "yarn build:modules && yarn build:umd",
     "test": "NODE_OPTIONS='--expose-gc' vitest run",
     "test:ui": "NODE_OPTIONS='--expose-gc' vitest --ui",
     "test:watch": "vitest",
