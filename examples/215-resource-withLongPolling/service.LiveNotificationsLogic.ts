@@ -13,8 +13,7 @@ interface ServerResponse {
   notifications: NotificationItem[]
 }
 
-// Из кортежа убран сигнал isServerOnline.
-// Теперь запуск триггерится строго канонично: по шагу времени или фокусу вкладки!
+// Запуск триггерится строго канонично: по шагу времени или фокусу вкладки!
 type TPollingDeps = [isLoopActive: boolean, pollingTick: number, isTabActive: boolean];
 
 export class LiveNotificationsLogic extends AbstractService {
@@ -166,8 +165,7 @@ export class LiveNotificationsLogic extends AbstractService {
 
   /**
    * ИМПЕРАТИВНЫЙ СТАРТЕР (Init)
-   * 🎓 Мы убрали вызов .refetch(). Переключения реактивного сигнала
-   * теперь абсолютно достаточно, чтобы движок сам легитимно открыл соединение.
+   * Достаточно, чтобы движок сам открыл соединение.
    */
   public startLongPolling = () => {
     if (this.isLoopActive.value) return
@@ -197,10 +195,6 @@ export class LiveNotificationsLogic extends AbstractService {
     }
   }
 
-  /**
-   * Изменение isServerOnline больше не дергает транзакции планировщика напрямую.
-   * Код работает плавно, без дедлоков рантайма.
-   */
   public toggleServerStatus() {
     this.isServerOnline.value = !this.isServerOnline.value
 

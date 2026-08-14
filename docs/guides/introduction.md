@@ -689,7 +689,7 @@ const cartService = engine.inject(CartService);
 
 ## Про `provide`, `inject` и `use`
 Метод `engine.use(item)` — это финальный мост (адаптер) между чистым реактивным миром вашей библиотеки и UI-компонентами React.
-Если методы `provide` и `inject` нужны для того, чтобы красиво организовывать и связывать код вне компонентов React (в чистых TypeScript-классах и сервисах), то метод use нужен исключительно внутри React-компонентов, чтобы заставить их перерисовываться при изменении данных.
+Если методы `provide` и `inject` нужны для того, чтобы красиво организовывать и связывать код вне компонентов React (в чистых TypeScript-классах и сервисах), то метод `use` нужен исключительно внутри React-компонентов, чтобы заставить их перерисовываться при изменении данных.
 
 ### 🔍 Про устаревший `use` (Объяснение разницы подходов)
 > _Используйте более новый путь - `useReactiveValue`_
@@ -792,7 +792,7 @@ export const UserHeader = () => {
   const name = useReactiveValue(authService.username);
 
   return (
-    <header style={{ padding: '10px', background: '#f5f5f5' }}>
+    <header>
       <h1>Привет, {name}!</h1>
       <button onClick={() => authService.changeName('Пётр')}>
         Сменить имя на Пётр

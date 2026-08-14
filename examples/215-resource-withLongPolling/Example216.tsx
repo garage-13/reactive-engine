@@ -21,7 +21,7 @@ export const LiveNotificationsExample = () => {
   const receivedNotifications = engine.use(logic.receivedNotifications)
   const outgoingBuffer = engine.use(logic.outgoingBuffer)
 
-  // ИСПРАВЛЕНИЕ: Комплексный эффект инициализации и отслеживания активности вкладки
+  // Комплексный эффект инициализации и отслеживания активности вкладки
   useEffect(() => {
     logic.startLongPolling()
 
@@ -53,7 +53,7 @@ export const LiveNotificationsExample = () => {
         запускать и гасить фоновые сетевые потоки. Переключение между ними абсолютно взаимоисключающее.
       </div>
 
-      {/* УПРАВЛЕНИЕ ЖИЗНЕННЫМ ЦИКЛОМ (Строго ваша стилистика кнопок) */}
+      {/* Управление жизненным циклом */}
       <div style={{ display: 'flex', gap: '16px', width: '100%' }}>
         <button
           disabled={isLoopActive}
