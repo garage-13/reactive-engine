@@ -27,13 +27,15 @@ The package is built with bundle size optimization in mind and features full **t
 
 The engine implements a unidirectional data flow that is completely decoupled from your UI framework (such as Vue, React, or Svelte):
 ```
-[ UI Action (Click/Input) ] ──> Update Signal
-                                      │
-                                      ▼
-                           [ Compute Computed ]
-                                      │
-                                      ▼
-[ Micro-optimized UI Render ] <── Effect (DOM Mutation)
+[ UI Action (Click/Input) ]
+↓
+Update Signal
+↓
+[ Compute Computed ]
+↓
+Effect (DOM Mutation)
+↓
+[ Micro-optimized UI Render ]
 ```
 
 ## Architectural Building Blocks
