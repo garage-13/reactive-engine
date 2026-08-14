@@ -5,10 +5,10 @@
 
 https://github.com/garage-13/reactive-engine/tree/main/examples/215-resource-withLongPolling
 
-*Бизнес-логика:*
+*Основная бизнес-логика:*
 
 <<< ../../examples/215-resource-withLongPolling/service.LiveNotificationsLogic.ts{ts}
 
 *React компонент:*
 
-<<< ../../examples/215-resource-withLongPolling/Example216.tsx{tsx}
+<<< ../../examples/215-resource-withLongPolling/Example215.tsx{tsx}
