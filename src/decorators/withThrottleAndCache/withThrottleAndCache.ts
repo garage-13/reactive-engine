@@ -11,8 +11,64 @@ interface CacheEntry<T> {
 }
 
 /**
- * Комбинированный декоратор: сначала применяет троттлинг к частоте вызовов,
- * а затем проверяет кэш перед отправкой реального fetcher-запроса.
+ * Комбинированный декоратор высокой производительности: применяет ограничение частоты вызовов (Throttling)
+ * с сохранением последнего вызова (Trailing edge) и проверяет валидность кэша в оперативной памяти
+ * перед отправкой реального сетевого запроса.
+ *
+ * Нативно поддерживает отмену операций через стандартный `AbortSignal` на всех этапах жизненного цикла.
+ *
+ * ### 🧠 Алгоритм работы (Два контура защиты):
+ * 1. **Контур Троттлинга:** Если функция вызывается чаще чем раз в `limit` миллисекунд,
+ *    вызовы группируются. Первый вызов выполняется мгновенно (Leading edge), а все последующие
+ *    внутри окна блокировки перезаписывают друг друга. Выполнится только самый последний вызов (Trailing edge)
+ *    по истечении таймера. Все промежуточные отброшенные вызовы отклоняются с ошибкой `AbortError`.
+ * 2. **Контур Кэширования:** Когда таймер троттлинга истекает и наступает время реального выполнения,
+ *    функция генерирует строковый ключ на основе аргумента `source` (через `JSON.stringify` для объектов).
+ *    Если в кэше есть свежий результат, чей возраст меньше `ttl`, он возвращается мгновенно **без**
+ *    повторного вызова исходного `fetcher`-запроса.
+ *
+ * @template S Тип входных данных (аргументов) для запроса. Используется для генерации ключа кэша.
+ * @template T Тип данных, возвращаемых асинхронным `fetcher`-ом (разрешенное значение промиса).
+ *
+ * @param {(source: S, signal: AbortSignal) => Promise<T>} fetcher Асинхронная функция-загрузчик, выполняющая реальный сетевой или дисковый запрос.
+ * @param {ThrottleAndCacheOptions} [options={}] Параметры конфигурации декоратора.
+ * @param {number} [options.limit=300] Окно троттлинга в миллисекундах (минимальный интервал между прямыми вызовами).
+ * @param {number} [options.ttl=300000] Время жизни кэша (Time-To-Live) в миллисекундах (по умолчанию 5 минут).
+ *
+ * @returns {(source: S, signal: AbortSignal) => Promise<T>} Возвращает обернутую функцию, которая возвращает `Promise<T>`.
+ *
+ * @example
+ * ```typescript
+ * import { withThrottleAndCache } from '@pravosleva/reactive-engine';
+ *
+ * interface SearchQuery { query: string; page: number; }
+ * interface SearchResult { items: string[]; total: number; }
+ *
+ * const fetchApi = async (search: SearchQuery, signal: AbortSignal): Promise<SearchResult> => {
+ *   const response = await fetch(`/api/search?q=${search.query}&p=${search.page}`, { signal });
+ *   return response.json();
+ * };
+ *
+ * // Создаем оптимизированную функцию поиска
+ * const optimizedSearch = withThrottleAndCache(fetchApi, { limit: 500, ttl: 60 * 1000 });
+ *
+ * // Пример вызова внутри реактивного эффекта
+ * const controller = new AbortController();
+ *
+ * optimizedSearch({ query: 'react', page: 1 }, controller.signal)
+ *   .then(data => updateUi(data))
+ *   .catch(err => {
+ *     if (err.name === 'AbortError') console.log('Запрос отменен троттлером или пользователем');
+ *   });
+ * ```
+ *
+ * @abstract
+ * ### 🚨 Интеграция с AbortSignal и управление памятью
+ * Декоратор имеет встроенный обработчик события `abort`. Если пользователь отменяет операцию
+ * (например, уходит со страницы) во время ожидания в окне троттлинга:
+ * - Активный таймер `setTimeout` сбрасывается и зануляется.
+ * - Ожидающий промис немедленно переходит в состояние `rejected` с ошибкой `AbortError`.
+ * - Все внутренние ссылки на `source` и методы разрешения промиса очищаются (`null`), предотвращая утечки памяти в замыканиях.
  */
 export const withThrottleAndCache = <S, T>(
   fetcher: (source: S, signal: AbortSignal) => Promise<T>,
