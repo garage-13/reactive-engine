@@ -14,7 +14,8 @@ const bannerText = `/*!
  *
  * @contact Telegram Channel: https://t.me/bash_exp_ru/3393
  * @contact Developer Telegram: https://t.me/pravosleva
- */`
+ */
+`
 
 export default defineConfig({
   resolve: {

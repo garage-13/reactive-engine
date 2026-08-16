@@ -39,12 +39,12 @@ export default defineConfig({
     sourcemap: true,
     lib: {
       entry: {
-        index: path.resolve(__dirname, 'src/core/index.ts'),
+        index: path.resolve(__dirname, 'src/index.ts'),
         'react/index': path.resolve(__dirname, 'src/react/index.ts'),
         'vue/index': path.resolve(__dirname, 'src/vue/index.ts'),
         'angular/index': path.resolve(__dirname, 'src/angular/index.ts'),
       },
-      name: "ReactiveEngineLib",
+      name: 'ReactiveEngineLib',
     },
     rollupOptions: {
       // Исключаем react, vue (возможно, что-то еще) из финального бандла,
