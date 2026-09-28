@@ -30,4 +30,8 @@ features:
     title: withLongPolling
     details: Автоматически организует периодические запросы к серверу для обновления ресурсов в реальном времени.
     link: /decorators/withLongPolling
+  - icon: 💾
+    title: withStaleWhileRevalidate
+    details: Эта утилита перехватывает вызовы `fetcher`, сохраняя последнее успешное состояние данных для возврата в случае сетевых сбоев или отмены запросов.
+    link: /decorators/withStaleWhileRevalidate
 ---

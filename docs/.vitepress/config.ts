@@ -60,7 +60,8 @@ export default defineConfig({
                 { text: 'withThrottle', link: '/decorators/withThrottle' },
                 { text: 'withThrottleComputed', link: '/decorators/withThrottleComputed' },
                 { text: 'withThrottleAndCache', link: '/decorators/withThrottleAndCache' },
-                { text: 'withLongPolling', link: '/decorators/withLongPolling' }
+                { text: 'withLongPolling', link: '/decorators/withLongPolling' },
+                { text: 'withStaleWhileRevalidate', link: '/decorators/withStaleWhileRevalidate' },
               ]
             }
           ],

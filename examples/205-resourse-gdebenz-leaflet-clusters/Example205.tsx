@@ -17,7 +17,9 @@ export const MapExample = () => {
   const logic = engine.inject(MapLogic)
 
   // Достаем состояние ресурса АЗС для декларативного отображения статуса в UI
-  const { loading, data: stations, error } = useReactiveValue(logic.stationsResource)
+  const { loading, error } = useReactiveValue(logic.stationsResource)
+
+  const markersCount = engine.use(logic.markers).length // По аналогии с Example100
 
   /**
    * Callback Ref для управления жизненным циклом DOM-ноды карты.
@@ -67,8 +69,8 @@ export const MapExample = () => {
         <span>
           {loading
             ? '🟡 Получение АЗС...'
-            : stations
-              ? `🟢 Найдено АЗС: ${stations.length}`
+            : !error
+              ? `🟢 Найдено АЗС: ${markersCount}`
               : error
                 ? '🔴 Ошибка запроса'
                 : '⚪'}

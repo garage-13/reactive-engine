@@ -1,6 +1,8 @@
 # 🚀 ReactiveEngine Core Framework
 A lightweight, type-safe reactive engine built with TypeScript, featuring Dependency Injection and seamless React integration.
 
+![logo](/public/reactive-engine.svg)
+
 ## Instruction
 - 🇬🇧 [In English](https://pravosleva.pro/reactive-engine/en)
 - 🇷🇺 [In Russian](https://pravosleva.pro/reactive-engine)
