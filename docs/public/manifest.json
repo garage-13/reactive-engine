@@ -1,0 +1,42 @@
+{
+  "name": "Reactive Engine Docs",
+  "short_name": "RE Docs",
+  "theme_color": "#ff8e53",
+  "background_color": "#ff8e53",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/reactive-engine/",
+  "start_url": "/reactive-engine/",
+  "icons": [
+    {
+      "src": "/reactive-engine/pwa/manifest-icon-192.maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/reactive-engine/pwa/manifest-icon-192.maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/reactive-engine/pwa/manifest-icon-512.maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/reactive-engine/pwa/manifest-icon-512.maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/reactive-engine/rocket-thruster-120x120.svg",
+      "sizes": "120x120",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

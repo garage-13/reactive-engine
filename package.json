@@ -62,7 +62,8 @@
     "postversion": "git push && git push --tags",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "_docs:pwa-gen": "npx pwa-asset-generator docs/public/rocket-thruster-120x120.svg docs/public/pwa/ --manifest docs/public/manifest.json --base /reactive-engine/pwa/ --background \"#1a1a24\" --padding \"15%\""
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",
@@ -100,6 +101,7 @@
     "@types/three": "^0.185.1",
     "@typescript-eslint/eslint-plugin": "^8.67.0",
     "@typescript-eslint/parser": "^8.67.0",
+    "@vite-pwa/vitepress": "^1.1.0",
     "@vitejs/plugin-react": "^5.0.4",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitest/ui": "^4.1.10",
@@ -127,6 +129,7 @@
     "typescript": "^5.9.3",
     "vite": "^8.1.3",
     "vite-plugin-dts": "^5.0.3",
+    "vite-plugin-pwa": "^1.3.0",
     "vite-tsconfig-paths": "^6.1.1",
     "vitepress": "^1.6.4",
     "vitest": "^4.1.10"

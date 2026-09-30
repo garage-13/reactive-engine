@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitepress'
+import { withPwa } from '@vite-pwa/vitepress'
 
-// Гарантируем, что base ВСЕГДА будет содержать слэш на конце: '/reactive-engine/'
+// Гарантируем, что base ВСЕГДА будет содержать слэш на конце: `${process.env.VITE_PUBLIC_URL}/'
 const PUBLIC_URL = process.env.VITE_PUBLIC_URL
   ? `${process.env.VITE_PUBLIC_URL}/`.replace(/\/+$/, '/')
-  : '/reactive-engine'
+  : `${process.env.VITE_PUBLIC_URL}`
 // Считываем ключ из переменных окружения (например, из .env.production.local)
 // Если переменной нет, можно указать фолбек-строку или оставить пустой
 const GA4_KEY = process.env.VITE_GA4_KEY || 'G-XXXXXXXXXX'
@@ -12,10 +13,92 @@ const GA4_KEY = process.env.VITE_GA4_KEY || 'G-XXXXXXXXXX'
 console.log('\n--- [CHECK] VITE_GA4_KEY VALUE:', GA4_KEY, '---\n')
 
 // https://vitepress.dev/reference/site-config
-export default defineConfig({
+export default withPwa(defineConfig({
   title: 'Reactive Engine',
   description: 'Логическое ядро проекта',
   base: PUBLIC_URL,
+
+  pwa: {
+    outDir: '.vitepress/dist', // Куда складывать sw.js при сборке
+    registerType: 'autoUpdate', // Автоматически обновлять кэш при пуше новой доки
+    includeAssets: ['rocket-thruster-120x120.svg'],
+
+    manifest: false, // Отключаем автогенерацию, так как мы используем наш готовый docs/public/manifest.json
+
+    workbox: {
+      globPatterns: ['**/*.{css,js,html,svg,png,ico,txt,woff2}'],
+      // Стратегия кэширования для страниц документации:
+      // Всегда мгновенно отдаем из кэша (для офлайна), но в фоне проверяем обновления на сервере
+      runtimeCaching: [
+        {
+          urlPattern: ({ url }) => url.pathname.includes(`${process.env.VITE_PUBLIC_URL}/`),
+          handler: 'StaleWhileRevalidate',
+          options: {
+            cacheName: 'vitepress-docs-cache',
+            expiration: {
+              maxEntries: 150,
+              maxAgeSeconds: 60 * 60 * 24 * 30 // Кэшируем на 30 дней
+            }
+          }
+        }
+      ]
+    }
+  },
+  head: [
+    // 0.1 Подключение внешнего скрипта библиотеки GA4
+    [
+      'script',
+      {
+        async: '', // Пустой атрибут async пишется именно так
+        src: `https://www.googletagmanager.com/gtag/js?id=${GA4_KEY}`
+      }
+    ],
+    // 0.2 Инициализирующий инлайн-скрипт
+    [
+      'script',
+      {},
+      `
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        // Флаг send_page_view: false отключает автоматический первый трек,
+        // так как наш роутер в теме сам отправит событие при инициализации приложения
+        gtag('config', '${GA4_KEY}', { send_page_view: false });
+      `
+    ],
+
+    // 1. Базовые настройки PWA и Манифест (с ?v=3 для гарантированного сброса старого кэша)
+    ['link', { rel: 'manifest', href: `${process.env.VITE_PUBLIC_URL}/manifest.json` }],
+    ['meta', { name: 'theme-color', content: '#ff8e53' }],
+    ['meta', { name: 'apple-mobile-web-app-capable', content: 'yes' }],
+    ['meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }],
+    ['meta', { name: 'apple-mobile-web-app-title', content: 'RE Docs' }],
+
+    // 2. Фавиконки для вкладок браузера (Ретина + Вектор)
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${process.env.VITE_PUBLIC_URL}/rocket-thruster-120x120.svg` }],
+    ['link', { rel: 'apple-touch-icon', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-icon-180.png` }],
+
+    // 3. Пакет экранов заставок Apple Splash Screens (Забираем из вывода генератора)
+    // Каждая строка жестко привязана к медиа-запросу конкретного iPhone/iPad
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-2048-2732.jpg`, media: '(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-2732-2048.jpg`, media: '(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-1668-2388.jpg`, media: '(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-2388-1668.jpg`, media: '(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-1536-2048.jpg`, media: '(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-2048-1536.jpg`, media: '(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-1125-2436.jpg`, media: '(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-2436-1125.jpg`, media: '(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-1242-2688.jpg`, media: '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-2688-1242.jpg`, media: '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-828-1792.jpg`, media: '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-1792-828.jpg`, media: '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-750-1334.jpg`, media: '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-1334-750.jpg`, media: '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-640-1136.jpg`, media: '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)' }],
+    ['link', { rel: 'apple-touch-startup-image', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-splash-1136-640.jpg`, media: '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)' }]
+    // Вы можете докинуть сюда остальные строки из консоли по аналогии, если требуется точечная поддержка старых iPad mini/iPhone SE
+  ],
 
   // Настройка локализации (Мультиязычность)
   locales: {
@@ -222,30 +305,7 @@ export default defineConfig({
   },
 
   // Массив head отвечает за инжекты в тег <head> каждой страницы
-  head: [
-    // 1. Подключение внешнего скрипта библиотеки GA4
-    [
-      'script',
-      {
-        async: '', // Пустой атрибут async пишется именно так
-        src: `https://www.googletagmanager.com/gtag/js?id=${GA4_KEY}`
-      }
-    ],
-    // 2. Инициализирующий инлайн-скрипт
-    [
-      'script',
-      {},
-      `
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
 
-        // Флаг send_page_view: false отключает автоматический первый трек,
-        // так как наш роутер в теме сам отправит событие при инициализации приложения
-        gtag('config', '${GA4_KEY}', { send_page_view: false });
-      `
-    ]
-  ],
 
   themeConfig: {
     // Включаем встроенный локальный поиск
@@ -298,4 +358,4 @@ export default defineConfig({
       }
     }
   },
-})
+}))

@@ -11,6 +11,10 @@ export default {
   Layout: () => {
     return h(DefaultTheme.Layout, null, {
       // https://vitepress.dev/guide/extending-default-theme#layout-slots
+
+      // Плагин @vite-pwa/vitepress автоматически регистрирует этот глобальный компонент во Vue,
+      // поэтому ручной import ... отсюда можно полностью удалить!
+      'layout-bottom': () => h('PwaRegistration')
     })
   },
   enhanceApp({ router }: EnhanceAppContext) {
