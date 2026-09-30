@@ -31,7 +31,6 @@ export default defineConfig({
         nav: [
           { text: 'Введение', link: '/guides' },
           { text: 'Старт с UI-слоем', link: '/guides/quick-start' },
-          { text: 'React', link: '/react' },
           { text: 'Декораторы', link: '/decorators/' },
           { text: 'Примеры', link: '/examples/' },
         ],
@@ -43,8 +42,8 @@ export default defineConfig({
               items: [
                 { text: 'Введение', link: '/guides' },
                 { text: 'Старт с UI-слоем', link: '/guides/quick-start' },
-                { text: 'React', link: '/react' },
-                { text: 'Хуки для React', link: '/react/hooks' },
+                // { text: 'React', link: '/react' },
+                // { text: 'Хуки для React', link: '/react/hooks' },
                 { text: 'Философия движка', link: '/guides/philosophy' },
                 // { text: 'Подробное описание', link: '/guides/introduction' },
               ]
@@ -158,7 +157,7 @@ export default defineConfig({
         // НАВИГАЦИЯ ДЛЯ АНГЛИЙСКОЙ ВЕРСИИ
         nav: [
           { text: 'Guides', link: '/en/guides' },
-          { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
+          // { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
           { text: 'Decorators', link: '/en/decorators/' },
         ],
         // Боковое меню для английской версии
@@ -168,7 +167,7 @@ export default defineConfig({
               text: 'Guide',
               items: [
                 { text: 'Guides', link: '/en/guides' },
-                { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
+                // { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
                 { text: 'Philosophy', link: '/en/guides/philosophy' },
                 { text: 'Introduction', link: '/guides/introduction' },
               ]

@@ -2,7 +2,8 @@
 import { h } from 'vue'
 import type { Theme as TTheme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
-import './style.css'
+// import './style.css'
+import './custom.css'
 import type { EnhanceAppContext } from 'vitepress'
 
 export default {
@@ -52,18 +53,18 @@ export default {
         const target = (event.target as HTMLElement).closest('a')
 
         switch (target?.href) {
-          case 'https://t.me/bash_exp_ru/3393':
-            if (typeof window.gtag === 'function') {
-              window.gtag('event', 'telegram_click', {
-                page_path: window.location.pathname,
-                target_url: target.href,
-                post_id: '3393'
-              })
-              // console.log('[GA4] Затрекан клик по ссылке на Telegram!')
-            }
-            break;
-          default:
-            break
+        case 'https://t.me/bash_exp_ru/3393':
+          if (typeof window.gtag === 'function') {
+            window.gtag('event', 'telegram_click', {
+              page_path: window.location.pathname,
+              target_url: target.href,
+              post_id: '3393'
+            })
+            // console.log('[GA4] Затрекан клик по ссылке на Telegram!')
+          }
+          break
+        default:
+          break
         }
       }
 

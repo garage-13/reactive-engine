@@ -6,10 +6,19 @@ hero:
   name: Reactive Engine
   text: Логическое ядро проекта
   tagline: Предсказуемый и быстрый граф реактивных вычислений
+  image:
+    src: /rocket-thruster-120x120.svg
+    alt: Reactive Engine Logo
   actions:
     - theme: brand
-      text: React
+      text: React 18+
       link: /react
+    - theme: brand
+      text: Vue 3.2+
+      link: /vue
+    - theme: brand
+      text: Angular 16+
+      link: /angular
     - theme: alt
       text: Описание
       link: /guides

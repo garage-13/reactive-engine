@@ -1,7 +1,7 @@
 // Декларация для обычных CSS-импортов
 declare module '*.css' {
-  const content: unknown;
-  export default content;
+  const content: unknown
+  export default content
 }
 
 // Расширяем глобальный объект Window

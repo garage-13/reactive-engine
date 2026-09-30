@@ -8,8 +8,8 @@ next:
 # UI-слой
 
 - [React](/guides/quick-start/react)
-- Vue
-- Angular
+- [Vue](/guides/quick-start/vue)
+- Angular (wip)
 
 ## Чтоб необходимо знать про инстансы движка
 

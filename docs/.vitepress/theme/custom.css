@@ -1,0 +1,121 @@
+/* ==========================================================================
+   ФИРМЕННЫЙ ОРАНЖЕВО-КРАСНЫЙ СТИЛЬ ДЛЯ REACTIVE ENGINE
+   ========================================================================== */
+
+:root {
+  /* 1. Градиент главного заголовка Name */
+  --vp-home-hero-name-background: linear-gradient(135deg, #ff8e53 0%, #ef4444 100%);
+
+  /* 2. Цвета для главной кнопки (Theme: Brand) */
+  --vp-button-brand-bg: #ff8e53;
+  --vp-button-brand-hover-bg: #ef4444;
+  --vp-button-brand-hover-border: #ef4444;
+  --vp-button-brand-text: #ffffff;
+
+  /* Дополнительные системные цвета акцентов темы под оранжевую гамму */
+  --vp-c-brand-1: #ff8e53;
+  --vp-c-brand-2: #ef4444;
+
+  /* 3. Мягкое фоновое неоновое свечение позади ракеты */
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(255, 142, 83, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
+  --vp-home-hero-image-filter: blur(68px);
+}
+
+/* Настройки сочности свечения специально для темной темы */
+.dark {
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(255, 142, 83, 0.35) 0%, rgba(239, 68, 68, 0.15) 100%);
+  --vp-home-hero-image-filter: blur(60px);
+}
+
+/* ==========================================================================
+   ОБНОВЛЕННЫЕ МУЛЬТИ-БРЕНДОВЫЕ КНОПКИ (УЧЕТ БАЗОВОГО URL И СИНЕГО REACT)
+   ========================================================================== */
+
+/* --- ⚛️ КНОПКА: React (Фирменный неоново-голубой цвет React) --- */
+.VPButton.brand[href="/reactive-engine/react.html"] {
+  background-color: #00d8ff !important;
+  border-color: #00d8ff !important;
+  color: #1a1a24 !important; /* На темном/ярком фоне циана темный текст читается лучше всего */
+  font-weight: bold !important;
+}
+.VPButton.brand[href="/reactive-engine/react.html"]:hover {
+  background-color: #00b4d8 !important;
+  border-color: #00b4d8 !important;
+  color: #ffffff !important; /* При затемнении кнопки возвращаем белый текст */
+  box-shadow: 0 0 16px rgba(0, 216, 255, 0.6) !important;
+}
+
+/* --- 💚 КНОПКА: Vue 3 (Изумрудно-зеленый) --- */
+.VPButton.brand[href="/reactive-engine/vue.html"] {
+  /* - FOR WIP LABEL ONLY */
+  position: relative !important;
+  padding-right: 48px !important; /* Освобождаем место справа под бэйдж WIP */
+  /* - */
+  background-color: #42b883 !important;
+  border-color: #42b883 !important;
+  color: #ffffff !important;
+}
+.VPButton.brand[href="/reactive-engine/vue.html"]:hover {
+  background-color: #33a06f !important;
+  border-color: #33a06f !important;
+  box-shadow: 0 0 16px rgba(66, 184, 131, 0.6) !important;
+}
+
+/* --- ❤️ КНОПКА: Angular 16+ (Малиново-красный) --- */
+/* .VPButton.brand[href="/reactive-engine/angular.html"] {
+  background-color: #dd0031 !important;
+  border-color: #dd0031 !important;
+  color: #ffffff !important;
+}
+.VPButton.brand[href="/reactive-engine/angular.html"]:hover {
+  background-color: #b50027 !important;
+  border-color: #b50027 !important;
+  box-shadow: 0 0 16px rgba(221, 0, 49, 0.6) !important;
+} */
+/* --- ❤️ КНОПКА: Angular 16+ (ЗАДИЗЕЙБЛЕНА ШТРИХОВКОЙ + WIP ЛЕЙБЛ) --- */
+.VPButton.brand[href="/reactive-engine/angular.html"] {
+  position: relative !important;
+  /* Красный фон + полупрозрачная косая штриховка */
+  background: linear-gradient(
+    rgba(221, 0, 49, 0.45),
+    rgba(221, 0, 49, 0.45)
+  ),
+  repeating-linear-gradient(
+    45deg,
+    #dd0031,
+    #dd0031 10px,
+    #c40028 10px,
+    #c40028 20px
+  ) !important;
+
+  border-color: #b50027 !important;
+  color: rgba(255, 255, 255, 0.6) !important; /* Слегка приглушаем текст */
+  padding-right: 48px !important; /* Освобождаем место справа под бэйдж WIP */
+
+  /* 🛑 Полная блокировка кликов и переходов */
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+/* 🏷️ ПРИНУДИТЕЛЬНЫЙ ЛЕЙБЛ "WIP" НА БАЗЕ ПСЕВДОЭЛЕМЕНТА */
+.VPButton.brand[href="/reactive-engine/vue.html"]::after,
+.VPButton.brand[href="/reactive-engine/angular.html"]::after {
+  content: "WIP" !important;
+  position: absolute !important;
+  right: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+
+  /* Стилизация мини-плашки */
+  background-color: #000000 !important;
+  color: #ffca28 !important; /* Яркий желтый неоновый текст */
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 10px !important;
+  font-weight: bold !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  border: 1px solid #ffca28 !important;
+  letter-spacing: 0.5px !important;
+  line-height: 1 !important;
+}

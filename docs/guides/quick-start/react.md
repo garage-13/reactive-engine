@@ -8,7 +8,7 @@ next:
   link: '/examples/signal/001'
 ---
 
-# Быстрый старт с React
+# Быстрый старт с React 18+
 
 ## Установка
 
