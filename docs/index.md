@@ -23,7 +23,7 @@ hero:
       text: Описание
       link: /guides
     - theme: alt
-      text: Декраторы
+      text: Декораторы
       link: /decorators
     - theme: alt
       text: Примеры и сущности
