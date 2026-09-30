@@ -4,7 +4,7 @@ import { AbstractService } from '@pravosleva/reactive-engine'
 import { ReactiveEngine as ReactiveEngine4Vue } from '@pravosleva/reactive-engine/vue'
 import clsx from 'clsx'
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 

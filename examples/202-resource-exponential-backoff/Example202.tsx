@@ -1,5 +1,5 @@
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 import { AbstractService } from '@pravosleva/reactive-engine'
 import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
 import clsx from 'clsx'

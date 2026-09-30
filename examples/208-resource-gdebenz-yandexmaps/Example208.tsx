@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { MapLogic, Station } from './service.MapLogic'
 import clsx from 'clsx'

@@ -24,7 +24,7 @@ import clsx from 'clsx';
 
 // Импортируем ваши общие стили песочницы (CSS/SCSS модули)
 import baseClasses from '~/ui.common.module.scss';
-import btnClasses from '~/ui.button.module.scss';
+import btnClasses from '~/shared/Button/ui.button.module.scss';
 
 // 1. Описываем изолированную бизнес-логику (Ядро/Сервис) — код 1-в-1 как в React/Angular
 class CounterLogic extends AbstractService {

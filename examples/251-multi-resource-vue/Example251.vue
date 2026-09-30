@@ -5,7 +5,7 @@ import { useUserInfoService, useSecondaryService, vueEngine } from './store'
 
 // Импортируем стили песочницы
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 

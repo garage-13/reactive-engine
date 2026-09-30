@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import { Kaboom2DLogic } from './service.Kaboom2DLogic'
 import clsx from 'clsx'

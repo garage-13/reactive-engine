@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import { Cube3DLogic } from './service.Cube3DLogic.v2'
 import clsx from 'clsx'

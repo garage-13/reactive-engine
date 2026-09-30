@@ -1,5 +1,5 @@
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 import { hostEngine, widgetEngine, hostLogic, widgetLogic } from './service.Example116'
 import clsx from 'clsx'
 

@@ -22,8 +22,9 @@ export const Select: React.FC<SelectProps> = ({
   const defaultId = useId()
   const selectId = id || defaultId
 
-  // Лейбл поднимается, если есть выбранное валидное значение
-  const hasValue = value !== undefined && value !== null && value !== ''
+  // Лейбл поднимается, если есть выбранное значение либо дефолтное значение
+  const hasValue = (value !== undefined && value !== null && value !== '') ||
+    (props.defaultValue !== undefined && props.defaultValue !== null && props.defaultValue !== '')
 
   // Сборка классов CSS-модулей
   const wrapperClasses = [

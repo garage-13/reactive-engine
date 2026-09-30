@@ -19,6 +19,7 @@ import { Example113 } from './113-reactive-form-2'
 import { Example115 } from './115-engine-instances-3'
 import { Example116 } from './116-engine-instances-2'
 import { Example117 } from './117-engine-instances-1'
+import { Example118 } from './118-reactive-form-3'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
 import { Example202 } from './202-resource-exponential-backoff'
@@ -156,6 +157,12 @@ export const App = () => {
             description='Engine instances exp (3)'
           >
             <Example117 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 118'
+            description='Reactive form & files (3)'
+          >
+            <Example118 />
           </CardModalWrapper>
 
         </div>

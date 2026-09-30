@@ -1,5 +1,5 @@
-@use './var-colors.scss' as *;
-@use './var-monitor-breakpoints.scss' as *;
+@use '../../var-colors.scss' as *;
+@use '../../var-monitor-breakpoints.scss' as *;
 
 .btn {
   white-space: nowrap;
@@ -139,5 +139,24 @@
       outline: 3px solid var(--btn-color);
       outline-offset: 4px;
     }
+  }
+}
+
+// Стили для встроенного индикатора загрузки
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: neon-spin 0.8s linear infinite;
+  margin-right: 8px; // Отступ перед текстом кнопки
+  vertical-align: middle;
+}
+
+@keyframes neon-spin {
+  to {
+    transform: rotate(360deg);
   }
 }

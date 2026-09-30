@@ -24,7 +24,7 @@ import clsx from 'clsx';
 
 // Import shared sandbox styles (CSS/SCSS Modules)
 import baseClasses from '~/ui.common.module.scss';
-import btnClasses from '~/ui.button.module.scss';
+import btnClasses from '~/shared/Button/ui.button.module.scss';
 
 // 1. Define pure business logic (Core/Service) — 100% identical to React/Angular versions
 class CounterLogic extends AbstractService {

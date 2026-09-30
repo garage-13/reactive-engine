@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 import { HostGlobalService, WidgetInternalService } from './services'
 import clsx from 'clsx'

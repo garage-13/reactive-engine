@@ -1,5 +1,7 @@
+export * from './Button'
 export * from './CardModalWrapper'
 export * from './Input'
+export * from './FileInput'
 export * from './Select'
 export * from './Textarea'
 export * from './VueInReactWrapper'

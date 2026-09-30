@@ -3,7 +3,7 @@ import { AbstractService } from '@pravosleva/reactive-engine'
 import { ReactiveEngine as ReactiveEngine4Vue } from '@pravosleva/reactive-engine/vue'
 import clsx from 'clsx'
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 
 // 1. Описываем каскадную бизнес-логику "Домино" внутри сервиса ядра
 class ClusterLogic extends AbstractService {

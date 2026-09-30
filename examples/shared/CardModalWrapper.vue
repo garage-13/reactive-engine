@@ -4,7 +4,7 @@ import clsx from 'clsx'
 
 // Импортируем ваши общие SCSS-модули
 import baseClasses from '../ui.common.module.scss'
-import btnClasses from '../ui.button.module.scss'
+import btnClasses from '../shared/Button/ui.button.module.scss'
 
 // Описываем интерфейс входных параметров (пропсов)
 interface Props {

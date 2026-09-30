@@ -1,6 +1,6 @@
 import { ChangeEvent, useEffect, useRef } from 'react'
 import baseClasses from '~/ui.common.module.scss'
-import btnClasses from '~/ui.button.module.scss'
+import btnClasses from '~/shared/Button/ui.button.module.scss'
 import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
 import { FormUploaderLogic } from './service.FormUploaderLogic'
 import clsx from 'clsx'

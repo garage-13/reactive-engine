@@ -2,7 +2,7 @@ import { useState, ReactNode, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import baseClasses from '../ui.common.module.scss'
-import btnClasses from '../ui.button.module.scss'
+import btnClasses from '../shared/Button/ui.button.module.scss'
 
 interface CardModalWrapperProps {
   title: string;
