@@ -1,4 +1,4 @@
-# 📡 `withLongPolling` decorator
+# 📡 `withLongPolling`
 
 The updated `withLongPolling` decorator is a high-performance tool for building a real-time update infrastructure using the standard HTTP protocol. In the v2 architecture, the decorator is completely free of hidden background `while` loops and recursive timeouts that were breaking the state manager scheduler.
 

@@ -1,4 +1,4 @@
-# ⏸️ `withDebounce` decorator
+# ⏸️ `withDebounce`
 
 The `withDebounce` decorator is an optimization tool used in scenarios with a high event rate, where a strictly final result is important after the flow of actions has completely stopped or is quiet for a certain period of time.
 
