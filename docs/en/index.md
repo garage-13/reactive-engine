@@ -8,7 +8,7 @@ hero:
   tagline: High-performance reactive state management and utils
   actions:
     - theme: brand
-      text: React
+      text: React 18+
       link: /en/guides/quick-start/react
     - theme: alt
       text: Core Description

@@ -32,13 +32,16 @@
    ========================================================================== */
 
 /* --- ⚛️ КНОПКА: React (Фирменный неоново-голубой цвет React) --- */
-.VPButton.brand[href="/reactive-engine/react.html"] {
+.VPButton.brand[href="/reactive-engine/react.html"],
+.VPButton.brand[href="/reactive-engine/en/react.html"],
+.VPButton.brand[href="/reactive-engine/en/guides/quick-start/react.html"] {
   background-color: #00d8ff !important;
   border-color: #00d8ff !important;
   color: #1a1a24 !important; /* На темном/ярком фоне циана темный текст читается лучше всего */
   font-weight: bold !important;
 }
-.VPButton.brand[href="/reactive-engine/react.html"]:hover {
+.VPButton.brand[href="/reactive-engine/react.html"]:hover,
+.VPButton.brand[href="/reactive-engine/en/react.html"]:hover {
   background-color: #00b4d8 !important;
   border-color: #00b4d8 !important;
   color: #ffffff !important; /* При затемнении кнопки возвращаем белый текст */
@@ -46,7 +49,8 @@
 }
 
 /* --- 💚 КНОПКА: Vue 3 (Изумрудно-зеленый) --- */
-.VPButton.brand[href="/reactive-engine/vue.html"] {
+.VPButton.brand[href="/reactive-engine/vue.html"],
+.VPButton.brand[href="/reactive-engine/en/vue.html"] {
   /* - FOR WIP LABEL ONLY */
   position: relative !important;
   padding-right: 48px !important; /* Освобождаем место справа под бэйдж WIP */
@@ -55,25 +59,29 @@
   border-color: #42b883 !important;
   color: #ffffff !important;
 }
-.VPButton.brand[href="/reactive-engine/vue.html"]:hover {
+.VPButton.brand[href="/reactive-engine/vue.html"]:hover,
+.VPButton.brand[href="/reactive-engine/en/vue.html"]:hover {
   background-color: #33a06f !important;
   border-color: #33a06f !important;
   box-shadow: 0 0 16px rgba(66, 184, 131, 0.6) !important;
 }
 
 /* --- ❤️ КНОПКА: Angular 16+ (Малиново-красный) --- */
-/* .VPButton.brand[href="/reactive-engine/angular.html"] {
+/* .VPButton.brand[href="/reactive-engine/angular.html"],
+.VPButton.brand[href="/reactive-engine/en/angular.html"] {
   background-color: #dd0031 !important;
   border-color: #dd0031 !important;
   color: #ffffff !important;
 }
-.VPButton.brand[href="/reactive-engine/angular.html"]:hover {
+.VPButton.brand[href="/reactive-engine/angular.html"]:hover,
+.VPButton.brand[href="/reactive-engine/en/angular.html"]:hover {
   background-color: #b50027 !important;
   border-color: #b50027 !important;
   box-shadow: 0 0 16px rgba(221, 0, 49, 0.6) !important;
 } */
 /* --- ❤️ КНОПКА: Angular 16+ (ЗАДИЗЕЙБЛЕНА ШТРИХОВКОЙ + WIP ЛЕЙБЛ) --- */
-.VPButton.brand[href="/reactive-engine/angular.html"] {
+.VPButton.brand[href="/reactive-engine/angular.html"],
+.VPButton.brand[href="/reactive-engine/en/angular.html"] {
   position: relative !important;
   /* Красный фон + полупрозрачная косая штриховка */
   background: linear-gradient(
@@ -100,22 +108,34 @@
 
 /* 🏷️ ПРИНУДИТЕЛЬНЫЙ ЛЕЙБЛ "WIP" НА БАЗЕ ПСЕВДОЭЛЕМЕНТА */
 .VPButton.brand[href="/reactive-engine/vue.html"]::after,
-.VPButton.brand[href="/reactive-engine/angular.html"]::after {
-  content: "WIP" !important;
-  position: absolute !important;
-  right: 8px !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
+.VPButton.brand[href="/reactive-engine/en/vue.html"]::after,
+.VPButton.brand[href="/reactive-engine/angular.html"]::after,
+.VPButton.brand[href="/reactive-engine/en/angular.html"]::after {
+  content: "WIP";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
 
   /* Стилизация мини-плашки */
-  background-color: #000000 !important;
-  color: #ffca28 !important; /* Яркий желтый неоновый текст */
-  font-family: 'Courier New', Courier, monospace !important;
-  font-size: 10px !important;
-  font-weight: bold !important;
-  padding: 2px 6px !important;
-  border-radius: 4px !important;
-  border: 1px solid #ffca28 !important;
-  letter-spacing: 0.5px !important;
-  line-height: 1 !important;
+  background-color: #000000;
+  color: #ffca28; /* Яркий желтый неоновый текст */
+  font-family: 'Courier New', Courier, monospace;
+  font-size: x-small;
+  font-weight: bold;
+  border-radius: 8px;
+  border: 1px solid #ffca28;
+  letter-spacing: 0.5px;
+
+  /* Идеальное флекс-центрирование */
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+
+  /* Исправление сдвига вверх: убираем line-height и делаем контролируемые паддинги */
+  line-height: normal;
+  padding: 3px 6px 2px 6px; /* Микро-коррекция: снизу паддинг чуть меньше, чтобы компенсировать оптическое смещение шрифта */
+
+  height: 16px; /* Жестко фиксируем высоту плашки для стабильности флекс-выравнивания */
+  box-sizing: border-box;
 }
