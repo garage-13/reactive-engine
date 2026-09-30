@@ -30,11 +30,3 @@ features:
   - title: Умная асинхронность
     details: Инструмент `resource` из коробки оркеструет `AbortController`, автоматически отменяя предыдущие зависшие сетевые запросы при изменении зависимостей
 ---
-
-<img
-  src="/reactive-engine.svg"
-  alt="Reactive Engine Logo"
-  style="display: block; margin: 2rem auto; width: 100%; max-width: 600px;"
-/>
-
-![logo](/reactive-engine.svg)
