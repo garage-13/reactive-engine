@@ -153,7 +153,12 @@ export const Example118 = () => {
     }
   }, [chosenFiles])
 
-  const handleFormChange = (e: React.FormEvent<HTMLFormElement>) => {
+  /**
+   * Сквозной обработчик изменений формы, полностью совместимый с React 19+.
+   * Использует BaseSyntheticEvent вместо устаревшего FormEvent.
+   */
+  const handleFormChange = (e: React.BaseSyntheticEvent) => {
+    // Метод updateReactiveStateFromForm по-прежнему принимает HTMLFormElement
     logic.updateReactiveStateFromForm(e.currentTarget)
   }
 
