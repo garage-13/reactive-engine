@@ -1,4 +1,4 @@
-# Декоратор `withLongPolling`
+# 📡 Декоратор `withLongPolling`
 
 Практические кейсы применения декоратора `withLongPolling` (Архитектура v2: Event-Driven)
 
