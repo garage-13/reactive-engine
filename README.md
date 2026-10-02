@@ -1,8 +1,8 @@
-# 🚀 ReactiveEngine Core Framework
+# ReactiveEngine Core Framework
 
 <div align="center">
 
-![ReactiveEngine Logo](public/rocket-thruster-120x120.svg)
+![ReactiveEngine Logo](public/rocket-thruster-animated-120x120.svg)
 
 A lightweight, ultra-performance, type-safe reactive engine built with TypeScript, featuring Dependency Injection and seamless multi-framework integration.
 
@@ -10,11 +10,11 @@ A lightweight, ultra-performance, type-safe reactive engine built with TypeScrip
 
 ---
 
-## 🗺️ Documentation & Instructions
+## Documentation & Instructions
 - 🇬🇧 [In English](https://pravosleva.pro/reactive-engine/en)
 - 🇷🇺 [Вводная документация на Русском](https://pravosleva.pro/reactive-engine)
 
-## 🎯 What Problems This Library Solves
+## What Problems This Library Solves
 
 When building large-scale frontend applications, developers constantly run into architectural bottlenecks imposed by built-in state tools. `@pravosleva/reactive-engine` is designed to elegantly solve the following pain points:
 
@@ -44,7 +44,7 @@ When building large-scale frontend applications, developers constantly run into 
 
 ---
 
-## 📦 Installation
+## Installation
 
 Install the package via your favorite package manager:
 
@@ -65,7 +65,7 @@ yarn add @pravosleva/reactive-engine
 
 ---
 
-## 💻 Multi-Framework Usage Examples
+## Multi-Framework Usage Examples
 
 <div>
 <details>

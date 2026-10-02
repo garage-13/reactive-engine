@@ -7,7 +7,7 @@ hero:
   text: Логическое ядро проекта
   tagline: Предсказуемый и быстрый граф реактивных вычислений
   image:
-    src: /rocket-thruster-120x120.svg
+    src: /rocket-thruster-animated-120x120.svg
     alt: Reactive Engine Logo
   actions:
     - theme: brand

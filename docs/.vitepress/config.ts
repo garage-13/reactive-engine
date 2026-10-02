@@ -1,15 +1,27 @@
 import { defineConfig } from 'vitepress'
 import { withPwa } from '@vite-pwa/vitepress'
+import { loadEnv } from 'vite'
 
-// Гарантируем, что base ВСЕГДА будет содержать слэш на конце: `${process.env.VITE_PUBLIC_URL}/'
-const PUBLIC_URL = process.env.VITE_PUBLIC_URL
-  ? `${process.env.VITE_PUBLIC_URL}/`.replace(/\/+$/, '/')
-  : `${process.env.VITE_PUBLIC_URL}`
+// 🎯 Шаг 1. Безопасно загружаем переменные окружения ДО экспорта объекта конфигурации
+// Так как здесь нет контекста `mode`, мы принудительно проверяем как dev, так и production режимы
+const env = {
+  ...loadEnv('development', process.cwd(), ''),
+  ...loadEnv('production', process.cwd(), '')
+}
+
+const rawPublicUrl = env.VITE_PUBLIC_URL
+
+// Шаг 2. Безопасное форматирование базового URL
+let PUBLIC_URL = '/'
+if (rawPublicUrl && rawPublicUrl !== 'undefined') {
+  PUBLIC_URL = `${rawPublicUrl}/`.replace(/\/+\$/, '/')
+}
+
 // Считываем ключ из переменных окружения (например, из .env.production.local)
 // Если переменной нет, можно указать фолбек-строку или оставить пустой
 const GA4_KEY = process.env.VITE_GA4_KEY || 'G-XXXXXXXXXX'
 
-// ВРЕМЕННЫЙ ТЕСТ: Выведет ключ прямо в терминал при сборке
+// Тест вывода в терминал при сборке
 console.log('\n--- [CHECK] VITE_GA4_KEY VALUE:', GA4_KEY, '---\n')
 
 // https://vitepress.dev/reference/site-config
@@ -21,7 +33,7 @@ export default withPwa(defineConfig({
   pwa: {
     outDir: '.vitepress/dist', // Куда складывать sw.js при сборке
     registerType: 'autoUpdate', // Автоматически обновлять кэш при пуше новой доки
-    includeAssets: ['rocket-thruster-120x120.svg'],
+    includeAssets: ['rocket-thruster-animated-120x120.svg'],
 
     manifest: false, // Отключаем автогенерацию, так как мы используем наш готовый docs/public/manifest.json
 
@@ -76,7 +88,7 @@ export default withPwa(defineConfig({
     ['meta', { name: 'apple-mobile-web-app-title', content: 'RE Docs' }],
 
     // 2. Фавиконки для вкладок браузера (Ретина + Вектор)
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${process.env.VITE_PUBLIC_URL}/rocket-thruster-120x120.svg` }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${process.env.VITE_PUBLIC_URL}/rocket-thruster-animated-120x120.svg` }],
     ['link', { rel: 'apple-touch-icon', href: `${process.env.VITE_PUBLIC_URL}/pwa/apple-icon-180.png` }],
 
     // 3. Пакет экранов заставок Apple Splash Screens (Забираем из вывода генератора)
@@ -358,4 +370,5 @@ export default withPwa(defineConfig({
       }
     }
   },
-}))
+}
+))
