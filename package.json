@@ -7,7 +7,10 @@
   "description": "Reactive Engine",
   "author": "Den Pol <selection4test@gmail.com> (https://pravosleva.pro)",
   "homepage": "https://github.com/garage-13/reactive-engine",
-  "repository": "github:garage-13/reactive-engine",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/garage-13/reactive-engine.git"
+  },
   "license": "MIT",
   "keywords": [
     "reactive",
