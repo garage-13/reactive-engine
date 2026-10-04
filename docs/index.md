@@ -10,6 +10,9 @@ hero:
     src: /rocket-thruster-animated-120x120.svg
     alt: Reactive Engine Logo
   actions:
+    - theme: sponsor
+      text: Читать большой обзор
+      link: https://pravosleva.pro/p/reactive-engine-ru/
     - theme: brand
       text: React 18+
       link: /react
