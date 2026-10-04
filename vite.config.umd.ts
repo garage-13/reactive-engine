@@ -1,4 +1,3 @@
-// vite.config.umd.ts
 import { defineConfig, UserConfig } from 'vite'
 import path from 'path'
 import fs from 'fs'
@@ -24,43 +23,62 @@ export default defineConfig({
     },
   },
   plugins: [
-    // Custom hook-plugin: Принудительное внедрение баннера после записи файла на диск
+    // Custom hook-plugin: Внедрение баннера и копирование результатов сборки в документацию
     {
-      name: 'umd-banner-injector',
+      name: 'umd-banner-and-copier',
       closeBundle() {
-        const umdPath = path.resolve(__dirname, 'dist/reactive-engine.umd.js')
+        const distDir = path.resolve(__dirname, 'dist')
+        const targetDocsDir = path.resolve(__dirname, 'docs/public/build')
+
+        const umdFileName = 'reactive-engine.umd.js'
+        const mapFileName = 'reactive-engine.umd.js.map'
+
+        const targetUmdPath = path.join(distDir, umdFileName)
+        const targetMapPath = path.join(distDir, mapFileName)
 
         try {
-          // Проверяем, что UMD файл успешно сгенерирован
-          if (fs.existsSync(umdPath)) {
-            const fileContent = fs.readFileSync(umdPath, 'utf8')
+          // --- ЭТАП 1: Внедрение баннера в UMD-файл ---
+          if (fs.existsSync(targetUmdPath)) {
+            const fileContent = fs.readFileSync(targetUmdPath, 'utf8')
 
-            // Если баннер ещё не добавлен (предохранитель от дублирования)
-            if (!fileContent.startsWith('/**\n * @pravosleva/reactive-engine')) {
-              // Склеиваем баннер и оригинальный код бандла
-              fs.writeFileSync(umdPath, bannerText + fileContent, 'utf8')
+            // Предохранитель от дублирования баннера
+            if (!fileContent.startsWith('/*!\n * @pravosleva/reactive-engine')) {
+              fs.writeFileSync(targetUmdPath, bannerText + fileContent, 'utf8')
               console.log('✅ [UMD Banner Injector]: Паспорт бандла успешно вшит в начало файла!')
+            }
+
+            // --- ЭТАП 2: Копирование файлов в документацию VitePress ---
+            // Убеждаемся, что целевая папка docs/public/build существует
+            if (!fs.existsSync(targetDocsDir)) {
+              fs.mkdirSync(targetDocsDir, { recursive: true })
+            }
+
+            // Копируем сам UMD-бандл
+            fs.copyFileSync(targetUmdPath, path.join(targetDocsDir, umdFileName))
+            console.log(`🚀 [Docs Copier]: Файл ${umdFileName} успешно скопирован в docs/public/build/`)
+
+            // Копируем карту кода (sourcemap), если она сгенерирована
+            if (fs.existsSync(targetMapPath)) {
+              fs.copyFileSync(targetMapPath, path.join(targetDocsDir, mapFileName))
+              console.log(`🚀 [Docs Copier]: Файл ${mapFileName} успешно скопирован в docs/public/build/`)
             }
           }
         } catch (err) {
-          console.error('❌ [UMD Banner Injector Error]: Не удалось записать баннер', err)
+          console.error('❌ [UMD Plugin Error]: Произошла ошибка во время обработки бандла', err)
         }
       }
     }
   ],
   build: {
-    // Говорим Vite НЕ затирать результаты предыдущей сборки ES/CJS в dist/
     emptyOutDir: false,
     sourcemap: true,
     lib: {
-      // Строго ОДНА точка входа — чистый JS-функционал ядра
       entry: path.resolve(__dirname, 'src/core/index.ts'),
       name: "ReactiveEngineLib",
       formats: ['umd'],
       fileName: () => 'reactive-engine.umd.js'
     },
     rollupOptions: {
-      // Исключаем абсолютно все внешние фреймворки, чтобы бандл весил копейки
       external: ['react', 'react-dom', 'vue', '@angular/core'],
       output: {
         exports: "named",
