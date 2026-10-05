@@ -859,7 +859,9 @@ export class ReactiveEngine {
       },
       subscribe: (cb: (val: T) => void) => sig.subscribe(cb),
       destroy() {
+        unsubscribeEffect()
         performCleanup()
+        engine.computedCache.delete(fn)
       }
     }
 
