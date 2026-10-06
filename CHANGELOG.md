@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 ### Добавлено
 * **Описание нового изменения**:
   * Документация.
-  * Bash-скрипт `generate_ai_patch.sh`, читающий из `.env.development` список файлов и промпт - на выходе выдает чистый `.patch` файл.
+  * Bash-скрипт `ai_generate_patch.sh`, читающий из `.env.development` список файлов и промпт - на выходе выдает чистый `.patch` файл.
 
 ## [1.5.9-beta] - 2026-09-28
 
