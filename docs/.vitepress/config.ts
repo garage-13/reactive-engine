@@ -151,6 +151,7 @@ export default withPwa(defineConfig({
               items: [
                 { text: 'Обзор', link: '/methods/' },
                 { text: 'signal', link: '/methods/signal' },
+                { text: 'computed', link: '/methods/computed' },
                 { text: 'reactive', link: '/methods/reactive' },
               ]
             }
@@ -286,6 +287,7 @@ export default withPwa(defineConfig({
               items: [
                 { text: 'Main', link: '/en/methods/' },
                 { text: 'signal', link: '/en/methods/signal' },
+                { text: 'computed', link: '/en/methods/computed' },
                 { text: 'reactive', link: '/en/methods/reactive' },
               ]
             }
