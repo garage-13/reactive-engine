@@ -139,6 +139,7 @@ export interface ResourceLogDetail {
   /** Была ли это повторная попытка (Retry) */
   isRetrying?: boolean;
 }
+export interface ReactiveDetail {}
 
 // Маппинг: связываем строковый литерал типа лога с его интерфейсом деталей
 export interface LogDetailMap {
@@ -147,6 +148,7 @@ export interface LogDetailMap {
   effect: EffectLogDetail;
   batch: BatchLogDetail;
   resource: ResourceLogDetail;
+  reactive: ReactiveDetail;
 }
 
 
@@ -263,6 +265,7 @@ export class ReactiveEngine {
       effect: 'background: #e01e5a; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
       batch: 'background: #7952b3; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
       resource: 'background: #d97706; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
+      reactive: 'background: #007acc; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
     }
 
     let subBadgeText = ''
@@ -934,6 +937,11 @@ export class ReactiveEngine {
           propsSubscribers.get(prop)!.add(engine.activeEffect)
         }
         const value = Reflect.get(obj, prop, receiver)
+        engine.queueLog?.('reactive', `${name}.${String(prop)}`, {
+          action: 'get',
+          property: String(prop),
+          value
+        })
         return (value !== null && typeof value === 'object')
           ? engine.reactive(value, `${name}.${String(prop)}`)
           : value
@@ -948,6 +956,12 @@ export class ReactiveEngine {
           propsSubscribers.get(prop)?.forEach(e =>
             engine.isBatching ? engine.pendingEffects.add(e) : e.run()
           )
+          engine.queueLog?.('reactive', `${name}.${String(prop)}`, {
+            action: 'set',
+            property: String(prop),
+            oldValue: old,
+            newValue: value
+          })
         }
         return true
       }
