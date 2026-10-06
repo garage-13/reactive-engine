@@ -37,3 +37,4 @@ tmp
 docs/.vitepress/cache/*
 *.patch
 .aider.*
+.aider*
