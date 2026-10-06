@@ -126,6 +126,7 @@ export default withPwa(defineConfig({
         nav: [
           { text: 'Введение', link: '/guides' },
           { text: 'Старт с UI-слоем', link: '/guides/quick-start' },
+          { text: 'Методы', link: '/methods/' },
           { text: 'Декораторы', link: '/decorators/' },
           { text: 'Примеры', link: '/examples/' },
         ],
@@ -149,6 +150,7 @@ export default withPwa(defineConfig({
               text: 'Публичные методы (wip)',
               items: [
                 { text: 'Обзор', link: '/methods/' },
+                { text: 'signal', link: '/methods/signal' },
                 { text: 'reactive', link: '/methods/reactive' },
               ]
             }
@@ -262,6 +264,7 @@ export default withPwa(defineConfig({
         nav: [
           { text: 'Guides', link: '/en/guides' },
           // { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
+          { text: 'Methods', link: '/en/methods/' },
           { text: 'Decorators', link: '/en/decorators/' },
         ],
         // Боковое меню для английской версии
@@ -282,6 +285,7 @@ export default withPwa(defineConfig({
               text: 'Public methods (wip)',
               items: [
                 { text: 'Main', link: '/en/methods/' },
+                { text: 'signal', link: '/en/methods/signal' },
                 { text: 'reactive', link: '/en/methods/reactive' },
               ]
             }

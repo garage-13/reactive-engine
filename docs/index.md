@@ -26,6 +26,9 @@ hero:
       text: Описание
       link: /guides
     - theme: alt
+      text: Методы
+      link: /methods
+    - theme: alt
       text: Декораторы
       link: /decorators
     - theme: alt

@@ -14,6 +14,9 @@ hero:
       text: Core Description
       link: /en/guides
     - theme: alt
+      text: Methods
+      link: /methods
+    - theme: alt
       text: Decorators
       link: /en/decorators
 

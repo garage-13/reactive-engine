@@ -107,6 +107,8 @@
 }
 
 /* 🏷️ ПРИНУДИТЕЛЬНЫЙ ЛЕЙБЛ "WIP" НА БАЗЕ ПСЕВДОЭЛЕМЕНТА */
+.VPButton.brand[href="/reactive-engine/methods.html"]::after,
+.VPButton.brand[href="/reactive-engine/en/methods.html"]::after,
 .VPButton.brand[href="/reactive-engine/vue.html"]::after,
 .VPButton.brand[href="/reactive-engine/en/vue.html"]::after,
 .VPButton.brand[href="/reactive-engine/angular.html"]::after,
