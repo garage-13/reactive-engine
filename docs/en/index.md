@@ -6,6 +6,9 @@ hero:
   name: "Reactive Engine"
   text: "The logical core of the project"
   tagline: High-performance reactive state management and utils
+  image:
+    src: /rocket-thruster-animated-120x120.svg
+    alt: Reactive Engine Logo
   actions:
     - theme: brand
       text: React 18+
