@@ -64,9 +64,9 @@ export const Example111 = () => {
   const user = engine.use(logic.uiBridge)
 
   // -- NOTE: Заметьте, эти эффекты будут выполняться по необхдимости
-  useEffect(() => console.log(`React effect: user.name -> ${user.name}`), [user.name])
-  useEffect(() => console.log(`React effect: user.age -> ${user.age}`), [user.age])
-  useEffect(() => console.log(`React effect: user.role -> ${user.role}`), [user.role])
+  useEffect(() => console.log(`React effect 1: user.name -> ${user.name}`), [user.name])
+  useEffect(() => console.log(`React effect 2: user.age -> ${user.age}`), [user.age])
+  useEffect(() => console.log(`React effect 3: user.role -> ${user.role}`), [user.role])
   // --
 
   // Увеличивается синхронно на каждый кадр выполнения функции React

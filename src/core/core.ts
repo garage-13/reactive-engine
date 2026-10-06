@@ -937,11 +937,7 @@ export class ReactiveEngine {
           propsSubscribers.get(prop)!.add(engine.activeEffect)
         }
         const value = Reflect.get(obj, prop, receiver)
-        engine.queueLog?.('reactive', `${name}.${String(prop)}`, {
-          action: 'get',
-          property: String(prop),
-          value
-        })
+        // engine.queueLog?.('reactive', `${name}.${String(prop)}`, { action: 'get', property: String(prop), value })
         return (value !== null && typeof value === 'object')
           ? engine.reactive(value, `${name}.${String(prop)}`)
           : value
