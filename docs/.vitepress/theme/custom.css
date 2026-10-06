@@ -106,9 +106,17 @@
   box-shadow: none !important;
 }
 
+.VPButton.alt[href="/reactive-engine/methods.html"],
+.VPButton.alt[href="/reactive-engine/en/methods.html"] {
+  /* - FOR WIP LABEL ONLY */
+  position: relative !important;
+  padding-right: 48px !important; /* Освобождаем место справа под бэйдж WIP */
+  /* - */
+}
+
 /* 🏷️ ПРИНУДИТЕЛЬНЫЙ ЛЕЙБЛ "WIP" НА БАЗЕ ПСЕВДОЭЛЕМЕНТА */
-.VPButton.brand[href="/reactive-engine/methods.html"]::after,
-.VPButton.brand[href="/reactive-engine/en/methods.html"]::after,
+.VPButton.alt[href="/reactive-engine/methods.html"]::after,
+.VPButton.alt[href="/reactive-engine/en/methods.html"]::after,
 .VPButton.brand[href="/reactive-engine/vue.html"]::after,
 .VPButton.brand[href="/reactive-engine/en/vue.html"]::after,
 .VPButton.brand[href="/reactive-engine/angular.html"]::after,

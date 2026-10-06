@@ -1,4 +1,4 @@
-# Method signal
+# `signal`
 
 The `signal` method allows creating reactive variables that automatically update their subscribers when the value changes.
 
