@@ -106,6 +106,8 @@
   box-shadow: none !important;
 }
 
+.VPButton.alt[href="/reactive-engine/decorators.html"],
+.VPButton.alt[href="/reactive-engine/en/decorators.html"],
 .VPButton.alt[href="/reactive-engine/examples.html"],
 .VPButton.alt[href="/reactive-engine/en/examples.html"] {
   /* - FOR WIP LABEL ONLY */
@@ -115,6 +117,8 @@
 }
 
 /* 🏷️ ПРИНУДИТЕЛЬНЫЙ ЛЕЙБЛ "WIP" НА БАЗЕ ПСЕВДОЭЛЕМЕНТА */
+.VPButton.alt[href="/reactive-engine/decorators.html"]::after,
+.VPButton.alt[href="/reactive-engine/en/decorators.html"]::after,
 .VPButton.alt[href="/reactive-engine/examples.html"]::after,
 .VPButton.alt[href="/reactive-engine/en/examples.html"]::after,
 .VPButton.brand[href="/reactive-engine/vue.html"]::after,

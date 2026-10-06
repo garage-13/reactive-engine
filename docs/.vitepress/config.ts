@@ -298,9 +298,9 @@ export default withPwa(defineConfig({
           ],
           '/en/decorators/': [
             {
-              text: 'Decorators (EN)',
+              text: 'Decorators',
               items: [
-                { text: 'Overview', link: '/en/decorators/' },
+                { text: 'All', link: '/en/decorators/' },
                 { text: 'withCache', link: '/en/decorators/withCache' },
                 { text: 'withDebounce', link: '/en/decorators/withDebounce' },
                 { text: 'withThrottleAndCache', link: '/en/decorators/withThrottleAndCache' },
