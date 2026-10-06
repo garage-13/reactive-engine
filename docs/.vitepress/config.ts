@@ -144,9 +144,18 @@ export default withPwa(defineConfig({
               ]
             }
           ],
+          '/methods/': [
+            {
+              text: 'Публичные методы (wip)',
+              items: [
+                { text: 'Обзор', link: '/methods/' },
+                { text: 'reactive', link: '/methods/reactive' },
+              ]
+            }
+          ],
           '/decorators/': [
             {
-              text: 'Декораторы (RU)',
+              text: 'Декораторы',
               items: [
                 { text: 'Обзор', link: '/decorators/' },
                 { text: 'withCache', link: '/decorators/withCache' },
@@ -265,6 +274,15 @@ export default withPwa(defineConfig({
                 // { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
                 { text: 'Philosophy', link: '/en/guides/philosophy' },
                 { text: 'Introduction', link: '/guides/introduction' },
+              ]
+            }
+          ],
+          '/en/methods/': [
+            {
+              text: 'Public methods (wip)',
+              items: [
+                { text: 'Main', link: '/en/methods/' },
+                { text: 'reactive', link: '/en/methods/reactive' },
               ]
             }
           ],
