@@ -147,13 +147,14 @@ export default withPwa(defineConfig({
           ],
           '/methods/': [
             {
-              text: 'Публичные методы (wip)',
+              text: 'Публичные методы',
               items: [
                 { text: 'Обзор', link: '/methods/' },
                 { text: 'signal', link: '/methods/signal' },
                 { text: 'computed', link: '/methods/computed' },
                 { text: 'reactive', link: '/methods/reactive' },
                 { text: 'resource', link: '/methods/resource' },
+                { text: 'effect', link: '/methods/effect' },
               ]
             }
           ],
@@ -291,6 +292,7 @@ export default withPwa(defineConfig({
                 { text: 'computed', link: '/en/methods/computed' },
                 { text: 'reactive', link: '/en/methods/reactive' },
                 { text: 'resource', link: '/en/methods/resource' },
+                { text: 'effect', link: '/en/methods/effect' },
               ]
             }
           ],

@@ -18,4 +18,7 @@ features:
   - title: resource
     details: This method allows creating asynchronous resources that automatically update their dependencies when the data changes.
     link: /en/methods/resource
+  - title: effect
+    details: This method allows you to create automatic functions that execute when dependent signals change. These effects can be used to update the UI or other dependencies.
+    link: /en/methods/effect
 ---
