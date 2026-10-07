@@ -64,56 +64,6 @@ interface LongPollingOptions {
 }
 ```
 
-## Примеры
-
-### Пример на чистом JavaScript с типизацией TypeScript
-
-```typescript
-import { ReactiveEngine, AbstractService } from '@pravosleva/reactive-engine';
-
-const engine = new ReactiveEngine();
-
-class NotificationService extends AbstractService {
-  public counter = this.engine.signal<number>(0);
-
-  public apiState = this.engine.resource<{ items: string[] }, number>(
-    withLongPolling(
-      async (counterValue, abortSignal) => {
-        const res = await fetch(
-          `https://api.example.com/notifications?counter=${counterValue}`,
-          { signal: abortSignal }
-        );
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        return res.json();
-      },
-      {
-        delay: 1000,
-        errorInitialDelay: 2000,
-        errorMaxDelay: 10000,
-        onNextTick: () => {
-          this.counter.value += 1;
-        },
-        onError: (delay, increaseDelay) => {
-          console.warn(`Ошибка сети. Следующая попытка через ${delay}мс`);
-          increaseDelay();
-        }
-      }
-    ),
-    this.counter,
-    'notificationResource'
-  );
-}
-
-const notificationService = new NotificationService(engine);
-
-notificationService.apiState.subscribe((state) => {
-  console.log('Notification state:', state);
-});
-
-// Запустит перезагрузку ресурса
-notificationService.counter.value += 1;
-```
-
 ## Дополнительная информация
 
 Декоратор `withLongPolling` является важной частью реактивной системы, позволяя автоматически обновлять UI и другие зависимости при изменении данных с использованием паттерна Long Polling.
