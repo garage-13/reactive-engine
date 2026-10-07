@@ -43,10 +43,10 @@ interface DebounceOptions {
  * const debouncedFetch = withDebounce(searchProducts, { delay: 400 });
  *
  * // Интеграция с фабрикой ресурсов вашего реактивного ядра
- * const productSearchResource = engine.resource({
+ * const productSearchResource = engine.resource(
  *   fetcher: debouncedFetch,
  *   source: () => searchInputValue.value // Следит за сигналом строки ввода
- * });
+ * );
  * ```
  *
  * @abstract

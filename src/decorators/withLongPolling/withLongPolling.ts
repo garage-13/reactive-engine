@@ -80,10 +80,10 @@ interface LongPollingOptions {
  * );
  *
  * // 2. Передаем декоратор в подсистему ресурсов ядра
- * const notificationResource = engine.resource({
+ * const notificationResource = engine.resource(
  *   fetcher: pollingFetch,
  *   source: () => currentUserId.value
- * });
+ * );
  * ```
  *
  * @abstract

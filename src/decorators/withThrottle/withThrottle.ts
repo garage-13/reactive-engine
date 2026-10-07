@@ -41,10 +41,10 @@ interface ThrottleOptions {
  * const throttledFetch = withThrottle(fetchUserData, { limit: 400 });
  *
  * // Интеграция с подсистемой ресурсов вашего ядра
- * const userResource = engine.resource({
+ * const userResource = engine.resource(
  *   fetcher: throttledFetch,
  *   source: () => currentUserId.value
- * });
+ * );
  * ```
  *
  * @abstract

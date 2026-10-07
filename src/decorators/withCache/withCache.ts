@@ -48,10 +48,10 @@ interface CacheOptions {
  * const cachedFetch = withCache(fetchCategories, { ttl: 60 * 1000 });
  *
  * // Интеграция с подсистемой ресурсов вашего реактивного ядра
- * const directoryResource = engine.resource({
+ * const directoryResource = engine.resource(
  *   fetcher: cachedFetch,
  *   source: () => currentFilters.value // Следит за сигналом фильтров
- * });
+ * );
  * ```
  *
  * @abstract
