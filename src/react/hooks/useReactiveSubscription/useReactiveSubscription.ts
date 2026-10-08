@@ -1,11 +1,7 @@
 import { useEffect, useRef } from 'react'
+import { ISignalLike } from '../types'
 
 type CleanupFn = () => void
-
-export interface ISignalLike<V> {
-  value: V;
-  subscribe: (cb: (v: V) => void) => CleanupFn;
-}
 
 /**
  * Универсальный хук подписки на реактивные источники ядра для React.

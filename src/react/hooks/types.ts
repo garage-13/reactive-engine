@@ -1,4 +1,4 @@
-import { CleanupFn } from '../../core';
+import { CleanupFn } from '../../core'
 
 /**
  * Общий интерфейс-контракт для любого реактивного объекта библиотеки,
@@ -15,3 +15,8 @@ export interface ObservableItem<T> {
  * либо функцию-фабрику, которая его лениво возвращает.
  */
 export type ReactiveInput<T> = ObservableItem<T> | (() => ObservableItem<T>);
+
+export interface ISignalLike<V> {
+  value: V;
+  subscribe: (cb: (v: V) => void) => CleanupFn;
+}
