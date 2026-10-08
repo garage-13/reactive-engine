@@ -45,5 +45,51 @@ describe('ReactiveEngine (React)', () => {
 
       expect(result.current).toBe('world')
     })
+
+    it('должен успешно синхронизировать reactive-объект напрямую через engine.use без computed-мостов', async () => {
+      const engine = new ReactiveEngine()
+      engine.setReactAdapters(useState, useEffect)
+
+      // 1. Создаем глубокий реактивный объект через Proxy
+      const formState = engine.reactive({
+        user: {
+          name: 'Иван',
+          age: 25
+        },
+        status: 'pending'
+      })
+
+      // 2. Передаем РЕАКТИВНЫЙ ОБЪЕКТ НАПРЯМУЮ в engine.use внутри хука.
+      // Никаких компьютед-мостов не создается.
+      const { result } = renderHook(() => {
+        const state = engine.use(formState)
+
+        // Имитируем чтение свойств в JSX компонента.
+        // Геттер Proxy перехватит обращение во время рендера и подпишет хук на эти ключи.
+        return {
+          displayName: state.user.name,
+          displayStatus: state.status
+        }
+      })
+
+      // Проверяем начальное состояние рендера
+      expect(result.current.displayName).toBe('Иван')
+      expect(result.current.displayStatus).toBe('pending')
+
+      // 3. Прямая мутация вложенного свойства Proxy-объекта
+      await act(async () => {
+        formState.user.name = 'Алексей'
+
+        // Позволяем Event Loop выполнить асинхронный авто-батчинг ядра (queueMicrotask)
+        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+      })
+
+      // Проверяем, что хук React успешно отследил изменения напрямую из Proxy и перерендерился
+      expect(result.current.displayName).toBe('Алексей')
+      expect(result.current.displayStatus).toBe('pending')
+
+      // Финальная очистка Event Loop макрозадач для стабильности Vitest
+      await new Promise((r) => setImmediate(r))
+    })
   })
 })

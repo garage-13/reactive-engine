@@ -148,5 +148,86 @@ describe('ReactiveEngine', () => {
       vi.spyOn(Math, 'random').mockRestore()
     })
 
+    it('должен гарантированно аннулировать подписку на reactive объект после остановки эффекта и не воскресать при мутациях', async () => {
+      const engine = new ReactiveEngine()
+      const state = engine.reactive({ count: 0 })
+      const spy = vi.fn()
+
+      const stop = engine.effect(() => {
+        spy(state.count)
+      })
+
+      expect(spy).toHaveBeenCalledTimes(1)
+      spy.mockClear()
+
+      // Останавливаем эффект
+      stop()
+
+      // Мутируем свойство Proxy
+      state.count = 1
+      await new Promise<void>((r) => queueMicrotask(r))
+
+      // ТЕСТ ДОЛЖЕН ПОКАЗАТЬ, ЧТО ЭФФЕКТ БОЛЬШЕ НЕ ВЫЗЫВАЕТСЯ
+      expect(spy).not.toHaveBeenCalled()
+      expect(spy).toHaveBeenCalledTimes(0)
+    })
+  })
+
+  describe('Глубокая Proxy-реактивность: Массивы и Вложенные структуры', () => {
+
+    it('должен корректно отслеживать обновление массивов через spread-оператор (иммутабельный паттерн)', async () => {
+      const engine = new ReactiveEngine()
+      const state = engine.reactive({ tags: ['js'] })
+      const spy = vi.fn()
+
+      engine.effect(() => {
+        spy(state.tags.length)
+      })
+
+      expect(spy).toHaveBeenCalledWith(1)
+      spy.mockClear()
+
+      // Рекомендованный паттерн для массивов в reactive-engine:
+      // Переприсваивание через spread-оператор идеально перехватывается сеттером Proxy
+      state.tags = [...state.tags, 'ts']
+
+      // Дожидаемся окончания очереди микрозадач нашего нового автобатчинга Proxy
+      await new Promise<void>((r) => queueMicrotask(r))
+
+      expect(spy).toHaveBeenCalledWith(2)
+      expect(spy).toHaveBeenCalledTimes(1)
+    })
+
+    it('должен гарантированно очищать подписки на вложенные подобъекты при остановке эффекта', async () => {
+      const engine = new ReactiveEngine()
+      // Глубокая структура (матрешка) объекта
+      const state = engine.reactive({
+        user: {
+          profile: {
+            name: 'Иван'
+          }
+        }
+      })
+      const spy = vi.fn()
+
+      const stop = engine.effect(() => {
+        spy(state.user.profile.name)
+      })
+
+      expect(spy).toHaveBeenCalledTimes(1)
+      spy.mockClear()
+
+      // Останавливаем эффект — все cleanups глубоких Proxy-путей должны сработать
+      stop()
+
+      // Мутируем самое глубокое свойство
+      state.user.profile.name = 'Алексей'
+      await new Promise<void>((r) => queueMicrotask(r))
+
+      // Проверяем, что глубокий путь полностью отписался и эффект не воскрес
+      expect(spy).not.toHaveBeenCalled()
+      expect(spy).toHaveBeenCalledTimes(0)
+    })
+
   })
 })

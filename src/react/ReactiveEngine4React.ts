@@ -1,14 +1,18 @@
 import { useState as useStateFromReact, useEffect as useEffectFromReact } from 'react'
 import { ReactiveEngine as OriginalReactiveEngine, CleanupFn } from '../core/core'
 
+// 1. Описываем строгий контракт для примитивных Сигналов/Computed
+export interface ISignalLike<V> {
+  value: V;
+  subscribe: (cb: (v: V) => void) => CleanupFn;
+}
+
 /**
  * Класс адаптера для интеграции реактивного движка с React.
- * Наследует функциональность оригинального реактивного движка и предоставляет специализированные методы для работы с React.
  */
 export class ReactiveEngine4React extends OriginalReactiveEngine {
   protected override frameworkPrefix = 'react'
 
-  // Описываем строгие типы для адаптеров React, чтобы не ломать встроенные типы React.
   private reactAdapters: {
     useState: typeof useStateFromReact;
     useEffect: typeof useEffectFromReact;
@@ -17,14 +21,6 @@ export class ReactiveEngine4React extends OriginalReactiveEngine {
       useEffect: useEffectFromReact,
     }
 
-  /**
-   * Установка адаптеров React.
-   * @function setReactAdapters
-   * @param {Function} useState - Функция useState из React.
-   * @param {Function} useEffect - Функция useEffect из React.
-   * @returns {void}
-   * @source
-   */
   public setReactAdapters(
     useState: typeof useStateFromReact,
     useEffect: typeof useEffectFromReact
@@ -33,37 +29,75 @@ export class ReactiveEngine4React extends OriginalReactiveEngine {
   }
 
   /**
-   * Использование реактивного значения в React компоненте.
+   * Использование реактивного значения в React-компоненте.
+   * Поддерживает как атомарные Сигналы/Computed, так и глубокие реактивные Proxy-объекты.
+   *
    * @template T
-   * @function use
-   * @param {{ value: T; subscribe: (cb: (v: T) => void) => CleanupFn }} item - Реактивный объект.
-   * @returns {T} - Значение реактивного объекта.
-   * @source
+   * @param {T} item - Реактивный объект (сигнал или прокси)
+   * @returns {T extends ISignalLike<infer V> ? V : T} - Развернутое значение или сам прокси-объект
    */
-  public use<T>(item: { value: T; subscribe: (cb: (v: T) => void) => CleanupFn }): T {
+  public use<T>(item: T): T extends ISignalLike<infer V> ? V : T {
     if (!this.reactAdapters) {
       throw new Error("[React Error]: Адаптеры React не установлены. Вызовите engine.setReactAdapters(useState, useEffect).")
     }
 
-    // NOTE: (защита) проверяем, что нам передали объект сигнала
-    if (!item || typeof item.subscribe !== 'function') {
-      const errorMsg = `
-        [Reactive Error]: engine.use() получил некорректный объект!
-        Скорее всего, вы пытаетесь подписаться на свойство сервиса, которое не было инициализировано.
-        Проверьте, что в классе написано: public mySignal = this.engine.signal(...)
-      `
-      console.error(errorMsg, { item })
-      throw new Error(errorMsg)
+    const isSignal = item &&
+                     typeof item === 'object' &&
+                     'subscribe' in item &&
+                     typeof (item as Record<string, unknown>).subscribe === 'function'
+
+    // 1. Сценарий А: Передан примитивный Сигнал или Computed
+    if (isSignal) {
+      const signalItem = (item as unknown) as ISignalLike<unknown>
+      const [val, setVal] = this.reactAdapters.useState<unknown>(signalItem.value)
+
+      this.reactAdapters.useEffect(
+        () => {
+          return signalItem.subscribe(setVal)
+        },
+        [signalItem]
+      )
+
+      return val as (T extends ISignalLike<infer V> ? V : T)
     }
-    const [val, setVal] = this.reactAdapters.useState(item.value)
 
-    this.reactAdapters.useEffect(
-      () => {
-        return item.subscribe(setVal)
-      },
-      [item]
-    )
+    // 2. Сценарий Б: Передан Proxy-объект из метода reactive()
+    if (item && typeof item === 'object') {
+      const [, forceUpdate] = this.reactAdapters.useState<unknown[]>([])
 
-    return val
+      // Используем useEffect для безопасного создания подписки вне фазы рендера React,
+      // но внутри эффекта мы ПРИНУДИТЕЛЬНО запускаем глубокое считывание
+      // свойств объекта (прогрев графа), чтобы ядро зацепило зависимости!
+      this.reactAdapters.useEffect(() => {
+        const unsubscribe = this.effect(() => {
+          // Ленивый глубокий проход по свойствам объекта первого уровня,
+          // чтобы Proxy-геттеры (строка 618 в core.ts) гарантированно перехватили
+          // этот эффект и добавили его в propsSubscribers!
+          try {
+            // Рекурсивно или плоско считываем ключи
+            JSON.stringify(item)
+          } catch (e) {
+            // Защита от круговых ссылок, просто считываем ключи первого уровня
+            Object.values(item as Record<string, unknown>)
+          }
+
+          // При изменении любого из этих ключей триггерим ререндер React
+          forceUpdate([])
+        }, 'react-use-reactive-proxy')
+
+        return () => unsubscribe()
+      }, [item])
+
+      // Возвращаем сам прокси-объект. При чтении в JSX он будет работать нативно.
+      return item as (T extends ISignalLike<infer V> ? V : T)
+    }
+
+    const errorMsg = `
+      [Reactive Error]: engine.use() получил некорректный объект!
+      Проверьте, что передаваемый инстанс является Сигналом или создан через engine.reactive().
+    `
+    console.error(errorMsg, { item })
+    throw new Error(errorMsg)
   }
+
 }
