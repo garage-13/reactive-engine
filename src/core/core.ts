@@ -715,14 +715,25 @@ export class ReactiveEngine {
       label, // Запоминаем имя эффекта для профайлера/логов
       cleanups: new Set(),
       run() {
-        // 1. Создаем моментальный снимок (копию) функций очистки.
-        // Итерация по копии гарантирует, что даже если внутри колбэков очистки
-        // или последующего safeRun в Set прилетят новые элементы,
-        // текущий цикл .forEach завершится строго по старой длине и НЕ зациклится!
+        // Создаем моментальный снимок функций очистки
         const cleanupsToRun = Array.from(this.cleanups)
         this.cleanups.clear()
 
-        cleanupsToRun.forEach(c => c())
+        // Безопасно изолируем вызовы деструкторов.
+        // Если один из колбэков очистки упадет с ошибкой (как в тесте #90),
+        // мы ловим её, логируем и НЕ ломаем выполнение остальных очисток в цикле!
+        cleanupsToRun.forEach(c => {
+          try {
+            c()
+          } catch (cleanupError) {
+            console.error(
+              `%c[Reactive Engine:Cleanup Error] %cОшибка в функции очистки (cleanup):`,
+              "color: white; background: red; padding: 2px 4px; border-radius: 3px;",
+              "font-weight: bold;",
+              cleanupError
+            )
+          }
+        })
 
         const prev = engine.activeEffect
         engine.activeEffect = this
@@ -763,9 +774,17 @@ export class ReactiveEngine {
     effectObj.run()
 
     return () => {
-      effectObj.cleanups.forEach(c => c())
+      // Чтобы гарантировать безопасность при ручном вызове stop(),
+      // тоже изолируем итерацию через try/catch:
+      effectObj.cleanups.forEach(c => {
+        try {
+          c()
+        } catch (e) {
+          console.error('[Reactive Engine:Cleanup Error]', e)
+        }
+      })
       engine.pendingEffects.delete(effectObj)
-      engine.allEffects.delete(effectObj) // Всегда чистим за собой
+      engine.allEffects.delete(effectObj)
     }
   }
 

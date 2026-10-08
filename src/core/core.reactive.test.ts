@@ -325,4 +325,84 @@ describe('ReactiveEngine', () => {
     })
 
   })
+
+  it('должен изолированно перехватывать ошибки в функциях очистки (cleanup) и не блокировать выполнение соседних деструкторов', async () => {
+    const engine = new ReactiveEngine()
+    const trigger = engine.signal(0)
+
+    const siblingCleanupSpy = vi.fn()
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    // Создаем эффект, который возвращает сразу два деструктора
+    const stopEffect = engine.effect(() => {
+      trigger.value // Подписываемся на сигнал
+
+      // Имитируем ситуацию, когда у одного эффекта накопилось несколько cleanups
+      // (например, от Proxy-подписок и внешних ресурсов)
+      const currentEffect = (engine as any).activeEffect
+      if (currentEffect) {
+        // Искусственно подмешиваем падающий деструктор в Set очисток
+        currentEffect.cleanups.add(() => {
+          throw new Error('Паническая ошибка внутри первого деструктора')
+        })
+      }
+
+      return () => {
+        siblingCleanupSpy()
+      }
+    })
+
+    expect(siblingCleanupSpy).not.toHaveBeenCalled()
+
+    // Провоцируем перезапуск эффекта, что вызовет каскад очисток перед вторым прогоном
+    trigger.value++
+    await new Promise<void>((r) => queueMicrotask(r))
+
+    // ПРОВЕРКА 1: Несмотря на падение первой очистки, вторая (соседняя) успешно отработала!
+    expect(siblingCleanupSpy).toHaveBeenCalledTimes(1)
+
+    // ПРОВЕРКА 2: Ошибка была безопасно поймана ядром и залогирована в console.error
+    expect(consoleErrorSpy).toHaveBeenCalled()
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('не должен ломать граф Proxy-автобатчинга массивов, если сбрасываемый эффект выбрасывает исключение в cleanup', async () => {
+    const engine = new ReactiveEngine()
+    const state = engine.reactive({ list: ['item_1'] })
+
+    const successEffectSpy = vi.fn()
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    // Эффект 1: Слушает массив и падает при очистке
+    engine.effect(() => {
+      const _ = state.list.length
+      return () => {
+        throw new Error('Сбой очистки Proxy-эффекта')
+      }
+    })
+
+    // Эффект 2: Независимый соседний эффект, слушающий тот же Proxy-массив
+    engine.effect(() => {
+      successEffectSpy(state.list.join(', '))
+    })
+
+    expect(successEffectSpy).toHaveBeenCalledWith('item_1')
+    successEffectSpy.mockClear()
+
+    // Нативно мутируем Proxy-массив, запуская автобатчинг и каскад очисток зависимостей
+    state.list.push('item_2')
+
+    // Дожидаемся окончания очереди микрозадач ядра
+    await new Promise<void>((r) => queueMicrotask(r))
+
+    // Проверяем, что падение очистки Эффекта 1 не заблокировало планировщик задач ядра:
+    // Эффект 2 успешно проснулся, считал актуальный Proxy-массив и обновил состояние!
+    expect(successEffectSpy).toHaveBeenCalledWith('item_1, item_2')
+    expect(successEffectSpy).toHaveBeenCalledTimes(1)
+    expect(consoleErrorSpy).toHaveBeenCalled()
+
+    consoleErrorSpy.mockRestore()
+  })
+
 })
