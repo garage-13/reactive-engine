@@ -1,3 +1,3 @@
-import { ReactiveEngine4Angular } from './ReactiveEngine4Angular'
+import { ReactiveEngine4AngularAutomatic } from './ReactiveEngine4Angular'
 
-export { ReactiveEngine4Angular as ReactiveEngine }
+export { ReactiveEngine4AngularAutomatic as ReactiveEngine }

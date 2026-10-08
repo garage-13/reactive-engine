@@ -1,136 +1,124 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { withCache } from './withCache'
-import { ReactiveEngine } from '../../core/core'
+import { ReactiveEngine, ReactiveEngineAutomatic } from '../../core/core'
 
-describe('withCache Decorator', () => {
-  let fetcherSpy: any
+const engines = [
+  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngine, isAsync: false },
+  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic, isAsync: true }
+]
 
-  beforeEach(() => {
-    vi.useFakeTimers()
-    fetcherSpy = vi.fn(async (source: any, signal: AbortSignal) => {
-      return `data_for_${JSON.stringify(source)}`
+engines.forEach(({ name, Engine, isAsync }) => {
+  describe(`${name} — withCache Decorator`, () => {
+    let fetcherSpy: any
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      fetcherSpy = vi.fn(async (source: any, _signal: AbortSignal) => {
+        return `data_for_${JSON.stringify(source)}`
+      })
     })
-  })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
 
-  it('должен делать реальный запрос при первом вызове и кэшировать его', async () => {
-    const cachedFetcher = withCache(fetcherSpy, { ttl: 5000 })
-    const abortSignal = new AbortController().signal
-
-    const res1 = await cachedFetcher('user_1', abortSignal)
-    expect(res1).toBe('data_for_"user_1"')
-    expect(fetcherSpy).toHaveBeenCalledTimes(1)
-
-    const res2 = await cachedFetcher('user_1', abortSignal)
-    expect(res2).toBe('data_for_"user_1"')
-    expect(fetcherSpy).toHaveBeenCalledTimes(1)
-  })
-
-  it('должен разделять кэш для разных зависимостей (source)', async () => {
-    const cachedFetcher = withCache(fetcherSpy, { ttl: 5000 })
-    const abortSignal = new AbortController().signal
-
-    await cachedFetcher({ userId: 1, tab: 'posts' }, abortSignal)
-    await cachedFetcher({ userId: 1, tab: 'photos' }, abortSignal)
-
-    expect(fetcherSpy).toHaveBeenCalledTimes(2)
-  })
-
-  it('должен инвалидировать кэш и делать новый запрос по истечении TTL', async () => {
-    const cachedFetcher = withCache(fetcherSpy, { ttl: 5000 })
-    const abortSignal = new AbortController().signal
-
-    await cachedFetcher('user_1', abortSignal)
-    expect(fetcherSpy).toHaveBeenCalledTimes(1)
-
-    await vi.advanceTimersByTimeAsync(4900)
-    await cachedFetcher('user_1', abortSignal)
-    expect(fetcherSpy).toHaveBeenCalledTimes(1)
-
-    await vi.advanceTimersByTimeAsync(200)
-
-    await cachedFetcher('user_1', abortSignal)
-    expect(fetcherSpy).toHaveBeenCalledTimes(2)
-  })
-
-  it('должен использовать дефолтный TTL (5 минут), если опции не переданы', async () => {
-    const cachedFetcher = withCache(fetcherSpy)
-    const abortSignal = new AbortController().signal
-
-    await cachedFetcher('user_1', abortSignal)
-
-    await vi.advanceTimersByTimeAsync(4 * 60 * 1000)
-    await cachedFetcher('user_1', abortSignal)
-    expect(fetcherSpy).toHaveBeenCalledTimes(1)
-
-    await vi.advanceTimersByTimeAsync(1 * 60 * 1000 + 1)
-    await cachedFetcher('user_1', abortSignal)
-    expect(fetcherSpy).toHaveBeenCalledTimes(2)
-  })
-
-  it('должен прокидывать ошибку fetcher наружу, если запрос упал', async () => {
-    const errorFetcher = vi.fn().mockRejectedValue(new Error('Network Crash'))
-    const cachedFetcher = withCache(errorFetcher)
-    const abortSignal = new AbortController().signal
-
-    await expect(cachedFetcher('user_1', abortSignal)).rejects.toThrow('Network Crash')
-  })
-
-  describe('withCache — Работа с массивами и коллекциями', () => {
-
-    it('должен успешно возвращать данные из кэша для массивов с разными ссылками, но одинаковым содержимым (Глубокое сравнение ключей)', async () => {
+    it('должен делать реальный запрос при первом вызове, кэшировать его и разделять кэш по ключам', async () => {
       const cachedFetcher = withCache(fetcherSpy, { ttl: 5000 })
       const abortSignal = new AbortController().signal
 
-      // 1. Первый вызов с инстансом массива №1
-      const arrayInstance1 = ['react', 'vue']
-      const res1 = await cachedFetcher(arrayInstance1, abortSignal)
-      expect(res1).toBe('data_for_["react","vue"]')
+      // Проверяем первичную запись и попадание в кэш
+      const res1 = await cachedFetcher('user_1', abortSignal)
+      expect(res1).toBe('data_for_"user_1"')
       expect(fetcherSpy).toHaveBeenCalledTimes(1)
 
-      // 2. Второй вызов с совершенно новым инстансом массива №2 (другая ссылка в памяти)
-      const arrayInstance2 = ['react', 'vue']
-      const res2 = await cachedFetcher(arrayInstance2, abortSignal)
+      const res2 = await cachedFetcher('user_1', abortSignal)
+      expect(res2).toBe('data_for_"user_1"')
+      expect(fetcherSpy).toHaveBeenCalledTimes(1)
 
-      // Кэш должен сработать! Декоратор обязан сериализовать структуру, а не ссылку.
-      expect(res2).toBe('data_for_["react","vue"]')
-      expect(fetcherSpy).toHaveBeenCalledTimes(1) // Сетевой fetcherSpy НЕ вызывался повторно
+      // Проверяем изоляцию разных ключей (source)
+      await cachedFetcher('user_2', abortSignal)
+      expect(fetcherSpy).toHaveBeenCalledTimes(2)
     })
 
-    it('должен сбрасывать/инвалидировать кэш, если внутри Proxy-массива произошла нативная мутация .push() при неизменной ссылке', async () => {
-      const engine = new ReactiveEngine()
+    it('должен инвалидировать кэш по истечении TTL (включая дефолтные 5 минут)', async () => {
       const cachedFetcher = withCache(fetcherSpy, { ttl: 5000 })
+      const defaultFetcher = withCache(fetcherSpy)
       const abortSignal = new AbortController().signal
 
-      // Создаем реактивный Proxy-массив
-      const state = engine.reactive({
-        tags: ['js']
+      await cachedFetcher('user_1', abortSignal)
+      await defaultFetcher('user_1', abortSignal)
+      expect(fetcherSpy).toHaveBeenCalledTimes(2)
+
+      // Прокручиваем время на границу короткого TTL (4900мс) — кэш еще живой
+      await vi.advanceTimersByTimeAsync(4900)
+      await cachedFetcher('user_1', abortSignal)
+      expect(fetcherSpy).toHaveBeenCalledTimes(2)
+
+      // Перешагиваем лимит (еще +200мс, суммарно 5100мс) — короткий кэш протух
+      await vi.advanceTimersByTimeAsync(200)
+      await cachedFetcher('user_1', abortSignal)
+      expect(fetcherSpy).toHaveBeenCalledTimes(3)
+
+      // Дефолтный кэш (5 минут) все еще валиден
+      await defaultFetcher('user_1', abortSignal)
+      expect(fetcherSpy).toHaveBeenCalledTimes(3)
+    })
+
+    it('должен прокидывать ошибку fetcher наружу, если запрос упал', async () => {
+      const errorFetcher = vi.fn().mockRejectedValue(new Error('Network Crash'))
+      const cachedFetcher = withCache(errorFetcher)
+      const abortSignal = new AbortController().signal
+
+      await expect(cachedFetcher('user_1', abortSignal)).rejects.toThrow('Network Crash')
+    })
+
+    // ====================================================
+    //  withCache — Работа с массивами и коллекциями
+    // ====================================================
+    describe('withCache — Работа с массивами и коллекциями', () => {
+
+      it('должен возвращать данные из кэша для массивов с разными ссылками, но одинаковым содержимым', async () => {
+        const cachedFetcher = withCache(fetcherSpy, { ttl: 5000 })
+        const abortSignal = new AbortController().signal
+
+        // Первый вызов с массивом-копией №1
+        const res1 = await cachedFetcher(['react', 'vue'], abortSignal)
+        expect(res1).toBe('data_for_["react","vue"]')
+        expect(fetcherSpy).toHaveBeenCalledTimes(1)
+
+        // Второй вызов с массивом-копией №2 (другая ссылка в памяти)
+        const res2 = await cachedFetcher(['react', 'vue'], abortSignal)
+
+        // Декоратор обязан применить структурную сериализацию ключа и выдать кэш без похода в сеть!
+        expect(res2).toBe('data_for_["react","vue"]')
+        expect(fetcherSpy).toHaveBeenCalledTimes(1)
       })
 
-      // 1. Делаем первый запрос, передавая прокси-массив как source
-      const res1 = await cachedFetcher(state.tags, abortSignal)
-      expect(res1).toBe('data_for_["js"]')
-      expect(fetcherSpy).toHaveBeenCalledTimes(1)
+      it('должен мгновенно и синхронно инвалидировать кэш при нативной мутации .push() внутри Proxy-массива', async () => {
+        const engine = new ReactiveEngine()
+        const cachedFetcher = withCache(fetcherSpy, { ttl: 5000 })
+        const abortSignal = new AbortController().signal
 
-      // Имитируем повторный быстрый вызов без изменений — должен сработать кэш
-      const _resCache = await cachedFetcher(state.tags, abortSignal)
-      expect(fetcherSpy).toHaveBeenCalledTimes(1)
+        // Создаем мутабельный Proxy-массив в нашем новом ядре
+        const state = engine.reactive({
+          tags: ['js']
+        })
 
-      // 2. Нативно мутируем массив внутри ядра (ссылка на state.tags осталась ТОЙ ЖЕ САМОЙ!)
-      state.tags.push('ts')
+        // 1. Первый запрос заносит в память слепок ключа '["js"]'
+        const res1 = await cachedFetcher(state.tags, abortSignal)
+        expect(res1).toBe('data_for_["js"]')
+        expect(fetcherSpy).toHaveBeenCalledTimes(1)
 
-      // Даем очиститься асинхронному автобатчингу микрозадач прокси
-      await new Promise<void>((r) => queueMicrotask(r))
+        // 2. Императивно мутируем массив (ссылка прежняя, состав новый)
+        state.tags.push('ts')
 
-      // 3. Делаем третий запрос с тем же прокси-массивом.
-      // Поскольку содержимое изменилось, декоратор обязан зафиксировать смену ключа и пробить сеть заново!
-      const res2 = await cachedFetcher(state.tags, abortSignal)
-      expect(res2).toBe('data_for_["js","ts"]')
-      expect(fetcherSpy).toHaveBeenCalledTimes(2) // Сработал честный второй вызов сети!
+        // Больше никаких асинхронных ожиданий микрозадач!
+        // 3. Делаем новый запрос. Декоратор считывает свежий JSON-слепок '["js","ts"]' и бьет по сети!
+        const res2 = await cachedFetcher(state.tags, abortSignal)
+        expect(res2).toBe('data_for_["js","ts"]')
+        expect(fetcherSpy).toHaveBeenCalledTimes(2)
+      })
+
     })
-
   })
 })

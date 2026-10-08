@@ -2,7 +2,8 @@ import React, { useMemo } from 'react'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { useReactiveValue } from './useReactiveValue'
-import { ReactiveEngine, Signal } from '../../core'
+// Импортируем автоматическую версию ядра для проверки асингулярных таймингов
+import { ReactiveEngineAutomatic, Signal } from '../../core'
 
 interface Product {
   id: number
@@ -10,12 +11,12 @@ interface Product {
   category: string
 }
 
-describe('Интеграционный тест: FilteredCatalog (Synchronous Flow)', () => {
-  let engine: ReactiveEngine
+describe('Интеграционный тест: FilteredCatalog (Automatic Async Flow)', () => {
+  let engine: ReactiveEngineAutomatic
   let localProductsSignal: Signal<Product[]>
 
   beforeEach(() => {
-    engine = new ReactiveEngine()
+    engine = new ReactiveEngineAutomatic()
     localProductsSignal = engine.signal<Product[]>([
       { id: 1, name: 'iPhone', category: 'electronics' },
       { id: 2, name: 'Shirt', category: 'clothes' },
@@ -41,7 +42,7 @@ describe('Интеграционный тест: FilteredCatalog (Synchronous Fl
     )
   }
 
-  it('должен корректно отрендерить список и автоматически обновляться синхронно внутри act', () => {
+  it('должен отрендерить список и автоматически обновляться на выходе в микрозадачу Event Loop', async () => {
     // 1. Рендерим компонент в StrictMode
     render(
       <React.StrictMode>
@@ -49,22 +50,23 @@ describe('Интеграционный тест: FilteredCatalog (Synchronous Fl
       </React.StrictMode>
     )
 
-    // Первоначальная проверка: должно быть 2 элемента (iPhone и iPad)
     const itemsBefore = screen.getAllByTestId('product-item')
     expect(itemsBefore).toHaveLength(2)
 
-    // 2. Нативно мутируем массив сигнала внутри СИНХРОННОГО блока act
-    act(() => {
+    // 2. Изменяем значение сигнала внутри АСИНХРОННОГО блока act
+    await act(async () => {
       localProductsSignal.value.push({ id: 4, name: 'MacBook', category: 'electronics' })
-      // Спред-оператор меняет ссылку в памяти, заставляя useSyncExternalStore в React 18 пройти Object.is() валидацию
       localProductsSignal.value = [...localProductsSignal.value]
+
+      // КРИТИЧЕСКИЙ ШАГ: Проталкиваем Event Loop. Наше автоматическое ядро проснется,
+      // соберет микрозадачи queueMicrotask и синхронизирует состояние до закрытия act()
+      await Promise.resolve()
     })
 
-    // Благодаря синхронному графу ядра, React применил изменения в DOM-дерево мгновенно на выходе из act()
+    // Ожидаем, что React успешно поймал асинхронный пуш ядра и перерисовал шаблон
     const itemsAfter = screen.getAllByTestId('product-item')
     expect(itemsAfter).toHaveLength(3)
 
-    // Убеждаемся, что MacBook успешно появился на экране
     expect(screen.getByText('MacBook')).toBeDefined()
   })
 })

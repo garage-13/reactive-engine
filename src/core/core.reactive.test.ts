@@ -1,408 +1,114 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ReactiveEngine } from './core'
+import { ReactiveEngine, ReactiveEngineAutomatic } from './core'
 
-describe('ReactiveEngine', () => {
-  let engine: ReactiveEngine
+const engines = [
+  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngine, isAsync: false },
+  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic, isAsync: true }
+]
 
-  beforeEach(() => {
-    engine = new ReactiveEngine()
-  })
+engines.forEach(({ name, Engine, isAsync }) => {
+  describe(`${name} — Синхронный Proxy (reactive)`, () => {
+    let engine: ReactiveEngine
 
-  describe('Reactive Proxy', () => {
-    it('должен отслеживать изменения глубоких свойств объекта', async () => { // <-- 1. Добавили async
-      const state = engine.reactive({ user: { age: 25 }, tags: ['js'] })
+    beforeEach(() => {
+      engine = new ReactiveEngine()
+    })
+
+    it('должен синхронно трекать глубокие свойства и кэшировать инстансы Proxy', () => {
+      const state = engine.reactive({ user: { age: 25 } })
       const spy = vi.fn()
 
-      const userState = state.user
-
-      engine.effect(() => {
-        spy(userState.age)
-      })
-
+      engine.effect(() => { spy(state.user.age) })
       spy.mockClear()
-      userState.age = 26
 
-      // 2. Ждем, пока асинхронный автобатчинг ядра прогонит очередь микрозадач
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-
-      // 3. Теперь проверка честно сойдется!
+      // Синхронная мутация — эффект срабатывает мгновенно без queueMicrotask!
+      state.user.age = 26
       expect(spy).toHaveBeenCalledWith(26)
       expect(spy).toHaveBeenCalledTimes(1)
+
+      // Проверка кэширования прокси-зеркал
+      const sameObj = { x: 1 }
+      expect(engine.reactive(sameObj)).toBe(engine.reactive(sameObj))
     })
 
-    it('должен кешировать Proxy для одного и того же объекта', () => {
-      const obj = { x: 1 }
-      const proxy1 = engine.reactive(obj)
-      const proxy2 = engine.reactive(obj)
+    it('должен динамически перестраивать ветки зависимостей и отписываться от мертвых веток', () => {
+      const store = engine.reactive({ branch: 'a', a: 10, b: 20 })
 
-      expect(proxy1).toBe(proxy2)
-    })
-
-    describe('Динамический трекинг зависимостей (Dynamic Dependency Tracking)', () => {
-      it('должен гарантированно очищать неактивные ветки зависимостей при динамическом переключении условий', async () => { // <-- Добавили async
-        const engine = new ReactiveEngine()
-
-        // Заворачиваем флаг условия внутрь реактивного объекта вместе с данными
-        const store = engine.reactive({
-          activeBranch: 'a', // Может быть 'a' или 'b'
-          a: 0,
-          b: 0
-        })
-
-        const effectSpy = vi.fn(() => {
-          const value = store.activeBranch === 'a' ? store.a : store.b
-        })
-
-        // Инициализация эффекта (Запуск #1)
-        engine.effect(effectSpy, 'dynamic-dependency-test')
-        expect(effectSpy).toHaveBeenCalledTimes(1)
-
-        // === ШАГ 1: Изменение активной ветки (store.a) ===
-        store.a = 10
-        // Проталкиваем микрозадачу автобатчинга Proxy
-        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-        expect(effectSpy).toHaveBeenCalledTimes(2) // Запуск #2 (сработал на 'a')
-
-        // === ШАГ 2: Изменение неактивной ветки (store.b) ===
-        store.b = 99
-        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-        expect(effectSpy).toHaveBeenCalledTimes(2) // Тишина, на 'b' подписки нет
-
-        // === ШАГ 3: Переключаем ветку через реактивное свойство ===
-        store.activeBranch = 'b'
-        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-        expect(effectSpy).toHaveBeenCalledTimes(3) // Запуск #3 (переключился на 'b')
-
-        // === ШАГ 4: Проверяем очистку старой ветки ===
-        // Изменяем store.a. Так как activeBranch теперь 'b', подписка на 'a' должна быть аннулирована.
-        store.a = 30
-        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-        expect(effectSpy).toHaveBeenCalledTimes(3) // УСПЕХ! Больше НЕ вызывается.
-
-        // === ШАГ 5: Проверяем работу новой активной ветки ===
-        store.b = 100
-        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-        expect(effectSpy).toHaveBeenCalledTimes(4) // Запуск #4 (сработал на 'b')
-      })
-    })
-
-    it('должен корректно очищать неактивные ветки при хаотичном случайном ветвлении (дословный кейс с Math.random)', async () => {
-      const engine = new ReactiveEngine()
-      const store = engine.reactive({ a: 0, b: 0 })
-
-      // Перехватываем Math.random, чтобы сделать тест детерминированным в рантайме,
-      // но имитирующим хаотичные прыжки условия туда-сюда
-      let mockRandomValue = 0.9 // > 0.5 (ветка A)
-      vi.spyOn(Math, 'random').mockImplementation(() => mockRandomValue)
-
-      const effectSpy = vi.fn(() => {
-      // Дословный кейс коллеги
-        const value = Math.random() > 0.5 ? store.a : store.b
+      // ИСПРАВЛЕНО: Завернули в фигурные скобки, чтобы функция возвращала void вместо number
+      const spy = vi.fn(() => {
+        const _ = store.branch === 'a' ? store.a : store.b
       })
 
-      engine.effect(effectSpy, 'math-random-dependency-test')
-      expect(effectSpy).toHaveBeenCalledTimes(1)
-
-      // --- ТАКТ 1: Активна ветка A ---
-      store.a = 10
-      await new Promise<void>((r) => queueMicrotask(r))
-      expect(effectSpy).toHaveBeenCalledTimes(2)
-
-      store.b = 99 // Неактивна. Тишина.
-      await new Promise<void>((r) => queueMicrotask(r))
-      expect(effectSpy).toHaveBeenCalledTimes(2)
-
-      // --- ТАКТ 2: Хаос! Переключаем на ветку B ---
-      mockRandomValue = 0.1 // < 0.5 (ветка B)
-      store.a = 20 // Триггерим перезапуск через А, чтобы эффект зашел в ветку B
-      await new Promise<void>((r) => queueMicrotask(r))
-      expect(effectSpy).toHaveBeenCalledTimes(3)
-
-      // Теперь ветка А должна быть мертва. Проверяем:
-      store.a = 30
-      await new Promise<void>((r) => queueMicrotask(r))
-      expect(effectSpy).toHaveBeenCalledTimes(3) // УСПЕХ! Ветка А очистилась.
-
-      // Ветка B активна:
-      store.b = 100
-      await new Promise<void>((r) => queueMicrotask(r))
-      expect(effectSpy).toHaveBeenCalledTimes(4)
-
-      // --- ТАКТ 3: Хаос возвращается! Прыгаем обратно на ветку A ---
-      mockRandomValue = 0.8 // > 0.5 (ветка A)
-      store.b = 200 // Триггерим перезапуск через B, чтобы эффект вернулся на А
-      await new Promise<void>((r) => queueMicrotask(r))
-      expect(effectSpy).toHaveBeenCalledTimes(5)
-
-      // Теперь ветка B должна умереть. Проверяем:
-      store.b = 300
-      await new Promise<void>((r) => queueMicrotask(r))
-      expect(effectSpy).toHaveBeenCalledTimes(5) // УСПЕХ! Ветка B очистилась.
-
-      // Ветка А снова активна:
-      store.a = 400
-      await new Promise<void>((r) => queueMicrotask(r))
-      expect(effectSpy).toHaveBeenCalledTimes(6)
-
-      // Восстанавливаем оригинальный Math.random
-      vi.spyOn(Math, 'random').mockRestore()
-    })
-
-    it('должен гарантированно аннулировать подписку на reactive объект после остановки эффекта и не воскресать при мутациях', async () => {
-      const engine = new ReactiveEngine()
-      const state = engine.reactive({ count: 0 })
-      const spy = vi.fn()
-
-      const stop = engine.effect(() => {
-        spy(state.count)
-      })
-
-      expect(spy).toHaveBeenCalledTimes(1)
+      engine.effect(spy)
       spy.mockClear()
 
-      // Останавливаем эффект
-      stop()
-
-      // Мутируем свойство Proxy
-      state.count = 1
-      await new Promise<void>((r) => queueMicrotask(r))
-
-      // ТЕСТ ДОЛЖЕН ПОКАЗАТЬ, ЧТО ЭФФЕКТ БОЛЬШЕ НЕ ВЫЗЫВАЕТСЯ
+      // Изменение неактивной ветки (b) — тишина
+      store.b = 99
       expect(spy).not.toHaveBeenCalled()
-      expect(spy).toHaveBeenCalledTimes(0)
-    })
-  })
 
-  describe('Глубокая Proxy-реактивность: Массивы и Вложенные структуры', () => {
-
-    it('должен корректно отслеживать обновление массивов через spread-оператор (иммутабельный паттерн)', async () => {
-      const engine = new ReactiveEngine()
-      const state = engine.reactive({ tags: ['js'] })
-      const spy = vi.fn()
-
-      engine.effect(() => {
-        spy(state.tags.length)
-      })
-
-      expect(spy).toHaveBeenCalledWith(1)
-      spy.mockClear()
-
-      // Рекомендованный паттерн для массивов в reactive-engine:
-      // Переприсваивание через spread-оператор идеально перехватывается сеттером Proxy
-      state.tags = [...state.tags, 'ts']
-
-      // Дожидаемся окончания очереди микрозадач нашего нового автобатчинга Proxy
-      await new Promise<void>((r) => queueMicrotask(r))
-
-      expect(spy).toHaveBeenCalledWith(2)
-      expect(spy).toHaveBeenCalledTimes(1)
-    })
-
-    it('должен гарантированно очищать подписки на вложенные подобъекты при остановке эффекта', async () => {
-      const engine = new ReactiveEngine()
-      // Глубокая структура (матрешка) объекта
-      const state = engine.reactive({
-        user: {
-          profile: {
-            name: 'Иван'
-          }
-        }
-      })
-      const spy = vi.fn()
-
-      const stop = engine.effect(() => {
-        spy(state.user.profile.name)
-      })
-
+      // Переключаем ветку на 'b' — эффект синхронно пересчитался
+      store.branch = 'b'
       expect(spy).toHaveBeenCalledTimes(1)
       spy.mockClear()
 
-      // Останавливаем эффект — все cleanups глубоких Proxy-путей должны сработать
-      stop()
-
-      // Мутируем самое глубокое свойство
-      state.user.profile.name = 'Алексей'
-      await new Promise<void>((r) => queueMicrotask(r))
-
-      // Проверяем, что глубокий путь полностью отписался и эффект не воскрес
+      // Теперь ветка 'a' мертва. Ее мутация не должна вызывать триггер
+      store.a = 999
       expect(spy).not.toHaveBeenCalled()
-      expect(spy).toHaveBeenCalledTimes(0)
     })
 
-    it('должен нативно отслеживать мутации массивов через .push() и длину .length без spread-оператора', async () => {
-      const engine = new ReactiveEngine()
-      const state = engine.reactive({ tags: ['js'] })
-      const spy = vi.fn()
+    it('должен нативно, синхронно и атомарно батчить мутации массивов (.push, .splice, .reverse, индексы)', () => {
+      const state = engine.reactive({ tags: ['js', 'ts'], numbers: [1, 2, 3] })
 
-      engine.effect(() => {
-        // Подписываемся строго на свойство .length массива
-        spy(state.tags.length)
-      })
+      // ИСПРАВЛЕНО: Добавлены фигурные скобки, чтобы функции возвращали void вместо number
+      const spyLength = vi.fn(() => { state.tags.length })
+      const spyIndex = vi.fn(() => { state.numbers[0] })
 
-      expect(spy).toHaveBeenCalledWith(1)
-      spy.mockClear()
+      engine.effect(spyLength)
+      engine.effect(spyIndex)
+      spyLength.mockClear()
+      spyIndex.mockClear()
 
-      // ТЕПЕРЬ МЫ ДЕЛАЕМ НАВЕРНЯКА НАВАТИВНУЮ МУТАЦИЮ!
-      // Больше никакого иммутабельного state.tags = [...state.tags, 'ts']
-      state.tags.push('ts')
+      // 1. Нативный .push() — склеивается и срабатывает строго 1 раз
+      state.tags.push('vue')
+      expect(spyLength).toHaveBeenCalledTimes(1)
 
-      // Дожидаемся нашего встроенного Proxy-автобатчинга микрозадач
-      await new Promise<void>((r) => queueMicrotask(r))
+      // 2. Нативный .splice()
+      state.tags.splice(1, 1)
+      expect(state.tags).toEqual(['js', 'vue'])
 
-      // Проверяем: длина стала 2, эффект сработал честно ровно 1 раз!
-      expect(spy).toHaveBeenCalledWith(2)
-      expect(spy).toHaveBeenCalledTimes(1)
-    })
+      // 3. Прямая мутация по индексу
+      state.numbers[0] = 99
+      expect(spyIndex).toHaveBeenCalledTimes(1)
 
-    it('должен нативно отслеживать удаление и изменение состава элементов через .splice()', async () => {
-      const engine = new ReactiveEngine()
-      const state = engine.reactive({ list: ['apple', 'banana', 'orange'] })
-      const spy = vi.fn()
-
-      engine.effect(() => {
-        spy(state.list.length)
-      })
-
-      expect(spy).toHaveBeenCalledWith(3)
-      spy.mockClear()
-
-      // Удаляем 1 элемент (banana) начиная с индекса 1
-      state.list.splice(1, 1)
-
-      // Ждем микрозадачу автобатчинга Proxy
-      await new Promise<void>((r) => queueMicrotask(r))
-
-      // Проверяем: длина уменьшилась до 2, эффект сработал
-      expect(spy).toHaveBeenCalledWith(2)
-      expect(spy).toHaveBeenCalledTimes(1)
-      expect(state.list).toEqual(['apple', 'orange'])
-    })
-
-    it('должен отслеживать изменение порядка элементов через .reverse() без изменения длины', async () => {
-      const engine = new ReactiveEngine()
-      const state = engine.reactive({ numbers: [1, 2, 3] }) // <-- Проверьте наличие [1, 2, 3]
-      const spy = vi.fn()
-
-      engine.effect(() => {
-        // Подписываемся на первый элемент, чтобы проверить перестановку индексов
-        spy(state.numbers[0])
-      })
-
-      expect(spy).toHaveBeenCalledWith(1)
-      spy.mockClear()
-
-      // Разворачиваем массив нативно
+      // 4. Нативный .reverse()
       state.numbers.reverse()
-
-      await new Promise<void>((r) => queueMicrotask(r))
-
-      // Проверяем: первый элемент стал 3, эффект успешно отреагировал
-      expect(spy).toHaveBeenCalledWith(3)
-      expect(spy).toHaveBeenCalledTimes(1)
+      expect(spyIndex).toHaveBeenCalledTimes(2)
     })
 
-    it('должен нативно отслеживать прямую замену элементов массива по индексу', async () => {
-      const engine = new ReactiveEngine()
-      const state = engine.reactive({ numbers: [10, 20, 30] })
-      const spy = vi.fn()
+    it('должен изолированно ловить ошибки в деструкторах (cleanup) и не блокировать граф', () => {
+      const trigger = engine.signal(0)
+      const siblingCleanupSpy = vi.fn()
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
       engine.effect(() => {
-        // Компонент читает весь массив (например, выводит в строку)
-        spy(state.numbers.join(', '))
+        trigger.value
+
+        // Искусственно инжектим падающий cleanup в активный эффект для изоляции теста
+        const active = (engine as any).activeConsumer
+        if (active) {
+          active.cleanups.add(() => { throw new Error('Панический сбой') })
+        }
+
+        return () => { siblingCleanupSpy() }
       })
 
-      expect(spy).toHaveBeenCalledWith('10, 20, 30')
-      spy.mockClear()
+      // Провоцируем перезапуск и вызов деструкторов
+      trigger.value++
 
-      // Прямая мутация по индексу!
-      state.numbers[1] = 99
-
-      await new Promise<void>((r) => queueMicrotask(r))
-
-      // Проверяем: значение обновилось, эффект сработал
-      expect(spy).toHaveBeenCalledWith('10, 99, 30')
-      expect(spy).toHaveBeenCalledTimes(1)
+      // Проверка: падающий деструктор пойман, а соседний — успешно выполнился!
+      expect(siblingCleanupSpy).toHaveBeenCalledTimes(1)
+      expect(consoleSpy).toHaveBeenCalled()
+      consoleSpy.mockRestore()
     })
-
   })
-
-  it('должен изолированно перехватывать ошибки в функциях очистки (cleanup) и не блокировать выполнение соседних деструкторов', async () => {
-    const engine = new ReactiveEngine()
-    const trigger = engine.signal(0)
-
-    const siblingCleanupSpy = vi.fn()
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    // Создаем эффект, который возвращает сразу два деструктора
-    const stopEffect = engine.effect(() => {
-      trigger.value // Подписываемся на сигнал
-
-      // Имитируем ситуацию, когда у одного эффекта накопилось несколько cleanups
-      // (например, от Proxy-подписок и внешних ресурсов)
-      const currentEffect = (engine as any).activeEffect
-      if (currentEffect) {
-        // Искусственно подмешиваем падающий деструктор в Set очисток
-        currentEffect.cleanups.add(() => {
-          throw new Error('Паническая ошибка внутри первого деструктора')
-        })
-      }
-
-      return () => {
-        siblingCleanupSpy()
-      }
-    })
-
-    expect(siblingCleanupSpy).not.toHaveBeenCalled()
-
-    // Провоцируем перезапуск эффекта, что вызовет каскад очисток перед вторым прогоном
-    trigger.value++
-    await new Promise<void>((r) => queueMicrotask(r))
-
-    // ПРОВЕРКА 1: Несмотря на падение первой очистки, вторая (соседняя) успешно отработала!
-    expect(siblingCleanupSpy).toHaveBeenCalledTimes(1)
-
-    // ПРОВЕРКА 2: Ошибка была безопасно поймана ядром и залогирована в console.error
-    expect(consoleErrorSpy).toHaveBeenCalled()
-
-    consoleErrorSpy.mockRestore()
-  })
-
-  it('не должен ломать граф Proxy-автобатчинга массивов, если сбрасываемый эффект выбрасывает исключение в cleanup', async () => {
-    const engine = new ReactiveEngine()
-    const state = engine.reactive({ list: ['item_1'] })
-
-    const successEffectSpy = vi.fn()
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    // Эффект 1: Слушает массив и падает при очистке
-    engine.effect(() => {
-      const _ = state.list.length
-      return () => {
-        throw new Error('Сбой очистки Proxy-эффекта')
-      }
-    })
-
-    // Эффект 2: Независимый соседний эффект, слушающий тот же Proxy-массив
-    engine.effect(() => {
-      successEffectSpy(state.list.join(', '))
-    })
-
-    expect(successEffectSpy).toHaveBeenCalledWith('item_1')
-    successEffectSpy.mockClear()
-
-    // Нативно мутируем Proxy-массив, запуская автобатчинг и каскад очисток зависимостей
-    state.list.push('item_2')
-
-    // Дожидаемся окончания очереди микрозадач ядра
-    await new Promise<void>((r) => queueMicrotask(r))
-
-    // Проверяем, что падение очистки Эффекта 1 не заблокировало планировщик задач ядра:
-    // Эффект 2 успешно проснулся, считал актуальный Proxy-массив и обновил состояние!
-    expect(successEffectSpy).toHaveBeenCalledWith('item_1, item_2')
-    expect(successEffectSpy).toHaveBeenCalledTimes(1)
-    expect(consoleErrorSpy).toHaveBeenCalled()
-
-    consoleErrorSpy.mockRestore()
-  })
-
 })

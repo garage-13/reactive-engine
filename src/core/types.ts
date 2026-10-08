@@ -1,104 +1,136 @@
+import type { ReactiveEngine } from './core'
 
+export type CleanupFn = () => void;
+export type EffectFn = () => CleanupFn | void;
+export type Token<T> = string | symbol | { new(engine: ReactiveEngine, ...args: any[]): T };
+export type Factory<T> = (engine: ReactiveEngine) => T;
 
-export interface ResourceState<T> {
-  data: T | null;
-  loading: boolean;
-  error: any | null;
+/**
+ * Интерфейс атомарного Сигнала графа.
+ */
+export interface Signal<T> {
+  value: T;
+  subscribe: (cb: (val: T) => void) => CleanupFn;
 }
 
 /**
- * Функция для очистки эффекта.
- * @typedef {() => void} CleanupFn
+ * Интерфейс синхронно-ленивого Вычисляемого свойства.
  */
-
-/**
- * Функция эффекта, которая может возвращать функцию очистки.
- * @typedef {() => CleanupFn | void} EffectFn
- */
-
-/**
- * Токен для зависимости.
- * @typedef {string | symbol | { new(engine: ReactiveEngine, ...args: any[]): T }} Token<T>
- */
-
-/**
- * Фабрика для создания сервиса.
- * @template T
- * @typedef {(engine: ReactiveEngine) => T} Factory<T>
- */
-
-/**
- * Интерфейс для состояния ресурса.
- * @template T Data format
- * @interface ResourceState<T>
- */
-export interface ResourceState<T> {
-  /**
-   * Данные ресурса.
-   * @type {T | null}
-   */
-  data: T | null;
-
-  /**
-   * Состояние загрузки ресурса.
-   * @type {boolean}
-   */
-  loading: boolean;
-
-  /**
-   * Ошибка ресурса.
-   * @type {any | null}
-   */
-  error: any | null;
-
-  /** Флаг активного процесса повторных попыток после сбоя сети */
-  isRetrying: boolean;
-}
-
-export interface ResourceOptions<T, S> {
-  name: string;
-  /** Автоматически сбрасывать data в null при изменении source. По умолчанию: true */
-  resetDataOnSourceChange?: boolean;
-  /** Функция для валидации успешного ответа сервера перед его сохранением в стейт.
-   *
-   * Варианты возвращаемого значения:
-   * - true 👉 все ок
-   * - false 👉 в error попадет стандартный текст ошибки
-   * - string 👉 попадет в поле error
-   * */
-  responseValidate?: (responseData: T) => boolean | string;
-  /** Функция валидации входных зависимостей (source) перед запуском fetch.
-   * Если возвращает false или string (текст ошибки) — запрос и ретраи блокируются. */
-  validateBeforeFetch?: (sourceValue: S) => boolean | string;
-  /** Настройка лимита повторов retry. */
-  retryCount?: number;
-  /** Настройка задержки первого повтора retry. */
-  retryDelay?: number;
-  /** Включить экспоненциальное увеличение задержки (каждая попытка ждет в 2 раза дольше). По умолчанию: false */
-  isExponentialBackoffEnabled?: boolean;
-  /** Максимальный лимит ожидания между попытками в миллисекундах. По умолчанию: 30000 (30 секунд) */
-  maxRetryDelay?: number;
-  /** Максимальное время ожидания ответа сервера в миллисекундах. По умолчанию: отсутствует (бесконечно) */
-  timeout?: number;
+export interface Computed<T> {
+  readonly value: T;
+  subscribe: (cb: (val: T) => void) => CleanupFn;
+  destroy: () => void;
 }
 
 /**
- * Интерфейс для опций сигнала.
- * @template T
- * @interface SignalOptions<T>
+ * Интерфейс побочного Эффекта планировщика.
+ */
+export interface IEffect {
+  id: number;
+  run: () => void;
+  markDirty: () => void;
+  cleanups: Set<CleanupFn>;
+  label?: string;
+}
+
+/**
+ * Опции конфигурации Сигналов.
  */
 export interface SignalOptions<T> {
-  /**
-   * Имя сигнала.
-   * @type {string}
-   */
   name?: string;
+  validate?: (value: T) => boolean | string;
+}
 
-  /**
-   * Валидатор значения сигнала.
-   * @function validate
-   * @param {T} val - Значение для валидации.
-   * @returns {boolean | string} - Результат валидации.
-   */
-  validate?: (val: T) => boolean | string;
+/**
+ * Состояние асинхронного ресурса.
+ */
+export interface ResourceState<T> {
+  data: T | null;
+  loading: boolean;
+  error: Error | null;
+  isRetrying?: boolean;
+}
+
+/**
+ * Контракт асинхронного Ресурса ядра.
+ */
+export interface Resource<T> extends ResourceState<T> {
+  refetch: () => void;
+  subscribe: (cb: (val: ResourceState<T>) => void) => CleanupFn;
+  readonly value: ResourceState<T>;
+}
+
+/**
+ * Настройки конфигурации асинхронного Ресурса.
+ * Полностью очищены от legacy-параметров ретраев и таймаутов.
+ */
+export interface ResourceOptions<T, S = void> {
+  /** Уникальное имя ресурса для трассировки и логирования */
+  name?: string;
+  /** Принудительный сброс данных в null при изменении источника (true по умолчанию) */
+  resetDataOnSourceChange?: boolean;
+  /** Декларативная пре-валидация параметров ДО отправки запроса в сеть */
+  validateBeforeFetch?: (source: S) => boolean | string;
+  /** Валидация структуры ответа сервера после успешного разрешения промиса */
+  responseValidate?: (data: T) => boolean | string;
+}
+
+/**
+ * Параметры продвинутой системы логирования транзакций.
+ */
+export interface EngineLoggerOptions {
+  instanceName?: string;
+  isEnabled: boolean;
+  traceTime?: boolean;
+  filter?: RegExp | string;
+  isCoreOptimizationDebugEnabled?: boolean;
+}
+
+// Детализированные Payload-структуры для логов
+export interface SignalLogDetail {
+  from: unknown;
+  to: unknown;
+  subscribersCount: number;
+  subscribers: string[];
+}
+
+export interface ComputedLogDetail {
+  value: unknown;
+  duration: string;
+}
+
+export interface EffectLogDetail {
+  triggeredBy: string;
+  executionTime?: string;
+}
+
+export interface BatchLogDetail {
+  transactionSize: number;
+  totalEffectsRun: number;
+}
+
+export interface ResourceLogDetail {
+  loading: boolean;
+  data: unknown;
+  error: Error | null;
+  isRetrying?: boolean;
+}
+
+export interface ReactiveDetail {
+  action: string;
+  property: string;
+  oldValue: unknown;
+  newValue: unknown;
+}
+
+/**
+ * Карта маппинга категорий логов для безопасной работы метода queueLog.
+ */
+export interface LogDetailMap {
+  signal: SignalLogDetail;
+  computed: ComputedLogDetail;
+  effect: EffectLogDetail;
+  batch: BatchLogDetail;
+  resource: ResourceLogDetail;
+  reactive: ReactiveDetail;
 }

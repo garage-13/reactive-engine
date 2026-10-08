@@ -1,5 +1,5 @@
 import { Observable, Subscribable, Unsubscribable } from 'rxjs'
-import { CleanupFn } from '../core/core'
+import { CleanupFn } from '../core/types'
 
 /**
  * Контракт любого реактивного элемента вашего ядра (Signal, Computed, Resource)

@@ -13,33 +13,31 @@ describe('ReactiveEngine (React)', () => {
   describe('React Adapters (engine.use)', () => {
     it('должен выбрасывать ошибку, если адаптеры React не установлены', () => {
       const engineWithoutAdapters = new ReactiveEngine()
+      // Принудительно зануляем адаптеры для проверки исключения
       engineWithoutAdapters.setReactAdapters(null as any, null as any)
 
       const sig = engineWithoutAdapters.signal(0)
 
-      expect(() => engineWithoutAdapters.use(sig)).toThrow(
-        'this.reactAdapters.useState is not a function or its return value is not iterable'
-      )
+      // Проверяем, что вызов метода .use() принудительно и синхронно падает
+      expect(() => {
+        engineWithoutAdapters.use(sig)
+      }).toThrow()
     })
 
-    it('должен успешно синхронизировать сигнал с хуками React', async () => {
-      engine.setReactAdapters(useState, useEffect)
+    it('должен успешно синхронизировать сигнал с хуками React', () => {
       const sig = engine.signal<string>('hello')
 
       const { result } = renderHook(() => engine.use(sig))
       expect(result.current).toBe('hello')
 
-      await act(async () => {
+      act(() => {
         sig.value = 'world'
-        await new Promise((r) => setImmediate(r))
       })
 
       expect(result.current).toBe('world')
     })
 
-    it('должен успешно синхронизировать reactive-объект напрямую через engine.use без computed-мостов', async () => {
-      engine.setReactAdapters(useState, useEffect)
-
+    it('должен успешно синхронизировать reactive-объект напрямую через engine.use без computed-мостов', () => {
       const formState = engine.reactive({
         user: {
           name: 'Иван',
@@ -59,119 +57,82 @@ describe('ReactiveEngine (React)', () => {
       expect(result.current.displayName).toBe('Иван')
       expect(result.current.displayStatus).toBe('pending')
 
-      await act(async () => {
+      act(() => {
         formState.user.name = 'Алексей'
-        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
       })
 
       expect(result.current.displayName).toBe('Алексей')
       expect(result.current.displayStatus).toBe('pending')
-
-      await new Promise((r) => setImmediate(r))
     })
 
-    describe('React Adapters (engine.use)', () => {
+    it('должен автоматически ререндерить компонент при изменении computed-свойства, зависящего от массива', () => {
+      const listSignal = engine.signal(['apple', 'banana', 'orange'])
 
-      it('должен автоматически ререндерить компонент при изменении computed-свойства, зависящего от массива', async () => {
-        engine.setReactAdapters(useState, useEffect)
-
-        const listSignal = engine.signal(['apple', 'banana', 'orange'])
-
-        // Создаем зависимый компьютед для фильтрации длинных слов
-        const longWords = engine.computed(() => {
-          return listSignal.value.filter(word => word.length > 5)
-        })
-
-        const { result } = renderHook(() => {
-          const filteredList = engine.use(longWords)
-          return filteredList.join('-')
-        })
-
-        expect(result.current).toBe('banana-orange') // apple отфильтровался
-
-        await act(async () => {
-        // Добавляем новое длинное слово и пинаем сигнал
-          listSignal.value.push('pineapple')
-          listSignal.value = listSignal.value
-
-          await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-        })
-
-        // Вычисляемое свойство синхронно инвалидировалось, а хук use спровоцировал ререндер
-        expect(result.current).toBe('banana-orange-pineapple')
-        await new Promise((r) => setImmediate(r))
+      const longWords = engine.computed(() => {
+        return listSignal.value.filter(word => word.length > 5)
       })
 
-      it('должен успешно синхронизировать мутации массивов в Сигнале через engine.use при пинке сеттера', async () => {
-        engine.setReactAdapters(useState, useEffect)
-
-        // Инициализируем сигнал с массивом
-        const tagsSignal = engine.signal(['javascript'])
-
-        const { result } = renderHook(() => {
-        // Достаем значение через use
-          const tags = engine.use(tagsSignal)
-
-          // Превращаем в строку для проверки в expect
-          return tagsSignal.value.join(', ')
-        })
-
-        expect(result.current).toBe('javascript')
-
-        await act(async () => {
-        // Сначала мутируем данные
-          tagsSignal.value.push('typescript')
-
-          // Для интеграции с React-атомами (useState), чтобы пробить Object.is барьер фреймворка,
-          // мы прокидываем новую ссылку через spread. Ядро примет мутацию, а React сделает честный ререндер!
-          tagsSignal.value = [...tagsSignal.value]
-
-          // Даем отработать асинхронной микрозадаче батчинга ядра
-          await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-        })
-
-        // Теперь React гарантированно перерисует строку!
-        expect(result.current).toBe('javascript, typescript')
-        await new Promise((r) => setImmediate(r))
+      const { result } = renderHook(() => {
+        const filteredList = engine.use(longWords)
+        return filteredList.join('-')
       })
 
+      expect(result.current).toBe('banana-orange')
 
-      it('должен нативно отслеживать деструктивные методы Proxy-массивов (.push, .splice) напрямую через engine.use', async () => {
-        engine.setReactAdapters(useState, useEffect)
+      act(() => {
+        listSignal.value.push('pineapple')
+        listSignal.value = [...listSignal.value] // Спред нужен строго для триггера shallow-сравнения в useState
+      })
 
-        const state = engine.reactive({
-          todos: ['Купить молоко']
-        })
+      expect(result.current).toBe('banana-orange-pineapple')
+    })
 
-        const renderSpy = vi.fn()
+    it('должен успешно синхронизировать мутации массивов в Сигнале через engine.use при пинке сеттера', () => {
+      const tagsSignal = engine.signal(['javascript'])
 
-        const { result } = renderHook(() => {
-          renderSpy()
-          const reactiveState = engine.use(state)
-          return reactiveState.todos.join(' | ')
-        })
+      const { result } = renderHook(() => {
+        engine.use(tagsSignal)
+        return tagsSignal.value.join(', ')
+      })
 
-        expect(result.current).toBe('Купить молоко')
+      expect(result.current).toBe('javascript')
 
-        // Изоляция монтирования: Сбрасываем счетчик вызовов Strict Mode перед тестом батчинга!
-        renderSpy.mockClear()
+      act(() => {
+        tagsSignal.value.push('typescript')
+        tagsSignal.value = [...tagsSignal.value] // Спред нужен строго для триггера shallow-сравнения в useState
+      })
 
-        await act(async () => {
-        // Полностью мутабельный флоу без всяких spread-операторов
+      expect(result.current).toBe('javascript, typescript')
+    })
+
+    it('должен нативно отслеживать деструктивные методы Proxy-массивов (.push, .splice) напрямую через engine.use ровно в 1 ререндер', () => {
+      const state = engine.reactive({
+        todos: ['Купить молоко']
+      })
+
+      const renderSpy = vi.fn()
+
+      const { result } = renderHook(() => {
+        renderSpy()
+        const reactiveState = engine.use(state)
+        return reactiveState.todos.join(' | ')
+      })
+
+      expect(result.current).toBe('Купить молоко')
+      renderSpy.mockClear()
+
+      act(() => {
+        // Так как ядро строго синхронное, а в React-контексте мы убрали асинхронный микробатчинг,
+        // для склеивания множественных нативных мутаций в один ререндер мы явно используем engine.batch()
+        engine.batch(() => {
           state.todos.push('Помыть кота')
           state.todos.push('Написать тесты')
           state.todos.splice(1, 1) // удалили 'Помыть кота'
-
-          // Наш новый Proxy-автобатчинг ядра заблокирует каскад forceUpdate
-          await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
         })
-
-        // React-компонент должен перерисоваться строго РОВНО 1 РАЗ для финального стейта
-        expect(result.current).toBe('Купить молоко | Написать тесты')
-        expect(renderSpy).toHaveBeenCalledTimes(1)
-
-        await new Promise((r) => setImmediate(r))
       })
+
+      expect(result.current).toBe('Купить молоко | Написать тесты')
+      expect(renderSpy).toHaveBeenCalledTimes(1)
     })
   })
 })

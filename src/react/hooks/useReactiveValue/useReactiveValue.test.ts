@@ -2,11 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useReactiveValue } from './useReactiveValue'
 import { useReactiveValue0 } from '../useReactiveValue0'
-import { ReactiveEngine4React } from '../../ReactiveEngine4React' // Укажите правильный относительный путь
+import { ReactiveEngine4React } from '../../ReactiveEngine4React'
 
 const runAutoCleanupTests = (hookName: string, hookFn: any) => {
   describe(`Авто-очистка под капотом: ${hookName}`, () => {
-
     it('должен гарантированно вызывать метод .destroy() при размонтировании, ОДНАКО только для ленивых фабрик', async () => {
       const destroySpy = vi.fn()
       const mockReactiveItem = {
@@ -34,7 +33,7 @@ const runAutoCleanupTests = (hookName: string, hookFn: any) => {
       const { unmount } = renderHook(() => hookFn(mockGlobalSignal))
       unmount()
 
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       expect(globalDestroySpy).not.toHaveBeenCalled()
     })
   })
@@ -45,9 +44,8 @@ describe('Интеграционные тесты авто-очистки пам
   runAutoCleanupTests('React 16.8+ (useState + useEffect)', useReactiveValue0)
 })
 
-describe('useReactiveValue: Работа с массивами и Proxy-объектами', () => {
-
-  it('должен корректно извлекать массив из Сигнала ядра и обновлять компонент при смене ссылок', async () => {
+describe('useReactiveValue: Работа с массивами и Proxy-объектами (Synchronous Engine)', () => {
+  it('должен корректно извлекать массив из Сигнала ядра и обновлять компонент при смене ссылок', () => {
     const engine = new ReactiveEngine4React()
     const tagsSignal = engine.signal(['javascript'])
 
@@ -58,24 +56,18 @@ describe('useReactiveValue: Работа с массивами и Proxy-объе
 
     expect(result.current).toBe('javascript')
 
-    await act(async () => {
-      // Мутируем массив и прокидываем спред-оператор для триггераuseSyncExternalStore
+    act(() => {
       tagsSignal.value.push('typescript')
-      tagsSignal.value = [...tagsSignal.value]
-
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+      tagsSignal.value = [...tagsSignal.value] // Спред-костыль строго для триггера shallow-сравнения useState React 18
     })
 
     expect(result.current).toBe('javascript, typescript')
   })
 
-  it('должен автоматически ререндерить компонент при изменении computed-цепочки, фильтрующей массив', async () => {
+  it('должен автоматически ререндерить компонент при изменении computed-цепочки, фильтрующей массив', () => {
     const engine = new ReactiveEngine4React()
     const listSignal = engine.signal(['apple', 'banana', 'orange'])
-
-    const longWords = engine.computed(() => {
-      return listSignal.value.filter(word => word.length > 5)
-    })
+    const longWords = engine.computed(() => listSignal.value.filter(word => word.length > 5))
 
     const { result } = renderHook(() => {
       const filteredList = useReactiveValue(longWords)
@@ -84,24 +76,17 @@ describe('useReactiveValue: Работа с массивами и Proxy-объе
 
     expect(result.current).toBe('banana-orange')
 
-    await act(async () => {
+    act(() => {
       listSignal.value.push('pineapple')
-      listSignal.value = [...listSignal.value]
-
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+      listSignal.value = [...listSignal.value] // Спред для пробития React useState барьера
     })
 
     expect(result.current).toBe('banana-orange-pineapple')
   })
 
-  it('должен нативно трекать деструктивные методы Proxy-массивов (.push, .splice) в reactive() без any и костылей', async () => {
+  it('должен нативно отслеживать деструктивные методы Proxy-массивов (.push, .splice) в reactive() ровно в 1 вызов', () => {
     const engine = new ReactiveEngine4React()
-
-    // Создаем честный реактивный объект через Proxy-адаптер React
-    const state = engine.reactive({
-      todos: ['Задача 1']
-    })
-
+    const state = engine.reactive({ todos: ['Задача 1'] })
     const renderSpy = vi.fn()
 
     const { result } = renderHook(() => {
@@ -111,28 +96,19 @@ describe('useReactiveValue: Работа с массивами и Proxy-объе
     })
 
     expect(result.current).toBe('Задача 1')
-
-    // Сбрасываем счетчик вызовов Strict Mode перед проверкой автобатчинга
     renderSpy.mockClear()
 
-    await act(async () => {
-      // Настоящие мутации без иммутабельных оберток!
-      state.todos.push('Задача 2')
-      state.todos.push('Задача 3')
-      state.todos.splice(1, 1) // удалили 'Задача 2'
-
-      // Проталкиваем Proxy-автобатчинг микрозадач ядра
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+    act(() => {
+      // Так как ядро строго синхронное, для склеивания мутаций Proxy
+      // в один ререндер мы явно используем транзакцию engine.batch
+      engine.batch(() => {
+        state.todos.push('Задача 2')
+        state.todos.push('Задача 3')
+        state.todos.splice(1, 1)
+      })
     })
 
-    // Благодаря нашему __subscribe и локальному forceUpdate,
-    // изменения склеились в РОВНО 1 дополнительный ререндер для финального состояния!
     expect(result.current).toBe('Задача 1 | Задача 3')
-    expect(renderCountSpy(renderSpy)).toBe(1)
+    expect(renderSpy.mock.calls.length).toBe(1)
   })
 })
-
-// Хелпер для подсчета вызовов в Strict Mode окружении Vitest
-function renderCountSpy(spy: any) {
-  return spy.mock.calls.length
-}

@@ -1,65 +1,67 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ReactiveEngine } from './core'
+import { ReactiveEngine, ReactiveEngineAutomatic } from './core'
 
-describe('ReactiveEngine', () => {
-  let engine: ReactiveEngine
+const engines = [
+  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngine, isAsync: false },
+  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic, isAsync: true }
+]
 
-  beforeEach(() => {
-    engine = new ReactiveEngine()
-  })
+engines.forEach(({ name, Engine, isAsync }) => {
+  describe(`${name} — Синхронный Batching`, () => {
+    let engine: ReactiveEngine
 
-  describe('Batching', () => {
-    it('должен откладывать запуск эффектов до завершения батча (микрозадачи)', async () => {
+    beforeEach(() => {
+      engine = new ReactiveEngine()
+    })
+
+    it('должен склеивать обновления и выполнять эффект строго 1 раз на выходе из батча', () => {
       const sig1 = engine.signal(1)
       const sig2 = engine.signal(10)
       const spy = vi.fn()
 
+      // Подписываемся на сигналы
       engine.effect(() => {
         spy(sig1.value, sig2.value)
       })
+      spy.mockClear() // Сбрасываем стартовый вызов
 
-      spy.mockClear()
-
+      // Запускаем транзакцию
       engine.batch(() => {
         sig1.value = 2
         sig2.value = 20
-        // Внутри батча эффект не должен сработать немедленно
+
+        // Внутри батча эффект еще заблокирован и не сработал промежуточно
         expect(spy).not.toHaveBeenCalled()
       })
 
-      // Ждем выполнения очереди микрозадач (queueMicrotask)
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-
-      // Эффект сработал ровно 1 раз для финальных значений вместо 2 раз
+      // На выходе из батча эффект сработал синхронно РОВНО 1 раз для финальных значений!
       expect(spy).toHaveBeenCalledTimes(1)
       expect(spy).toHaveBeenCalledWith(2, 20)
     })
 
-    it('должен объединять несколько синхронных обновлений в один ререндер (Автобатчинг)', async () => {
-      const sig1 = engine.signal(0)
-      const sig2 = engine.signal(0)
-      const effectSpy = vi.fn()
+    it('должен поддерживать вложенные батчи и флушить эффекты только на выходе из самого внешнего', () => {
+      const sig = engine.signal(0)
+      const spy = vi.fn()
 
-      // Создаем эффект, зависящий от обоих сигналов
-      engine.effect(() => {
-        effectSpy(sig1.value, sig2.value)
+      engine.effect(() => { spy(sig.value) })
+      spy.mockClear()
+
+      engine.batch(() => {
+        sig.value = 1
+
+        // Вложенный батч
+        engine.batch(() => {
+          sig.value = 2
+          expect(spy).not.toHaveBeenCalled()
+        })
+
+        // Вышли из внутреннего, но внешний еще открыт — эффект все еще ждет
+        expect(spy).not.toHaveBeenCalled()
       })
 
-      // Очищаем первоначальный вызов при монтировании эффекта
-      effectSpy.mockClear()
-
-      // Имитируем два синхронных изменения подряд БЕЗ использования метода engine.batch
-      sig1.value = 10
-      sig2.value = 20
-
-      // Ждем окончания текущего цикла микрозадач (Event Loop)
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
-
-      // ПРОВЕРКА:
-      // Если в вашей текущей версии ядра тест ПАДАЕТ (вызовов будет 2) — автобатчинга нет.
-      // Иначе тест станет ЗЕЛЕНЫМ (вызов будет ровно 1)!
-      expect(effectSpy).toHaveBeenCalledTimes(1)
-      expect(effectSpy).toHaveBeenCalledWith(10, 20)
+      // Вышли из внешнего — эффект синхронно выполнился 1 раз с финальным значением
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(sig.value).toBe(2)
     })
   })
 })

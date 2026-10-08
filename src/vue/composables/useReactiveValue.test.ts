@@ -2,11 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { defineComponent, h, nextTick, effectScope } from 'vue'
 import { mount } from '@vue/test-utils'
 import { ReactiveEngine4Vue as ReactiveEngine } from '../ReactiveEngine4Vue'
-import { useReactiveValue } from '../composables/useReactiveValue'
+import { useReactiveValue } from './useReactiveValue'
 
-describe('useReactiveValue Composable (Vue 3)', () => {
-  // Инициализируем тестовый экземпляр ядра перед каждым тестом
-  const createEngine = () => new ReactiveEngine({ logger: { isEnabled: false } })
+describe('useReactiveValue Composable (Vue 3 — Synchronous Flow)', () => {
+  const createEngine = () => new ReactiveEngine()
 
   it('должен корректно считывать стартовое значение сигнала ядра', () => {
     const engine = createEngine()
@@ -39,9 +38,7 @@ describe('useReactiveValue Composable (Vue 3)', () => {
 
     signal.value = 'updated'
 
-    await Promise.resolve()
     await nextTick()
-
     expect(wrapper.find('#output').text()).toBe('updated')
   })
 
@@ -108,18 +105,13 @@ describe('useReactiveValue Composable (Vue 3)', () => {
     vi.stubGlobal('window', originalWindow)
   })
 
-  // ====================================================
-  //  НОВЫЕ ИНТЕГРАЦИОННЫЕ ТЕСТЫ РАБОТЫ С МАССИВАМИ В DOM
-  // ====================================================
-
-  it('должен обновлять DOM-дерево при мутации массивов в Сигнале при пинке сеттера', async () => {
+  it('должен обновлять DOM-дерево при мутации массивов в Сигнале ядра', async () => {
     const engine = createEngine()
     const tagsSignal = engine.signal(['js', 'ts'], { name: 'test:tags' })
 
     const TestComponent = defineComponent({
       setup() {
         const tags = useReactiveValue(tagsSignal)
-        // Эмулируем рендеринг списка элементов ul > li
         return () => h('ul', { id: 'list' }, tags.value.map(tag => h('li', tag)))
       }
     })
@@ -128,23 +120,18 @@ describe('useReactiveValue Composable (Vue 3)', () => {
     expect(wrapper.find('#list').text()).toContain('js')
     expect(wrapper.find('#list').text()).toContain('ts')
 
-    // Мутируем массив нативно внутри сигнала и пинаем его сеттер
+    // В синхронном режиме меняем ссылку через спред для триггера shallowRef во Vue
     tagsSignal.value.push('vue')
-    tagsSignal.value = tagsSignal.value
+    tagsSignal.value = [...tagsSignal.value]
 
-    // Ждем микрозадачу автобатчинга ядра и макрозадачу перерисовки шаблона Vue
-    await Promise.resolve()
     await nextTick()
-
-    // Проверяем, что Vue успешно добавил новый тег в DOM
     expect(wrapper.find('#list').text()).toContain('vue')
   })
 
-  it('должен автоматически перерисовывать DOM-дерево при изменении computed-свойства, фильтрующего массив', async () => {
+  it('должен автоматически перерисовывать DOM-дерево при изменении computed-свойства, зависящего от массива', async () => {
     const engine = createEngine()
     const listSignal = engine.signal(['apple', 'banana', 'orange'])
 
-    // Создаем computed на стороне ядра движка для фильтрации длинных слов
     const longWords = engine.computed(() => {
       return listSignal.value.filter(word => word.length > 5)
     }, 'test:computed:longWords')
@@ -157,16 +144,12 @@ describe('useReactiveValue Composable (Vue 3)', () => {
     })
 
     const wrapper = mount(TestComponent)
-    expect(wrapper.find('#output').text()).toBe('banana-orange') // apple отфильтровался
+    expect(wrapper.find('#output').text()).toBe('banana-orange')
 
-    // Добавляем новый элемент в ядро и пинаем сигнал
     listSignal.value.push('pineapple')
-    listSignal.value = listSignal.value
+    listSignal.value = [...listSignal.value]
 
-    await Promise.resolve()
     await nextTick()
-
-    // Цепочка вычислений (Ядро -> Composable -> Vue DOM) должна успешно сойтись
     expect(wrapper.find('#output').text()).toBe('banana-orange-pineapple')
   })
 
@@ -192,18 +175,18 @@ describe('useReactiveValue Composable (Vue 3)', () => {
     expect(wrapper.find('#output').text()).toBe('Task 1')
     expect(renderCount).toBe(1)
 
-    // Множественные нативные мутации массива в ядре без spread-костылей
-    state.todos.push('Task 2')
-    state.todos.push('Task 3')
-    state.todos.splice(1, 1) // удалили 'Task 2'
+    renderCount = 0
 
-    // Проталкиваем Proxy-автобатчинг ядра и планировщик Vue
-    await Promise.resolve()
+    // В строго синхронном ядре склеиваем мутации Proxy через явный batch
+    engine.batch(() => {
+      state.todos.push('Task 2')
+      state.todos.push('Task 3')
+      state.todos.splice(1, 1)
+    })
+
     await nextTick()
 
-    // Проверяем: DOM обновился до актуального состояния, а renderCount увеличился СТРОГО на 1 вызов
     expect(wrapper.find('#output').text()).toBe('Task 1 | Task 3')
-    expect(renderCount).toBe(2)
+    expect(renderCount).toBe(1)
   })
-
 })

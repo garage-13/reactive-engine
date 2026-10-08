@@ -1,4 +1,4 @@
-import { ReactiveEngine4React } from './ReactiveEngine4React'
+import { ReactiveEngine4ReactAutomatic } from './ReactiveEngine4React'
 
-export { ReactiveEngine4React as ReactiveEngine }
+export { ReactiveEngine4ReactAutomatic as ReactiveEngine }
 export * from './hooks'
