@@ -193,32 +193,42 @@ export class ReactiveEngineCore {
   }
 
   /**
-   * СИНХРОННЫЙ АТОМАРНЫЙ СИГНАЛ (БЕЗРЕКУРСИОННЫЙ)
+   * СИНХРОННЫЙ АТОМАРНЫЙ СИГНАЛ (БЕЗРЕКУРСИОННЫЙ С МАРКЕРОМ ИСТОЧНИКА)
    */
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
     const engine = this
     let val = initialValue
 
-    // Множество активных подписчиков (потребителей: эффектов или компьютеров)
     const subscribers = new Set<any>()
     const options = typeof optionsOrName === 'string' ? { name: optionsOrName } : optionsOrName || {}
     const name = options.name || 'unnamed_signal'
 
+    // Создаем структурный узел внутри замыкания, чтобы хранить версию мутаций
+    const signalNode = {
+      version: 0
+    }
+
     return {
       get value(): T {
-        // ДИНАМИЧЕСКИЙ ТРЕКИНГ: Если сигнал читается внутри активного контекста
         if (engine.activeConsumer) {
           const consumer = engine.activeConsumer
           if (!subscribers.has(consumer)) {
             subscribers.add(consumer)
-            // Заставляем потребителя отписаться от нас при его следующем перезапуске
-            consumer.cleanups.add(() => subscribers.delete(consumer))
+
+            const unsubscribeClosure = () => {
+              subscribers.delete(consumer)
+            }
+
+            // КРИТИЧЕСКИЙ ШАГ ДЛЯ АВТОБАТЧИНГА: Сохраняем ссылку на контекст
+            // узла и его версию непосредственно на замыкании функции отписки!
+            (unsubscribeClosure as any)._sourceNode = signalNode
+
+            consumer.cleanups.add(unsubscribeClosure)
           }
         }
         return val
       },
       set value(newValue: T) {
-        // Валидатор: если возвращает строку, выводим ошибку, но запись блокируем
         if (options?.validate) {
           const validationResult = options.validate(newValue)
           if (validationResult !== true) {
@@ -231,13 +241,15 @@ export class ReactiveEngineCore {
         if (isPrimitive && val === newValue) return
 
         const old = val
-        val = newValue;
+        val = newValue
+
+        // Инкрементируем версию при каждой честной мутации данных
+        signalNode.version++;
+
         (engine as any).onSignalChange?.(name, newValue, old)
 
-        // ФАЗА PUSH: Рассылаем статус загрязнения вниз по течению (downstream)
         const targets = Array.from(subscribers)
         targets.forEach(consumer => {
-          // БАРЬЕР ОТ САМОВЫЗОВА: защищает от бесконечных циклов
           if (consumer === engine.activeConsumer) return
           consumer.markDirty()
         })
@@ -589,6 +601,121 @@ export class ReactiveEngineAutomatic extends ReactiveEngine {
   constructor(options?: { logger?: EngineLoggerOptions }) {
     super(options)
     this.frameworkPrefix = 'auto-core'
+  }
+
+  /**
+   * СИНХРОННО-ЛЕНИВОЕ ВЫЧИСЛЯЕМОЕ СВОЙСТВО С АКТИВНОЙ ВАЛИДАЦИЕЙ РОДИТЕЛЕЙ
+   * Перехватывает pull-запросы внутри транзакций и синхронно проверяет апстрим-узлы,
+   * предотвращая холостые пересчеты (Кейсы #128, #132).
+   */
+  public override computed<T>(fn: () => T, signalName?: string): Computed<T> {
+    const engine = this
+
+    if (engine.computedCache.has(fn)) {
+      const cachedRef = engine.computedCache.get(fn)
+      const cachedInstance = cachedRef?.deref()
+      if (cachedInstance) return cachedInstance as Computed<T>
+    }
+
+    const name = signalName || 'unnamed_auto_computed'
+    let cachedValue: T
+    let isValueCached = false
+    const downstreamSubscribers = new Set<any>()
+
+    // Храним мапу версий родительских сигналов
+    const upstreamVersions = new Map<any, number>()
+
+    const computedNode: any = {
+      id: ++engine.subscriberId,
+      isDirty: true,
+      cleanups: new Set<() => void>(),
+      markDirty() {
+        if (!this.isDirty) {
+          this.isDirty = true
+          const targets = Array.from(downstreamSubscribers)
+          targets.forEach(sub => {
+            if (sub === engine.activeConsumer) return
+            sub.markDirty()
+          })
+        }
+      }
+    }
+
+    const computedInstance: Computed<T> = {
+      get value(): T {
+        if (engine.activeConsumer) {
+          const parentConsumer = engine.activeConsumer
+          if (!downstreamSubscribers.has(parentConsumer)) {
+            downstreamSubscribers.add(parentConsumer)
+            parentConsumer.cleanups.add(() => downstreamSubscribers.delete(parentConsumer))
+          }
+        }
+
+        // ПУЛЕНЕПРОБИВАЕМЫЙ ПЕРЕХВАТ: Если узел считается грязным, но у нас есть кэш,
+        // мы проверяем, изменились ли реальные версии сигналов в апстриме
+        if (computedNode.isDirty && isValueCached) {
+          let hasRealChanges = false
+          for (const [node, savedVersion] of upstreamVersions.entries()) {
+            if (node.version !== savedVersion) {
+              hasRealChanges = true
+              break
+            }
+          }
+          // Если версии совпали (изменений не было или был revert) — гасим грязь!
+          if (!hasRealChanges) {
+            computedNode.isDirty = false
+          }
+        }
+
+        // Если узел действительно грязный или кэша еще нет — выполняем расчет
+        if (computedNode.isDirty || !isValueCached) {
+          const oldCleanups = Array.from(computedNode.cleanups) as (() => void)[]
+          computedNode.cleanups.clear()
+          oldCleanups.forEach(unsub => unsub())
+
+          const prevConsumer = engine.activeConsumer
+          engine.activeConsumer = computedNode
+
+          try {
+            cachedValue = fn()
+            computedNode.isDirty = false
+            isValueCached = true
+
+            // Запоминаем текущие версии сигналов, которые были прочитаны в процессе fn()
+            upstreamVersions.clear()
+            computedNode.cleanups.forEach((unsub: any) => {
+              // Ищем родительский узел через ссылки подписок графа ядра
+              if (unsub && typeof unsub === 'function') {
+                // Извлекаем контекст источника, сохраненный при сборке зависимостей
+                const srcNode = (engine as any).allEffects?.has(unsub) || unsub._sourceNode
+                if (srcNode) {
+                  upstreamVersions.set(srcNode, srcNode.version || 0)
+                }
+              }
+            })
+
+          } finally {
+            engine.activeConsumer = prevConsumer
+          }
+        }
+        return cachedValue
+      },
+
+      subscribe: (cb: (val: T) => void) => engine.effect(() => cb(computedInstance.value), `computed:auto:${name}`),
+
+      destroy() {
+        const finalCleanups = Array.from(computedNode.cleanups) as (() => void)[]
+        computedNode.cleanups.clear()
+        finalCleanups.forEach(unsub => unsub())
+        downstreamSubscribers.clear()
+        upstreamVersions.clear()
+
+        engine.computedCache.delete(fn)
+      }
+    }
+
+    engine.computedCache.set(fn, new WeakRef(computedInstance as Computed<unknown>))
+    return computedInstance
   }
 
   /**

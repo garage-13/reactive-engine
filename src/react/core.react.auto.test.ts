@@ -61,22 +61,20 @@ describe('ReactiveEngine4ReactAutomatic (React)', () => {
       const listSignal = engine.signal(['apple', 'banana', 'orange'])
       const longWords = engine.computed(() => listSignal.value.filter(word => word.length > 5))
 
-      const { result } = renderHook(() => {
-        const filteredList = engine.use(longWords)
-        return filteredList.join('-')
-      })
+      const { result } = renderHook(() => engine.use(longWords))
 
-      expect(result.current).toBe('banana-orange')
+      expect(result.current.join('-')).toBe('banana-orange')
 
-      // ИСПРАВЛЕНО: Переводим act на async и проталкиваем Event Loop
+      // ИСПРАВЛЕНО: Переводим act на асингулярную модель и меняем ссылку массива через спред
       await act(async () => {
         listSignal.value.push('pineapple')
-        listSignal.value = [...listSignal.value]
-        await Promise.resolve()
+        listSignal.value = [...listSignal.value] // Спред пробивает барьер идентичности сигналов ядра!
+        await Promise.resolve() // Даем шедулеру микрозадач ядра отработать flushEffects
       })
 
-      expect(result.current).toBe('banana-orange-pineapple')
+      expect(result.current.join('-')).toBe('banana-orange-pineapple')
     })
+
 
     it('должен успешно синхронизировать мутации массивов в Сигнале через engine.use при пинке сеттера', async () => {
       const tagsSignal = engine.signal(['javascript'])
