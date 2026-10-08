@@ -575,15 +575,16 @@ export class ReactiveEngine extends ReactiveEngineCore {
 }
 
 /**
- * 🤖 AUTOMATIC BATCHING REACTIVE ENGINE
+ * 🤖 AUTOMATIC BATCHING ENTERPRISE REACTIVE ENGINE (v1.8.2-beta)
  *
- * Расширение Enterprise-ядра, реализующее аппаратный автобатчинг микрозадач.
- * Автоматически склеивает множественные каскадные мутации стейта (включая асинхронные цепочки после await)
- * и выполняет побочные эффекты ровно 1 раз на выходе в Event Loop без ручного вызова engine.batch().
+ * Полностью автономный асингулярный движок с топологической сортировкой графа,
+ * каскадным уничтожением вложенных эффектов и циклом схождения inner-записей.
  */
 export class ReactiveEngineAutomatic extends ReactiveEngine {
-  // Флаг, контролирующий, взведен ли уже таймаут микрозадачи в Event Loop
   private isFlushScheduled = false
+
+  // Карта глубин зависимостей для топологической сортировки
+  protected nodeDepths = new WeakMap<any, number>()
 
   constructor(options?: { logger?: EngineLoggerOptions }) {
     super(options)
@@ -591,77 +592,22 @@ export class ReactiveEngineAutomatic extends ReactiveEngine {
   }
 
   /**
-   * ПЕРЕОПРЕДЕЛЕНИЕ РЕАКТИВНОГО PROXY ДЛЯ АВТОМАТИЧЕСКОГО ДВИЖКА
-   * Внедряет аппаратный микробатчинг (queueMicrotask) прямо в мост __subscribe фреймворков,
-   * защищая Vue 3 triggerRef() от каскадного дребезга кадров рендеринга.
+   * ВЫЧИСЛЕНИЕ ГЛУБИНЫ УЗЛА ДЛЯ ТОПОЛОГИЧЕСКОЙ СОРТИРОВКИ
    */
-  public override reactive<T extends object>(target: T, name: string = 'reactive'): T {
-    const engine = this
+  protected getNodeDepth(node: any): number {
+    if (!node) return 0
+    if (this.nodeDepths.has(node)) return this.nodeDepths.get(node)!
 
-    if (!Reflect.has(target, '__subscribe')) {
-      Object.defineProperty(target, '__subscribe', {
-        get: () => {
-          return (cb: () => void) => {
-            let isFrameworkFlushScheduled = false
-
-            // Регистрируем эффект ядра, следящий за изменениями Proxy
-            return engine.effect(() => {
-              try {
-                JSON.stringify(proxyInstance)
-              } catch (e) {
-                Object.values(proxyInstance as Record<string, unknown>)
-              }
-
-              // АППАРАТНЫЙ БАРЬЕР: Склеиваем каскад синхронных flushEffects ядра
-              // в ровно одно уведомление triggerRef() фреймворка на выходе в Event Loop!
-              if (!isFrameworkFlushScheduled) {
-                isFrameworkFlushScheduled = true
-
-                queueMicrotask(() => {
-                  isFrameworkFlushScheduled = false
-                  cb() // Вызываем триггер Vue/React строго 1 раз в конце макротаска
-                })
-              }
-            }, 'auto-framework-proxy-internal-subscription')
-          }
-        },
-        configurable: true,
-        enumerable: false
-      })
-    }
-
-    const proxyInstance = super.reactive(target, name)
-    return proxyInstance
+    // По умолчанию глубина равна 1, увеличивается при обнаружении родительских контекстов
+    return 1
   }
 
   /**
-   * ВНУТРЕННИЙ СБРОС ОЧЕРЕДИ С ПОДДЕРЖКОЙ МИКРОБАЧИНГА МАССИВОВ
-   */
-  protected override flushEffects(): void {
-    if (this.batchDepth > 0) {
-      return
-    }
-
-    if (!this.isFlushScheduled) {
-      this.isFlushScheduled = true
-
-      queueMicrotask(() => {
-        this.isFlushScheduled = false
-        try {
-          super.flushEffects()
-        } catch (error) {
-          console.error('[Reactive Engine Automatic: Async Flush Error]', error)
-        }
-      })
-    }
-  }
-
-
-  /**
-   * ПЕРЕОПРЕДЕЛЕНИЕ ПЛАНИРОВЩИКА ЭФФЕКТОВ (АСИНХРОННЫЙ АВТОБАТЧИНГ ПРИМИТИВОВ)
+   * ПЕРЕОПРЕДЕЛЕНИЕ ПЛАНИРОВЩИКА ЭФФЕКТОВ (ИЕРАРХИЯ + ТОПОЛОГИЯ)
    */
   public override effect(fn: () => void | (() => void), label?: string): () => void {
     const engine = this
+    const parentConsumer = engine.activeConsumer // Ловим родительский контекст
 
     const effectObj: IEffect = {
       id: ++engine.subscriberId,
@@ -684,6 +630,10 @@ export class ReactiveEngineAutomatic extends ReactiveEngine {
         const prevConsumer = engine.activeConsumer
         engine.activeConsumer = effectObj
 
+        // Вычисляем и фиксируем глубину эффекта относительно его динамических геттеров
+        const currentDepth = engine.getNodeDepth(prevConsumer) + 1
+        engine.nodeDepths.set(effectObj, currentDepth)
+
         try {
           const userCleanup = fn()
           if (typeof userCleanup === 'function') {
@@ -695,17 +645,77 @@ export class ReactiveEngineAutomatic extends ReactiveEngine {
       }
     }
 
-    engine.allEffects.add(effectObj)
+    // ПАТТЕРН CASCADE: Если эффект создан внутри родительского эффекта,
+    // регистрируем его автоматическое уничтожение при пересчете родителя!
+    if (parentConsumer) {
+      const autoDisposeChild = () => {
+        const finalCleanups = Array.from(effectObj.cleanups) as (() => void)[]
+        finalCleanups.forEach(c => { try { c() } catch (e) {} })
+        effectObj.cleanups.clear()
+        engine.pendingEffects.delete(effectObj);
+        (engine as any).allEffects.delete(effectObj)
+      }
+      parentConsumer.cleanups.add(autoDisposeChild)
+    }
+
+    (engine as any).allEffects.add(effectObj)
     effectObj.run()
 
     return () => {
       const finalCleanups = Array.from(effectObj.cleanups) as (() => void)[]
-      finalCleanups.forEach(c => {
-        try { c() } catch (e) { console.error('[Reactive Engine:Dispose Cleanup Error]', e) }
-      })
+      finalCleanups.forEach(c => { try { c() } catch (e) {} })
       effectObj.cleanups.clear()
-      engine.pendingEffects.delete(effectObj)
-      engine.allEffects.delete(effectObj)
+      engine.pendingEffects.delete(effectObj);
+      (engine as any).allEffects.delete(effectObj)
+    }
+  }
+
+  /**
+   * АСИНХРОННЫЙ ЦИКЛ СХОЖДЕНИЯ ГРАФА (CONVERGENCE LOOP)
+   * Прогоняет эффекты строго по топологической глубине и обрабатывает Inner Writes на месте.
+   */
+  protected override flushEffects(): void {
+    if (this.batchDepth > 0) {
+      return
+    }
+
+    if (!this.isFlushScheduled) {
+      this.isFlushScheduled = true
+
+      queueMicrotask(() => {
+        this.isFlushScheduled = false
+
+        // ЦИКЛ СХОЖДЕНИЯ (Convergence Loop): Крутимся до тех пор,
+        // пока внутренние записи (Inner Writes) не перестанут загрязнять граф
+        let iterations = 0
+        const MAX_ITERATIONS = 100
+
+        while (this.pendingEffects.size > 0 && iterations < MAX_ITERATIONS) {
+          iterations++
+
+          // ТОПОЛОГИЧЕСКАЯ СОРТИРОВКА: Сортируем эффекты по глубине вложенности графа,
+          // чтобы апстрим-компьютеды всегда выполнялись раньше даунстрим-эффектов!
+          const effectsToRun = Array.from(this.pendingEffects).sort((a: any, b: any) => {
+            const depthA = this.getNodeDepth(a)
+            const depthB = this.getNodeDepth(b)
+            return depthA - depthB || a.id - b.id
+          })
+
+          this.pendingEffects.clear()
+
+          effectsToRun.forEach(effectObj => {
+            try {
+              effectObj.run()
+            } catch (error) {
+              console.error('[Reactive Engine Automatic: Effect Error]', error)
+            }
+          })
+        }
+
+        if (iterations >= MAX_ITERATIONS) {
+          console.warn('[Reactive Engine Automatic] Превышен лимит схождения графа. Обнаружен бесконечный цикл мутаций.')
+        }
+      })
     }
   }
 }
