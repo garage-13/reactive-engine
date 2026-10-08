@@ -84,7 +84,10 @@ describe('ReactiveEngine4Angular', () => {
     }).toThrow()
   })
 
-  it('должен автоматически отписываться от сигнала ядра при вызове onDestroy в Angular', () => {
+  it('должен автоматически отписываться от сигнала ядра при вызове onDestroy в Angular', async () => {
+    // 1. Включаем фейковые таймеры, чтобы Vitest перехватил любые скрытые setTimeout от Angular
+    vi.useFakeTimers()
+
     const engine = new ReactiveEngine4Angular()
     const service = engine.inject(TestService)
 
@@ -92,20 +95,30 @@ describe('ReactiveEngine4Angular', () => {
     const originalSubscribe = service.counter.subscribe.bind(service.counter)
 
     vi.spyOn(service.counter, 'subscribe').mockImplementation((cb) => {
-      originalSubscribe(cb)
-      return mockUnsubscribe // Возвращаем наш шпион отписки
+      const realUnsubscribe = originalSubscribe(cb)
+      return () => {
+        mockUnsubscribe()
+        realUnsubscribe() // Честно гасим внутренний эффект ядра
+      }
     })
 
-    // Инициализируем подписку. Наш переопределенный на верхнем уровне inject()
-    // запишет замыкание отписки внутрь onDestroySpy.cb
+    // Инициализируем подписку
     engine.use(service.counter)
-
     expect(service.counter.subscribe).toHaveBeenCalled()
 
-    // Имитируем уничтожение компонента Angular фреймворком (вызов хука DestroyRef)
+    // Имитируем уничтожение компонента Angular фреймворком
     onDestroySpy.cb()
 
-    // Проверяем, что функция отписки из ядра была вызвана ровно 1 раз
+    // Проверяем вызов шпиона
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1)
+
+    // 2. Прокручиваем и очищаем ВСЕ таймеры, которые мог создать фреймворк под капотом
+    await vi.runAllTimersAsync()
+
+    // 3. Возвращаем нативное время
+    vi.useRealTimers()
+
+    // 4. Финальная зачистка макрозадач
+    await new Promise((r) => setImmediate(r))
   })
 })

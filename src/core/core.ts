@@ -644,7 +644,7 @@ export class ReactiveEngine {
       set value(newValue: T) {
         if (val === newValue) return
 
-        // ВАЛИДАЦИЯ В RUNTIME
+        // Валидация в рантайме
         if (options.validate) {
           const result = options.validate(newValue)
           if (result === false || typeof result === 'string') {
@@ -675,10 +675,10 @@ export class ReactiveEngine {
           subscribers: subscriberLabels,
         })
 
-        // 1. Всегда добавляем подписчиков в очередь отложенных эффектов
+        // Всегда добавляем подписчиков в очередь отложенных эффектов
         subscribers.forEach(e => engine.pendingEffects.add(e))
 
-        // 2. Планируем автоматическое выполнение транзакции ВСЕГДА!
+        // Планируем автоматическое выполнение транзакции ВСЕГДА!
         // Теперь микрозадача гарантированно выполнится и зачистит буфер flushLogs,
         // даже если у сигнала было 0 подписчиков.
         if (!engine.isBatching) {
@@ -727,11 +727,18 @@ export class ReactiveEngine {
       label, // Запоминаем имя эффекта для профайлера/логов
       cleanups: new Set(),
       run() {
-        this.cleanups.forEach(c => c())
+        // 1. Создаем моментальный снимок (копию) функций очистки.
+        // Итерация по копии гарантирует, что даже если внутри колбэков очистки
+        // или последующего safeRun в Set прилетят новые элементы,
+        // текущий цикл .forEach завершится строго по старой длине и НЕ зациклится!
+        const cleanupsToRun = Array.from(this.cleanups)
         this.cleanups.clear()
+
+        cleanupsToRun.forEach(c => c())
+
         const prev = engine.activeEffect
         engine.activeEffect = this
-        // Замер производительности эффекта:
+
         const startTime = performance.now()
         engine.safeRun(this, () => {
           const cleanup = fn()
@@ -933,11 +940,26 @@ export class ReactiveEngine {
     const proxy = new Proxy(target, {
       get(obj, prop, receiver) {
         if (engine.activeEffect) {
+          const currentEffect = engine.activeEffect
           if (!propsSubscribers.has(prop)) propsSubscribers.set(prop, new Set())
-          propsSubscribers.get(prop)!.add(engine.activeEffect)
+
+          const subscribers = propsSubscribers.get(prop)!
+
+          // Проверяем, что эффект еще НЕ находится в подписчиках,
+          // И что эта конкретная функция очистки еще не была зарегистрирована,
+          // предотвращая каскадный дребезг Set.forEach
+          if (!subscribers.has(currentEffect)) {
+            subscribers.add(currentEffect)
+
+            const cleanupFn = () => {
+              subscribers.delete(currentEffect)
+            }
+
+            currentEffect.cleanups.add(cleanupFn)
+          }
         }
+
         const value = Reflect.get(obj, prop, receiver)
-        // engine.queueLog?.('reactive', `${name}.${String(prop)}`, { action: 'get', property: String(prop), value })
         return (value !== null && typeof value === 'object')
           ? engine.reactive(value, `${name}.${String(prop)}`)
           : value
@@ -949,9 +971,36 @@ export class ReactiveEngine {
         if (old !== value) {
           Reflect.set(obj, prop, value, receiver)
           engine.onSignalChange?.(`${name}.${String(prop)}`, value, old)
-          propsSubscribers.get(prop)?.forEach(e =>
-            engine.isBatching ? engine.pendingEffects.add(e) : e.run()
-          )
+
+          // Берем моментальный снимок подписчиков этого ключа.
+          // Это гарантирует, что синхронный перезапуск эффекта не зациклит текущий .forEach
+          const targets = propsSubscribers.get(prop)
+          const effectsToRun = targets ? Array.from(targets) : []
+
+          effectsToRun.forEach(e => {
+            if (engine.isBatching) {
+              engine.pendingEffects.add(e)
+            } else {
+              // Автобатчинг для Proxy: Взводим флаг и планируем микрозадачу,
+              // как это делает нативный Signal
+              // чтобы разделить фазу мутации и фазу синхронного перезапуска эффектов UI.
+              engine.pendingEffects.add(e)
+
+              if (!engine.isBatching) {
+                engine.isBatching = true
+
+                queueMicrotask(() => {
+                  for (const effectObj of engine.pendingEffects) {
+                    engine.pendingEffects.delete(effectObj)
+                    effectObj.run()
+                  }
+                  engine.isBatching = false
+                  engine.flushLogs?.()
+                })
+              }
+            }
+          })
+
           engine.queueLog?.('reactive', `${name}.${String(prop)}`, {
             action: 'set',
             property: String(prop),

@@ -62,7 +62,7 @@ describe('ReactiveEngine4Vue', () => {
     scope.stop()
   })
 
-  it('должен автоматически вызывать функцию отписки при уничтожении контекста Vue (onScopeDispose)', () => {
+  it('должен автоматически вызывать функцию отписки при уничтожении контекста Vue (onScopeDispose)', async () => {
     const engine = new ReactiveEngine4Vue()
     const service = engine.inject(TestService)
 
@@ -70,8 +70,11 @@ describe('ReactiveEngine4Vue', () => {
     const originalSubscribe = service.counter.subscribe.bind(service.counter)
 
     vi.spyOn(service.counter, 'subscribe').mockImplementation((cb) => {
-      originalSubscribe(cb)
-      return mockUnsubscribe
+      const realUnsubscribe = originalSubscribe(cb)
+      return () => {
+        mockUnsubscribe()
+        realUnsubscribe() // Честно гасим эффект ядра
+      }
     })
 
     const scope = effectScope()
@@ -82,9 +85,17 @@ describe('ReactiveEngine4Vue', () => {
 
     expect(service.counter.subscribe).toHaveBeenCalled()
 
-    // Останавливаем область видимости — это гарантированно вызовет onScopeDispose
+    // 1. Останавливаем область видимости Vue
     scope.stop()
 
+    // 2. Ждем, пока Vue полностью прогонит свой внутренний nextTick и выполнит onScopeDispose
+    await nextTick()
+
+    // 3. Проверяем вызов шпиона
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1)
+
+    // 4. Принудительно зачищаем макрозадачи Event Loop, как мы сделали в Angular
+    await new Promise((r) => setImmediate(r))
   })
+
 })

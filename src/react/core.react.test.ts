@@ -28,16 +28,19 @@ describe('ReactiveEngine (React)', () => {
     })
 
     it('должен успешно синхронизировать сигнал с хуками React', async () => {
-      engine.setReactAdapters(useState, useEffect)
-      const sig = engine.signal('hello')
+      // engine.setReactAdapters(useState, useEffect)
+      const sig = engine.signal<string>('hello')
 
+      // Читаем sig.value НАПРЯМУЮ в теле хука, чтобы спровоцировать трекинг,
+      // либо считываем значение, возвращаемое из engine.use
       const { result } = renderHook(() => engine.use(sig))
+
       expect(result.current).toBe('hello')
 
-      // Изменяем сигнал внутри act. Так как act в React умеет сам дожидаться асинхронных микрозадач,
-      // нам просто нужно использовать async/await версию act
+      // Изменяем стейт
       await act(async () => {
         sig.value = 'world'
+        await new Promise((r) => setImmediate(r))
       })
 
       expect(result.current).toBe('world')
