@@ -1,43 +1,49 @@
-import { useLayoutEffect, useRef } from 'react'
-import { Signal, CleanupFn } from '../../../core'
+import { useEffect, useRef } from 'react'
+
+type CleanupFn = () => void
+
+export interface ISignalLike<V> {
+  value: V;
+  subscribe: (cb: (v: V) => void) => CleanupFn;
+}
 
 /**
- * Универсальный хук для безопасной синхронной подписки на изменения Signal, Computed или Resource.
- * Гарантирует отсутствие упущенных тиков (Race Conditions) и мгновенную очистку в React StrictMode.
- *
- * @template T Тип данных внутри реактивного контейнера
- * @param {Pick<Signal<T>, 'subscribe'>} signal Объект подписки (Signal/Computed/Resource)
- * @param {(val: T) => void} callback Функция обратного вызова, принимающая новое значение
- * @returns {void}
- * @source
+ * Универсальный хук подписки на реактивные источники ядра для React.
+ * Полиморфно поддерживает как примитивные Сигналы/Computed, так и Proxy-объекты reactive().
  */
-export const useReactiveSubscription = <T>(
-  signal: Pick<Signal<T>, 'subscribe'>,
-  callback: (val: T) => void
-): void => {
-  // 1. Сохраняем актуальный callback в ref.
-  // Мы обновляем его синхронно прямо во время рендера, уходя от лишнего useEffect
+export function useReactiveSubscription<T>(
+  item: T,
+  callback: (val: T extends ISignalLike<infer V> ? V : T) => void
+): void {
+  // Сохраняем ссылку на актуальный колбэк, чтобы защитить от лишних переподписок
   const callbackRef = useRef(callback)
-  callbackRef.current = callback
 
-  // 2. Используем useLayoutEffect вместо useEffect.
-  // Подписка оформляется синхронно ДО того, как браузер отрисует пиксели на экране.
-  // Это полностью исключает Tearing (пропуск первого асинхронного тика данных из сети/WebSocket).
-  useLayoutEffect(() => {
-    if (!signal || typeof signal.subscribe !== 'function') return
+  useEffect(() => {
+    callbackRef.current = callback
+  }, [callback])
 
-    // Подписываемся на изменения в ядре.
-    // Наш метод frameworkPrefix автоматически подставит бэдж "react:use:..." в логи!
-    const unsubscribe: CleanupFn = signal.subscribe((val) => {
-      callbackRef.current(val)
-    })
+  useEffect(() => {
+    if (!item || typeof item !== 'object') return
 
-    // Возвращаем функцию очистки. В useLayoutEffect она срабатывает мгновенно
-    // при unmount, на корню уничтожая "зомби-эффекты" в StrictMode.
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe()
-      }
+    // 1. Сценарий А: У объекта есть нативный метод подписки .subscribe (Сигнал / Computed)
+    if ('subscribe' in item && typeof (item as Record<string, unknown>).subscribe === 'function') {
+      const signalItem = (item as unknown) as ISignalLike<unknown>
+
+      const unsubscribe = signalItem.subscribe((newValue) => {
+        callbackRef.current(newValue as any)
+      })
+
+      return () => unsubscribe()
     }
-  }, [signal])
+
+    // 2. Сценарий Б: Передан Proxy-объект (используем служебный геттер фреймворк-адаптеров)
+    if ('__subscribe' in item && typeof (item as Record<string, unknown>).__subscribe === 'function') {
+      const unsubscribe = ((item as Record<string, unknown>).__subscribe as (cb: () => void) => CleanupFn)(() => {
+        // При мутации свойств или массивов Proxy пинаем колбэк с актуальным состоянием объекта
+        callbackRef.current(item as any)
+      })
+
+      return () => unsubscribe()
+    }
+  }, [item])
 }

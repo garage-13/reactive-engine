@@ -7,7 +7,7 @@ describe('withThrottleComputed', () => {
 
   beforeEach(() => {
     engine = new ReactiveEngine()
-    vi.useFakeTimers() // Контролирует Date.now() и setTimeout безупречно
+    vi.useFakeTimers()
   })
 
   afterEach(() => {
@@ -140,5 +140,122 @@ describe('withThrottleComputed', () => {
 
     // Так как метод destroy вызвал clearTimeout, отложенный хвост 99 полностью аннулирован!
     expect(throttled.value).toBe(1)
+  })
+
+  describe('withThrottleComputed — Работа с массивами и коллекциями', () => {
+
+    it('должен отслеживать изменения массивов в Сигналах и прогонять их через Trailing edge при пинке сеттера', async () => {
+      const tagsSignal = engine.signal(['js'])
+
+      const throttled = withThrottleComputed(
+        engine,
+        () => [...tagsSignal.value], // возвращаем копию для чистоты snapshot-проверки
+        { limit: 1000 }
+      )
+
+      expect(throttled.value).toEqual(['js'])
+
+      // 1. Первая мутация — Leading edge пробивается сразу
+      tagsSignal.value.push('ts')
+      tagsSignal.value = tagsSignal.value
+      await vi.advanceTimersByTimeAsync(0)
+      expect(throttled.value).toEqual(['js', 'ts'])
+
+      // 2. Спамим мутации внутрь окна блокировки (Trailing edge накопитель)
+      tagsSignal.value.push('vue')
+      tagsSignal.value = tagsSignal.value
+      await vi.advanceTimersByTimeAsync(0)
+
+      tagsSignal.value.push('angular')
+      tagsSignal.value = tagsSignal.value
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Окно заблокировано — значение удерживает предыдущий массив
+      expect(throttled.value).toEqual(['js', 'ts'])
+
+      // 3. Перематываем время лимита вперед на 1000мс
+      await vi.advanceTimersByTimeAsync(1000)
+
+      // Хвостовое состояние массива долетело в полном составе!
+      expect(throttled.value).toEqual(['js', 'ts', 'vue', 'angular'])
+    })
+
+    it('должен нативно трекать деструктивные мутации Proxy-массивов (.push) и отдавать актуальный срез данных на хвосте таймера', async () => {
+      const state = engine.reactive({
+        todos: ['Task 1']
+      })
+
+      const throttled = withThrottleComputed(
+        engine,
+        () => [...state.todos],
+        { limit: 1000 }
+      )
+
+      expect(throttled.value).toEqual(['Task 1'])
+
+      // 1. Первая мутация (Leading)
+      state.todos.push('Task 2')
+      // Проталкиваем Proxy-автобатчинг микрозадач ядра
+      await new Promise<void>((r) => queueMicrotask(r))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(throttled.value).toEqual(['Task 1', 'Task 2'])
+
+      // 2. Накапливаем нативные мутации внутри активного окна блокировки
+      state.todos.push('Task 3')
+      await new Promise<void>((r) => queueMicrotask(r))
+      state.todos.push('Task 4')
+      await new Promise<void>((r) => queueMicrotask(r))
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Троттлинг удерживает стабильное Leading-состояние
+      expect(throttled.value).toEqual(['Task 1', 'Task 2'])
+
+      // 3. Крутим виртуальное время на 1000мс вперед, провоцируя Trailing edge
+      await vi.advanceTimersByTimeAsync(1000)
+
+      // Декоратор нативно прочитал изменившийся прокси-массив по истечении таймаута!
+      expect(throttled.value).toEqual(['Task 1', 'Task 2', 'Task 3', 'Task 4'])
+    })
+
+    it('должен корректно обновлять затроттленный computed, если он зависит от обычного computed, фильтрующего массив', async () => {
+      const listSignal = engine.signal(['apple', 'banana', 'orange'])
+
+      // Промежуточный обычный компьютед ядра для фильтрации слов длиннее 5 символов
+      const longWords = engine.computed(() => {
+        return listSignal.value.filter(word => word.length > 5)
+      })
+
+      // Затроттленный компьютед зависит от промежуточного компьютеда longWords
+      const throttled = withThrottleComputed(
+        engine,
+        () => longWords.value.join('-'),
+        { limit: 1000 }
+      )
+
+      expect(throttled.value).toBe('banana-orange') // apple отфильтровался
+
+      // Мутируем массив в корневом сигнале
+      listSignal.value.push('pineapple')
+      listSignal.value = listSignal.value
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Волна инвалидации (Эффект домино) прошла мгновенно через цепочку вычислений (Leading edge)
+      expect(throttled.value).toBe('banana-orange-pineapple')
+
+      // Делаем вторую мутацию (спам в окно блокировки)
+      listSignal.value.push('watermelon')
+      listSignal.value = listSignal.value
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Заблокировано троттлингом
+      expect(throttled.value).toBe('banana-orange-pineapple')
+
+      // Прокручиваем лимит времени
+      await vi.advanceTimersByTimeAsync(1000)
+
+      // Хвост успешно долетел через всю цепочку вычислений реактивного графа!
+      expect(throttled.value).toBe('banana-orange-pineapple-watermelon')
+    })
+
   })
 })

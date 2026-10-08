@@ -1,47 +1,55 @@
 interface StaleOptions<T> {
-  /**
-   * Дефолтное значение, которое вернется при самом первом запросе,
-   * если он завершился ошибкой или был отменен.
-   */
   initialData?: T;
   isLogsEnabled?: boolean;
+  /**
+   * Время жизни кэша в миллисекундах (Time-To-Live).
+   * Если текущий запрос упал ИЛИ был отменен, декоратор вернет `stale`-данные
+   * для конкретного source только если они были получены в пределах этого интервала.
+   */
+  ttl?: number;
 }
 
 /**
- * Декоратор для сохранения предыдущего успешного состояния данных,
- * специально адаптированный для использования совместно с `engine.resource`.
- *
- * Оборачивает асинхронную функцию `fetcher`. Если текущий запрос отменяется
- * (например, через AbortSignal при перетаскивании карты) или завершается ошибкой,
- * декоратор перехватывает исключение и возвращает последнее успешно полученное значение.
- *
- * ### 🧠 Механика Stale-While-Revalidate:
- * 1. **Стабильный кэш последнего состояния:** Декоратор сохраняет в замыкании успешный результат.
- * 2. **Грациозная деградация (Graceful Degradation):** При возникновении `AbortError` (отмена)
- *    или любого другого сетевого сбоя, вместо выброса исключения в граф возвращается `stale`-дата.
- * 3. **Бесшовный UX:** Карта или UI-компонент не сбрасывают свое состояние в `null` во время
- *    перепривязки сигналов, исключая эффект "моргания".
- *
- * @template S Тип входных данных (аргументов) для функции запроса.
- * @template T Тип данных, возвращаемых асинхронным `fetcher`-ом.
- *
- * @param {(source: S, signal: AbortSignal) => Promise<T>} fetcher Оригинальная асинхронная функция запроса.
- * @param {StaleOptions<T>} [options={}] Параметры конфигурации предыдущего состояния.
- *
- * @returns {(source: S, signal: AbortSignal) => Promise<T>} Вовращает обернутую функцию с сохраненной сигнатурой типов.
+ * Декоратор для сохранения предыдущего успешного состояния данных (Failover Cache) с поддержкой TTL.
  */
 export const withStaleWhileRevalidate = <S, T>(
   fetcher: (source: S, signal: AbortSignal) => Promise<T>,
   options: StaleOptions<T> = {}
 ) => {
-  // Хранилище для последнего успешного ответа сервера в рамках замыкания декоратора
-  let lastValidData: T | undefined = options.initialData
+  // Структурная мапа кэша: сериализованный JSON-строка ключа (source) -> { data: T, savedTime: number }
+  const cacheMap = new Map<string, { data: T; savedTime: number }>()
+
   const isLogsEnabled = options.isLogsEnabled ?? false
+  const ttl = options.ttl
+
+  // Если переданы начальные данные initialData, заносим их под дефолтным пустым ключом
+  if (options.initialData !== undefined) {
+    cacheMap.set('__initial__', { data: options.initialData, savedTime: Date.now() })
+  }
+
+  // Внутренний хелпер для безопасной сериализации ключей (защита от круговых ссылок)
+  const getCacheKey = (source: S): string => {
+    try {
+      return JSON.stringify(source)
+    } catch (e) {
+      return String(source)
+    }
+  }
 
   return async (source: S, signal: AbortSignal): Promise<T> => {
-    // Если запрос отменен еще до старта, сразу возвращаем последнее известное состояние
+    const cacheKey = getCacheKey(source)
+
+    // Ищем кэш конкретно под текущий сериализованный слепок параметров!
+    let cachedRecord = cacheMap.get(cacheKey) || cacheMap.get('__initial__')
+
+    const isCacheValid = (): boolean => {
+      if (!cachedRecord) return false
+      if (ttl === undefined) return true
+      return Date.now() - cachedRecord.savedTime < ttl
+    }
+
     if (signal.aborted) {
-      if (lastValidData !== undefined) return lastValidData
+      if (isCacheValid() && cachedRecord) return cachedRecord.data
       throw signal.reason || new DOMException('The operation was aborted.', 'AbortError')
     }
 
@@ -49,27 +57,27 @@ export const withStaleWhileRevalidate = <S, T>(
       // Выполняем реальный сетевой запрос
       const freshData = await fetcher(source, signal)
 
-      // Запоминаем успешный результат
-      lastValidData = freshData
+      // Запоминаем успешный результат строго под его индивидуальным ключом параметров!
+      cacheMap.set(cacheKey, { data: freshData, savedTime: Date.now() })
+
+      // Удаляем временный initialData ключ после первого успешного наполнения реального кэша
+      cacheMap.delete('__initial__')
 
       return freshData
     } catch (error) {
-      // Если запрос был отменен движком (например, изменился bbox) ИЛИ произошла сетевая ошибка
       const isAbort = error instanceof DOMException && error.name === 'AbortError'
 
-      // Если у нас уже есть сохраненные старые данные — отдаем их вместо падения
-      if (lastValidData !== undefined) {
+      // Возвращаем старые данные ТОЛЬКО если они подходят под этот конкретный source по параметрам!
+      if (isCacheValid() && cachedRecord) {
         if (isLogsEnabled) {
-          // Логируем для трассировки в dev-режиме (опционально)
           console.warn(
-            `[ReactiveEngine:Stale] Запрос ${isAbort ? 'отменен' : 'упал с ошибкой'}. Отдаем предыдущее состояние.`,
+            `[ReactiveEngine:Stale] Запрос для ключа ${cacheKey} ${isAbort ? 'отменен' : 'упал'}. Отдаем сохраненное состояние.`,
             error
           )
         }
-        return lastValidData
+        return cachedRecord.data
       }
 
-      // Если это самый первый запрос и кэш пуст — прокидываем ошибку дальше в граф
       throw error
     }
   }

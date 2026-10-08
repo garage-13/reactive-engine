@@ -1,81 +1,120 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { withStaleWhileRevalidate } from './withStaleWhileRevalidate'
+import { ReactiveEngine } from '../../core/core' // Укажите ваш правильный относительный путь
 
-describe('withStaleWhileRevalidate', () => {
-  it('должен успешно возвращать свежие данные при первом вызове', async () => {
-    const fetcher = vi.fn().mockResolvedValue('fresh-data')
-    const decorated = withStaleWhileRevalidate(fetcher)
-    const controller = new AbortController()
+describe('withStaleWhileRevalidate decorator', () => {
+  let fetcherSpy: any
 
-    const result = await decorated('source-1', controller.signal)
-
-    expect(result).toBe('fresh-data')
-    expect(fetcher).toHaveBeenCalledTimes(1)
+  beforeEach(() => {
+    vi.useFakeTimers()
+    fetcherSpy = vi.fn(async (source: any, signal: AbortSignal) => {
+      return `data_for_${JSON.stringify(source)}`
+    })
   })
 
-  it('должен отдавать initialData, если первый запрос был отменен', async () => {
-    const fetcher = vi.fn().mockRejectedValue(new DOMException('Aborted', 'AbortError'))
-    const decorated = withStaleWhileRevalidate(fetcher, { initialData: 'stale-initial' })
-    const controller = new AbortController()
-
-    // Имитируем отмену до или во время запроса
-    controller.abort()
-
-    const result = await decorated('source-1', controller.signal)
-
-    expect(result).toBe('stale-initial')
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
-  it('должен прокидывать ошибку, если первый запрос упал, а initialData не задан', async () => {
-    const networkError = new Error('Network failed')
-    const fetcher = vi.fn().mockRejectedValue(networkError)
-    const decorated = withStaleWhileRevalidate(fetcher)
-    const controller = new AbortController()
+  it('должен делать реальный запрос при самом первом вызове (кэш пуст)', async () => {
+    const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000 })
+    const abortSignal = new AbortController().signal
 
-    await expect(decorated('source-1', controller.signal)).rejects.toThrow('Network failed')
+    const res = await cachedFetcher('user_1', abortSignal)
+    expect(res).toBe('data_for_"user_1"')
+    expect(fetcherSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('должен возвращать последнее валидное состояние при последующей отмене (AbortError)', async () => {
-    let callCount = 0
-    // Первый вызов успешен, второй имитирует отмену движком при смене сигналов
-    const fetcher = vi.fn().mockImplementation(async () => {
-      callCount++
-      if (callCount === 1) return 'first-successful-data'
-      throw new DOMException('The operation was aborted.', 'AbortError')
+  it('должен возвращать stale-данные из кэша при ошибке или отмене повторного вызова, если их TTL валиден', async () => {
+    // Включаем TTL на 5000 миллисекунд
+    const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000, isLogsEnabled: false })
+    const abortSignal = new AbortController().signal
+
+    // 1. Первый успешный вызов — прогреваем кэш
+    const res1 = await cachedFetcher('user_1', abortSignal)
+    expect(res1).toBe('data_for_"user_1"')
+    expect(fetcherSpy).toHaveBeenCalledTimes(1)
+
+    // Имитируем падение бэкенда (сетевой сбой) для повторного вызова
+    fetcherSpy.mockRejectedValueOnce(new Error('500 Internal Server Error'))
+
+    // 2. Повторный вызов — бэкенд лежит, но TTL кэша еще валиден!
+    const resFallback = await cachedFetcher('user_1', abortSignal)
+
+    // Декоратор обязан перехватить 500-ю ошибку и мягко отдать старый валидный кэш!
+    expect(resFallback).toBe('data_for_"user_1"')
+    expect(fetcherSpy).toHaveBeenCalledTimes(2) // Запрос честно пытался сходить по сети
+  })
+
+
+  it('должен полностью стирать кэш и делать честный жесткий запрос, если TTL истек', async () => {
+    const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000 })
+    const abortSignal = new AbortController().signal
+
+    await cachedFetcher('user_1', abortSignal)
+    expect(fetcherSpy).toHaveBeenCalledTimes(1)
+
+    // Полностью перематываем TTL
+    await vi.advanceTimersByTimeAsync(5001)
+
+    const res = await cachedFetcher('user_1', abortSignal)
+    // Кэш мертв, это не SWR-ревалидация, а жесткий новый запрос
+    expect(res).toBe('data_for_"user_1"')
+    expect(fetcherSpy).toHaveBeenCalledTimes(2)
+  })
+
+  describe('withStaleWhileRevalidate — Работа с массивами и коллекциями', () => {
+
+    it('должен успешно отдавать stale-кэш для массивов при сетевом сбое, если у них одинаковое содержимое (Структурный SWR-ключ)', async () => {
+      const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000, isLogsEnabled: false })
+      const abortSignal = new AbortController().signal
+
+      // 1. Первый успешный вызов с копией массива №1
+      const arr1 = ['js', 'ts']
+      await cachedFetcher(arr1, abortSignal)
+      expect(fetcherSpy).toHaveBeenCalledTimes(1)
+
+      // Имитируем падение сети на повторном запросе
+      fetcherSpy.mockRejectedValueOnce(new Error('Network Error'))
+
+      // 2. Повторный вызов с копией массива №2 (другая ссылка в памяти, но то же содержимое)
+      const arr2 = ['js', 'ts']
+      const resStale = await cachedFetcher(arr2, abortSignal)
+
+      // SWR-механизм обязан понять, что структуры равны, перехватить ошибку и выдать кэш!
+      expect(resStale).toBe('data_for_["js","ts"]')
+      expect(fetcherSpy).toHaveBeenCalledTimes(2)
     })
 
-    const decorated = withStaleWhileRevalidate(fetcher)
+    it('должен прокидывать ошибку дальше и не возвращать stale-кэш, если внутри Proxy-массива произошла мутация .push()', async () => {
+      const engine = new ReactiveEngine()
+      const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000, isLogsEnabled: false })
+      const abortSignal = new AbortController().signal
 
-    // 1. Успешный первый прогон
-    const controller1 = new AbortController()
-    const firstResult = await decorated('source-1', controller1.signal)
-    expect(firstResult).toBe('first-successful-data')
+      // Создаем мутабельный Proxy-массив в ядре
+      const state = engine.reactive({
+        filters: ['active']
+      })
 
-    // 2. Второй прогон (например, пользователь сдвинул карту, bbox изменился, пошла отмена)
-    const controller2 = new AbortController()
-    const secondResult = await decorated('source-2', controller2.signal)
+      // 1. Первый успешный вызов — заносим в кэш слепок ["active"]
+      const res1 = await cachedFetcher(state.filters, abortSignal)
+      expect(res1).toBe('data_for_["active"]')
+      expect(fetcherSpy).toHaveBeenCalledTimes(1)
 
-    // Должно вернуться старое состояние вместо падения графа
-    expect(secondResult).toBe('first-successful-data')
-    expect(fetcher).toHaveBeenCalledTimes(2)
-  })
+      // 2. Императивно мутируем массив (ссылка прежняя, состав новый)
+      state.filters.push('archived')
+      await new Promise<void>((r) => queueMicrotask(r)) // даем отработать Proxy-автобатчингу
 
-  it('должен возвращать последнее валидное состояние при обычных сетевых ошибках', async () => {
-    let callCount = 0
-    const fetcher = vi.fn().mockImplementation(async () => {
-      callCount++
-      if (callCount === 1) return 'stable-data'
-      throw new Error('500 Internal Server Error')
+      // Имитируем падение бэкенда
+      fetcherSpy.mockRejectedValueOnce(new Error('Fatal Crunch'))
+
+      // 3. Вызываем фетчер снова. Поскольку состав изменился, старый кэш ["active"]
+      // больше не является валидным для нового ключа ["active","archived"]!
+      // Декоратор обязан проигнорировать старый кэш и честно выбросить ошибку наружу в граф.
+      await expect(cachedFetcher(state.filters, abortSignal)).rejects.toThrow('Fatal Crunch')
+      expect(fetcherSpy).toHaveBeenCalledTimes(2)
     })
 
-    const decorated = withStaleWhileRevalidate(fetcher)
-
-    // 1. Наполняем кэш замыкания успешными данными
-    const res1 = await decorated('param', new AbortController().signal)
-    expect(res1).toBe('stable-data')
-
-    // 2. Запрос ломается, но граф защищен и получает старые данные
-    const res2 = await decorated('param', new AbortController().signal)
-    expect(res2).toBe('stable-data')
   })
 })

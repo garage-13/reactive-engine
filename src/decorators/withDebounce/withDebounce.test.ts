@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { withDebounce } from './withDebounce' // Предполагаем, что декоратор лежит в этом же каталоге
+import { withDebounce } from './withDebounce'
+import { ReactiveEngine } from '../../core/core'
 
 describe('withDebounce decorator', () => {
   beforeEach(() => {
@@ -101,5 +102,75 @@ describe('withDebounce decorator', () => {
 
     // Проверяем, что декоратор успешно транслирует ошибку оригинальной функции
     await expect(promise).rejects.toThrow('Сбой сервера 500')
+  })
+
+  // ====================================================
+  //  withDebounce — Работа с массивами и коллекциями
+  // ====================================================
+  describe('withDebounce — Работа с массивами и коллекциями', () => {
+
+    it('должен корректно дебаунсить запросы при быстрой смене иммутабельных массивов-фильтров', async () => {
+      const mockFetcher = vi.fn().mockResolvedValue('filtered-data')
+      const debouncedFetcher = withDebounce(mockFetcher, { delay: 300 })
+
+      const c1 = new AbortController()
+      const c2 = new AbortController()
+
+      // Имитируем клики пользователя по чекбоксам фильтров (смена массивов)
+      const p1 = debouncedFetcher(['react'], c1.signal)
+      vi.advanceTimersByTime(150) // Прошло 150мс
+
+      const p2 = debouncedFetcher(['react', 'vue'], c2.signal)
+
+      // Первый запрос отменяется новым таймаутом
+      await expect(p1).rejects.toThrow('Aborted due to debounce')
+
+      // Перематываем дебаунс до конца для финального массива
+      vi.advanceTimersByTime(300)
+
+      const result = await p2
+      expect(mockFetcher).toHaveBeenCalledTimes(1)
+      expect(mockFetcher).toHaveBeenCalledWith(['react', 'vue'], c2.signal)
+      expect(result).toBe('filtered-data')
+    })
+
+    it('должен корректно дебаунсить вызовы при нативных мутациях .push() одного Proxy-массива в ядре', async () => {
+      const engine = new ReactiveEngine()
+      const mockFetcher = vi.fn().mockImplementation(async (arr: string[]) => `len_${arr.length}`)
+      const debouncedFetcher = withDebounce(mockFetcher, { delay: 300 })
+
+      const state = engine.reactive({
+        filters: ['js']
+      })
+
+      const c1 = new AbortController()
+      const c2 = new AbortController()
+
+      // Первый вызов с исходным состоянием прокси-массива
+      const p1 = debouncedFetcher(state.filters, c1.signal)
+      vi.advanceTimersByTime(100)
+
+      // Императивно мутируем этот же прокси-массив (ссылка прежняя, состав новый!)
+      state.filters.push('ts')
+      // Проталкиваем микрозадачу автобатчинга ядра, чтобы прокси зафиксировал стейт
+      await new Promise<void>((r) => queueMicrotask(r))
+
+      // Повторно пинаем дебаунс-фетчер тем же самым массивом
+      const p2 = debouncedFetcher(state.filters, c2.signal)
+
+      // Первое ожидание сбрасывается из-за повторного вызова дебаунса
+      await expect(p1).rejects.toThrow('Aborted due to debounce')
+
+      // Докручиваем оставшийся дебаунс-таймаут
+      vi.advanceTimersByTime(300)
+
+      const result = await p2
+
+      // Проверяем: фетчер вызвался строго 1 раз и улетел со свежим набором элементов внутри Proxy
+      expect(mockFetcher).toHaveBeenCalledTimes(1)
+      expect(mockFetcher).toHaveBeenCalledWith(state.filters, c2.signal)
+      expect(result).toBe('len_2')
+    })
+
   })
 })

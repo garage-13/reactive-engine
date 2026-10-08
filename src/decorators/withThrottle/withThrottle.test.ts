@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { withThrottle } from './withThrottle'
+import { ReactiveEngine } from '../../core/core'
 
 describe('withThrottle decorator', () => {
   let fakeNow = 1000
@@ -95,5 +96,84 @@ describe('withThrottle decorator', () => {
     // Проверяем, что все три вызова успешно дошли до оригинального фетчера
     expect(mockFetcher).toHaveBeenCalledTimes(3)
     expect(mockFetcher).toHaveBeenLastCalledWith('3', c3.signal)
+  })
+
+  // ====================================================
+  //  withThrottle — Работа с массивами и коллекциями
+  // ====================================================
+  describe('withThrottle — Работа с массивами и коллекциями', () => {
+
+    it('должен корректно троттлить вызовы при быстрой смене иммутабельных массивов-зависимостей', async () => {
+      const mockFetcher = vi.fn().mockResolvedValue('array-throttled')
+      const throttledFetcher = withThrottle(mockFetcher, { limit: 300 })
+
+      const c1 = new AbortController()
+      const c2 = new AbortController()
+      const c3 = new AbortController()
+
+      // 1. Первый вызов (Leading) -> Улетает мгновенно
+      throttledFetcher(['js'], c1.signal)
+      expect(mockFetcher).toHaveBeenCalledTimes(1)
+      expect(mockFetcher).toHaveBeenCalledWith(['js'], c1.signal)
+
+      fakeNow += 100 // отметка 1100мс
+
+      // 2. Промежуточный вызов с массивом-копией №2 -> Отклоняется
+      const p2 = throttledFetcher(['js', 'ts'], c2.signal)
+
+      fakeNow += 50 // отметка 1150мс
+
+      // 3. Хвостовой вызов с массивом-копией №3 -> Встает в Trailing edge
+      const p3 = throttledFetcher(['js', 'ts', 'vue'], c3.signal)
+
+      await expect(p2).rejects.toThrow('Aborted due to newer throttled value')
+
+      // Сдвигаем время на конец лимита (1300мс)
+      fakeNow = 1300
+      const result = await p3
+
+      // Проверяем, что хвостовой вызов улетел строго с финальным составом массива
+      expect(mockFetcher).toHaveBeenCalledTimes(2)
+      expect(mockFetcher).toHaveBeenLastCalledWith(['js', 'ts', 'vue'], c3.signal)
+      expect(result).toBe('array-throttled')
+    })
+
+    it('должен нативно извлекать свежий состав Proxy-массива на Trailing edge при его мутациях .push()', async () => {
+      const engine = new ReactiveEngine()
+      const mockFetcher = vi.fn().mockImplementation(async (arr: string[]) => `length:${arr.length}`)
+      const throttledFetcher = withThrottle(mockFetcher, { limit: 300 })
+
+      const c1 = new AbortController()
+      const c2 = new AbortController()
+
+      const state = engine.reactive({
+        items: ['A']
+      })
+
+      // 1. Первый вызов (Leading) -> улетает мгновенно с ['A']
+      throttledFetcher(state.items, c1.signal)
+      expect(mockFetcher).toHaveBeenCalledTimes(1)
+      expect(mockFetcher).toHaveBeenCalledWith(['A'], c1.signal)
+
+      fakeNow += 150 // отметка 1150мс
+
+      // 2. Ставим вызов в хвост (Trailing) внутри окна блокировки
+      const p2 = throttledFetcher(state.items, c2.signal)
+
+      // Императивно мутируем этот же прокси-массив до срабатывания таймаута хвоста
+      state.items.push('B')
+      state.items.push('C')
+      await new Promise<void>((r) => queueMicrotask(r)) // даем отработать Proxy-автобатчингу
+
+      // Сдвигаем время на конец лимита (1300мс), провоцируя запуск таймаута
+      fakeNow = 1300
+      const result = await p2
+
+      // Декоратор обязан на хвосте прочитать мутировавший прокси-массив и отдать актуальный состав!
+      expect(mockFetcher).toHaveBeenCalledTimes(2)
+      expect(mockFetcher).toHaveBeenLastCalledWith(state.items, c2.signal)
+      expect(result).toBe('length:3') // Длина массива стала 3
+    })
+
   })
 })

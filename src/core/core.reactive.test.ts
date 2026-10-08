@@ -229,5 +229,100 @@ describe('ReactiveEngine', () => {
       expect(spy).toHaveBeenCalledTimes(0)
     })
 
+    it('должен нативно отслеживать мутации массивов через .push() и длину .length без spread-оператора', async () => {
+      const engine = new ReactiveEngine()
+      const state = engine.reactive({ tags: ['js'] })
+      const spy = vi.fn()
+
+      engine.effect(() => {
+        // Подписываемся строго на свойство .length массива
+        spy(state.tags.length)
+      })
+
+      expect(spy).toHaveBeenCalledWith(1)
+      spy.mockClear()
+
+      // ТЕПЕРЬ МЫ ДЕЛАЕМ НАВЕРНЯКА НАВАТИВНУЮ МУТАЦИЮ!
+      // Больше никакого иммутабельного state.tags = [...state.tags, 'ts']
+      state.tags.push('ts')
+
+      // Дожидаемся нашего встроенного Proxy-автобатчинга микрозадач
+      await new Promise<void>((r) => queueMicrotask(r))
+
+      // Проверяем: длина стала 2, эффект сработал честно ровно 1 раз!
+      expect(spy).toHaveBeenCalledWith(2)
+      expect(spy).toHaveBeenCalledTimes(1)
+    })
+
+    it('должен нативно отслеживать удаление и изменение состава элементов через .splice()', async () => {
+      const engine = new ReactiveEngine()
+      const state = engine.reactive({ list: ['apple', 'banana', 'orange'] })
+      const spy = vi.fn()
+
+      engine.effect(() => {
+        spy(state.list.length)
+      })
+
+      expect(spy).toHaveBeenCalledWith(3)
+      spy.mockClear()
+
+      // Удаляем 1 элемент (banana) начиная с индекса 1
+      state.list.splice(1, 1)
+
+      // Ждем микрозадачу автобатчинга Proxy
+      await new Promise<void>((r) => queueMicrotask(r))
+
+      // Проверяем: длина уменьшилась до 2, эффект сработал
+      expect(spy).toHaveBeenCalledWith(2)
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(state.list).toEqual(['apple', 'orange'])
+    })
+
+    it('должен отслеживать изменение порядка элементов через .reverse() без изменения длины', async () => {
+      const engine = new ReactiveEngine()
+      const state = engine.reactive({ numbers: [1, 2, 3] }) // <-- Проверьте наличие [1, 2, 3]
+      const spy = vi.fn()
+
+      engine.effect(() => {
+        // Подписываемся на первый элемент, чтобы проверить перестановку индексов
+        spy(state.numbers[0])
+      })
+
+      expect(spy).toHaveBeenCalledWith(1)
+      spy.mockClear()
+
+      // Разворачиваем массив нативно
+      state.numbers.reverse()
+
+      await new Promise<void>((r) => queueMicrotask(r))
+
+      // Проверяем: первый элемент стал 3, эффект успешно отреагировал
+      expect(spy).toHaveBeenCalledWith(3)
+      expect(spy).toHaveBeenCalledTimes(1)
+    })
+
+    it('должен нативно отслеживать прямую замену элементов массива по индексу', async () => {
+      const engine = new ReactiveEngine()
+      const state = engine.reactive({ numbers: [10, 20, 30] })
+      const spy = vi.fn()
+
+      engine.effect(() => {
+        // Компонент читает весь массив (например, выводит в строку)
+        spy(state.numbers.join(', '))
+      })
+
+      expect(spy).toHaveBeenCalledWith('10, 20, 30')
+      spy.mockClear()
+
+      // Прямая мутация по индексу!
+      state.numbers[1] = 99
+
+      await new Promise<void>((r) => queueMicrotask(r))
+
+      // Проверяем: значение обновилось, эффект сработал
+      expect(spy).toHaveBeenCalledWith('10, 99, 30')
+      expect(spy).toHaveBeenCalledTimes(1)
+    })
+
   })
 })

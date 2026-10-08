@@ -642,60 +642,48 @@ export class ReactiveEngine {
         return val
       },
       set value(newValue: T) {
-        if (val === newValue) return
+        // ШАГ 1: Проверяем валидатор. Валидация считается успешной ТОЛЬКО если
+        // метод вернул строго true. Если вернулась строка ошибки или false — блокируем запись.
+        if (options?.validate && options.validate(newValue) !== true) {
+          // Вытаскиваем строку ошибки, если валидатор её вернул
+          const validationResult = options.validate(newValue)
+          const errorReason = typeof validationResult === 'string' ? validationResult : 'Unknown reason'
 
-        // Валидация в рантайме
-        if (options.validate) {
-          const result = options.validate(newValue)
-          if (result === false || typeof result === 'string') {
-            const errorMsg = typeof result === 'string'
-              ? result
-              : `[Validation Error]: Некорректное значение для сигнала "${name}"`
-
-            console.error(`%c${errorMsg}`, "color: orange; font-weight: bold;", {
-              received: newValue,
-              current: val
-            })
-            return // Прерываем обновление, если данные не валидны
-          }
+          console.error(`[ReactiveEngine] Validation failed for signal "${name}": ${errorReason}`, { value: newValue })
+          return // Мгновенный выход, val остается равен 10!
         }
 
+        // ШАГ 2: Патч для мутабельности объектов/массивов
+        const isPrimitive = newValue === null || (typeof newValue !== 'object' && typeof newValue !== 'function')
+        if (isPrimitive && val === newValue) return
+
+        // ШАГ 3: Запись значения
         const old = val
         val = newValue
         engine.onSignalChange?.(name, newValue, old)
 
-        // Извлекаем текстовые метки подписчиков для логгера
-        const subscriberLabels = Array.from(subscribers).map(
-          (e) => e.label || 'unnamed_effect'
-        )
-        engine.queueLog?.('signal', name, {
-          from: old,
-          to: newValue,
-          subscribersCount: subscribers.size,
-          subscribers: subscriberLabels,
-        })
+        // ШАГ 4: Оповещение подписчиков без само-циклирования
+        subscribers.forEach(e => {
+          if (e === engine.activeEffect) return
 
-        // Всегда добавляем подписчиков в очередь отложенных эффектов
-        subscribers.forEach(e => engine.pendingEffects.add(e))
+          if (engine.isBatching) {
+            engine.pendingEffects.add(e)
+          } else {
+            engine.pendingEffects.add(e)
 
-        // Планируем автоматическое выполнение транзакции ВСЕГДА!
-        // Теперь микрозадача гарантированно выполнится и зачистит буфер flushLogs,
-        // даже если у сигнала было 0 подписчиков.
-        if (!engine.isBatching) {
-          engine.isBatching = true
-
-          queueMicrotask(() => {
-            // Динамический каскадный цикл (Push-домино)
-            for (const effectObj of engine.pendingEffects) {
-              engine.pendingEffects.delete(effectObj)
-              effectObj.run()
+            if (!engine.isBatching) {
+              engine.isBatching = true
+              queueMicrotask(() => {
+                for (const effectObj of engine.pendingEffects) {
+                  engine.pendingEffects.delete(effectObj)
+                  effectObj.run()
+                }
+                engine.isBatching = false
+                engine.flushLogs?.()
+              })
             }
-            // Гасим флаг батчинга строго после того, как ВСЕ эффекты завершились
-            engine.isBatching = false
-            // Вызываем flushLogs на самом финише, когда вся транзакция полностью стабилизировалась
-            engine.flushLogs?.()
-          })
-        }
+          }
+        })
       },
       subscribe(cb: (val: T) => void) {
         // Чистая и безопасная подписка для React/Vue/Angular адаптеров
@@ -944,18 +932,61 @@ export class ReactiveEngine {
           if (!propsSubscribers.has(prop)) propsSubscribers.set(prop, new Set())
 
           const subscribers = propsSubscribers.get(prop)!
-
-          // Проверяем, что эффект еще НЕ находится в подписчиках,
-          // И что эта конкретная функция очистки еще не была зарегистрирована,
-          // предотвращая каскадный дребезг Set.forEach
           if (!subscribers.has(currentEffect)) {
             subscribers.add(currentEffect)
 
             const cleanupFn = () => {
               subscribers.delete(currentEffect)
             }
-
             currentEffect.cleanups.add(cleanupFn)
+          }
+        }
+
+        // ====================================================
+        //  ИСПРАВЛЕННЫЙ ПЕРХВАТ МЕТОДОВ МАССИВОВ (АВТОБАТЧИНГ)
+        // ====================================================
+        if (Array.isArray(obj) && typeof prop === 'string') {
+          const mutatingMethods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']
+
+          if (mutatingMethods.includes(prop)) {
+            const originalMethod = (obj as any)[prop]
+
+            return function (...args: any[]) {
+              // Перед мутацией принудительно замораживаем граф (включаем батчинг),
+              // чтобы внутренние мутации индексов нативного JavaScript не вызывали e.run()
+              const WAS_BATCHING = engine.isBatching
+              engine.isBatching = true
+
+              const result = originalMethod.apply(obj, args)
+
+              // Аккумулируем ВСЕХ подписчиков текущего массива в очередь отложенных эффектов
+              propsSubscribers.forEach((subscribers, key) => {
+                if (key !== prop) {
+                  Array.from(subscribers).forEach(e => {
+                    // Исключаем само-циклирование внутри методов
+                    if (e === engine.activeEffect) return
+                    engine.pendingEffects.add(e)
+                  })
+                }
+              })
+
+              // Восстанавливаем стейт батчинга и планируем микрозадачу
+              engine.isBatching = WAS_BATCHING
+
+              if (!engine.isBatching && engine.pendingEffects.size > 0) {
+                engine.isBatching = true
+                queueMicrotask(() => {
+                  for (const effectObj of engine.pendingEffects) {
+                    engine.pendingEffects.delete(effectObj)
+                    effectObj.run()
+                  }
+                  engine.isBatching = false
+                  engine.flushLogs?.()
+                })
+              }
+
+              return result
+            }
           }
         }
 
@@ -964,6 +995,7 @@ export class ReactiveEngine {
           ? engine.reactive(value, `${name}.${String(prop)}`)
           : value
       },
+
       set(obj, prop, value, receiver) {
         const old = Reflect.get(obj, prop, receiver)
         if (old === value) return true
@@ -972,23 +1004,28 @@ export class ReactiveEngine {
           Reflect.set(obj, prop, value, receiver)
           engine.onSignalChange?.(`${name}.${String(prop)}`, value, old)
 
-          // Берем моментальный снимок подписчиков этого ключа.
-          // Это гарантирует, что синхронный перезапуск эффекта не зациклит текущий .forEach
           const targets = propsSubscribers.get(prop)
           const effectsToRun = targets ? Array.from(targets) : []
 
+          if (Array.isArray(obj)) {
+            const lengthTargets = propsSubscribers.get('length')
+            if (lengthTargets) {
+              effectsToRun.push(...Array.from(lengthTargets))
+            }
+          }
+
           effectsToRun.forEach(e => {
+            // ШАГ 2: БРОНЕБОЙНЫЙ БАРЬЕР В SET ОТ САМО-ЦИКЛИРОВАНИЯ
+            // Если мутация прилетела изнутри этого же выполняющегося эффекта — полностью игнорируем её!
+            if (e === engine.activeEffect) return
+
             if (engine.isBatching) {
               engine.pendingEffects.add(e)
             } else {
-              // Автобатчинг для Proxy: Взводим флаг и планируем микрозадачу,
-              // как это делает нативный Signal
-              // чтобы разделить фазу мутации и фазу синхронного перезапуска эффектов UI.
               engine.pendingEffects.add(e)
 
               if (!engine.isBatching) {
                 engine.isBatching = true
-
                 queueMicrotask(() => {
                   for (const effectObj of engine.pendingEffects) {
                     engine.pendingEffects.delete(effectObj)

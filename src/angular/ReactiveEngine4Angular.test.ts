@@ -121,4 +121,73 @@ describe('ReactiveEngine4Angular', () => {
     // 4. Финальная зачистка макрозадач
     await new Promise((r) => setImmediate(r))
   })
+
+  describe('ReactiveEngine4Angular — Работа с массивами и коллекциями', () => {
+
+    it('должен успешно обновлять Angular Signal при мутации массива в Сигнале ядра', async () => {
+      const engine = new ReactiveEngine4Angular()
+      const tagsSignal = engine.signal(['angular'])
+
+      const angularSignal = engine.use(tagsSignal)
+      expect(angularSignal().join(', ')).toBe('angular')
+
+      // Мутируем массив и пинаем его сеттер
+      tagsSignal.value.push('rx')
+      tagsSignal.value = tagsSignal.value
+
+      // Проталкиваем асингулярные очереди батчинга ядра и планировщика Angular
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+      await flushAngularEffects()
+
+      expect(angularSignal().join(', ')).toBe('angular, rx')
+    })
+
+    it('должен автоматически триггерить изменения Angular Signal при инвалидации computed-цепочки массивов', async () => {
+      const engine = new ReactiveEngine4Angular()
+      const listSignal = engine.signal(['apple', 'banana', 'orange'])
+
+      // Создаем computed для фильтрации длинных слов
+      const longWords = engine.computed(() => {
+        return listSignal.value.filter(word => word.length > 5)
+      })
+
+      const angularSignal = engine.use(longWords)
+      expect(angularSignal().join('-')).toBe('banana-orange') // apple отфильтровался
+
+      // Мутируем исходный список в ядре данных
+      listSignal.value.push('pineapple')
+      listSignal.value = listSignal.value
+
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+      await flushAngularEffects()
+
+      // Вычисляемое свойство ядра сбросило кэш, а Angular Signal отдал новое значение
+      expect(angularSignal().join('-')).toBe('banana-orange-pineapple')
+    })
+
+    it('должен нативно трекать деструктивные методы Proxy-массивов (.push, .splice) в reactive() без any и spread-костылей', async () => {
+      const engine = new ReactiveEngine4Angular()
+
+      // Создаем реактивный Proxy-объект средствами Angular-адаптера
+      const state = engine.reactive({
+        todos: ['Task 1']
+      })
+
+      const angularSignal = engine.use(state)
+      expect(angularSignal().todos.join(' | ')).toBe('Task 1')
+
+      // Настоящие мутации массива в ядре данных без иммутабельных оберток
+      state.todos.push('Task 2')
+      state.todos.push('Task 3')
+      state.todos.splice(1, 1) // удалили 'Task 2'
+
+      // Проталкиваем Proxy-автобатчинг микрозадач ядра
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+      await flushAngularEffects()
+
+      // Множественные операции склеились, Angular Signal выдает финальное состояние данных
+      expect(angularSignal().todos.join(' | ')).toBe('Task 1 | Task 3')
+    })
+
+  })
 })

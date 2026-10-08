@@ -1,7 +1,6 @@
 import { useState as useStateFromReact, useEffect as useEffectFromReact } from 'react'
-import { ReactiveEngine as OriginalReactiveEngine, CleanupFn } from '../core/core'
+import { ReactiveEngine as OriginalReactiveEngine, type CleanupFn } from '../core/core'
 
-// 1. Описываем строгий контракт для примитивных Сигналов/Computed
 export interface ISignalLike<V> {
   value: V;
   subscribe: (cb: (v: V) => void) => CleanupFn;
@@ -9,6 +8,7 @@ export interface ISignalLike<V> {
 
 /**
  * Класс адаптера для интеграции реактивного движка с React.
+ * Предоставляет полиморфные методы для бесшовной работы с Сигналами и Proxy-объектами.
  */
 export class ReactiveEngine4React extends OriginalReactiveEngine {
   protected override frameworkPrefix = 'react'
@@ -29,22 +29,47 @@ export class ReactiveEngine4React extends OriginalReactiveEngine {
   }
 
   /**
+   * Переопределяем метод создания реактивных объектов для React-версии движка.
+   * Безопасно внедряет скрытое свойство __subscribe в оригинальный граф без double-proxying.
+   */
+  public override reactive<T extends object>(target: T, name?: string): T {
+    if (!Reflect.has(target, '__subscribe')) {
+      Object.defineProperty(target, '__subscribe', {
+        get: () => {
+          return (cb: () => void) => {
+            return this.effect(() => {
+              try {
+                JSON.stringify(originalProxy) // Глубокий прогрев геттеров ядра
+              } catch (e) {
+                Object.values(originalProxy as Record<string, unknown>)
+              }
+              cb() // Пинаем колбэк хука React
+            }, 'react-proxy-internal-subscription')
+          }
+        },
+        configurable: true,
+        enumerable: false
+      })
+    }
+
+    const originalProxy = super.reactive(target, name)
+    return originalProxy
+  }
+
+  /**
    * Использование реактивного значения в React-компоненте.
-   * Поддерживает как атомарные Сигналы/Computed, так и глубокие реактивные Proxy-объекты.
-   *
-   * @template T
-   * @param {T} item - Реактивный объект (сигнал или прокси)
-   * @returns {T extends ISignalLike<infer V> ? V : T} - Развернутое значение или сам прокси-объект
+   * Полиморфно поддерживает как атомарные Сигналы/Computed, так и глубокие реактивные Proxy-объекты.
    */
   public use<T>(item: T): T extends ISignalLike<infer V> ? V : T {
     if (!this.reactAdapters) {
       throw new Error("[React Error]: Адаптеры React не установлены. Вызовите engine.setReactAdapters(useState, useEffect).")
     }
 
-    const isSignal = item &&
-                     typeof item === 'object' &&
-                     'subscribe' in item &&
-                     typeof (item as Record<string, unknown>).subscribe === 'function'
+    if (item === null || item === undefined || typeof item !== 'object') {
+      return item as any
+    }
+
+    const isSignal = 'subscribe' in item && typeof (item as Record<string, unknown>).subscribe === 'function'
 
     // 1. Сценарий А: Передан примитивный Сигнал или Computed
     if (isSignal) {
@@ -62,42 +87,17 @@ export class ReactiveEngine4React extends OriginalReactiveEngine {
     }
 
     // 2. Сценарий Б: Передан Proxy-объект из метода reactive()
-    if (item && typeof item === 'object') {
-      const [, forceUpdate] = this.reactAdapters.useState<unknown[]>([])
+    const [, forceUpdate] = this.reactAdapters.useState<unknown[]>([])
 
-      // Используем useEffect для безопасного создания подписки вне фазы рендера React,
-      // но внутри эффекта мы ПРИНУДИТЕЛЬНО запускаем глубокое считывание
-      // свойств объекта (прогрев графа), чтобы ядро зацепило зависимости!
+    if ('__subscribe' in item && typeof (item as Record<string, unknown>).__subscribe === 'function') {
       this.reactAdapters.useEffect(() => {
-        const unsubscribe = this.effect(() => {
-          // Ленивый глубокий проход по свойствам объекта первого уровня,
-          // чтобы Proxy-геттеры (строка 618 в core.ts) гарантированно перехватили
-          // этот эффект и добавили его в propsSubscribers!
-          try {
-            // Рекурсивно или плоско считываем ключи
-            JSON.stringify(item)
-          } catch (e) {
-            // Защита от круговых ссылок, просто считываем ключи первого уровня
-            Object.values(item as Record<string, unknown>)
-          }
-
-          // При изменении любого из этих ключей триггерим ререндер React
-          forceUpdate([])
-        }, 'react-use-reactive-proxy')
-
+        const unsubscribe = ((item as Record<string, unknown>).__subscribe as (cb: () => void) => CleanupFn)(() => {
+          forceUpdate([]) // Триггерим асинхронный авто-батчинг ререндера React
+        })
         return () => unsubscribe()
       }, [item])
-
-      // Возвращаем сам прокси-объект. При чтении в JSX он будет работать нативно.
-      return item as (T extends ISignalLike<infer V> ? V : T)
     }
 
-    const errorMsg = `
-      [Reactive Error]: engine.use() получил некорректный объект!
-      Проверьте, что передаваемый инстанс является Сигналом или создан через engine.reactive().
-    `
-    console.error(errorMsg, { item })
-    throw new Error(errorMsg)
+    return item as (T extends ISignalLike<infer V> ? V : T)
   }
-
 }

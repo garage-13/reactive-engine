@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useReactiveSubscription } from './useReactiveSubscription'
+import { ReactiveEngine4React as ReactiveEngine } from '../../ReactiveEngine4React' // Укажите ваш правильный относительный путь
 
 describe('useReactiveSubscription', () => {
-  // Фейковый объект сигнала для изоляции тестов от самого ядра
+  // Фейковый объект сигнала для изоляции базовых тестов от самого ядра
   let mockSignal: { value: number; subscribe: any }
   let subscribers: Set<(val: number) => void>
 
@@ -116,5 +117,90 @@ describe('useReactiveSubscription', () => {
 
     // Функция очистки должна удалять коллбек из подписчиков
     expect(subscribers.size).toBe(0)
+  })
+
+  it('должен вызывать callback при мутации массивов в Сигнале ядра при пинке сеттера', async () => {
+    const engine = new ReactiveEngine()
+    const tagsSignal = engine.signal(['javascript'])
+    const callbackSpy = vi.fn()
+
+    renderHook(() => useReactiveSubscription(tagsSignal, callbackSpy))
+
+    // ИЗОЛИРУЕМ СТАРТОВЫЙ ВЫЗОВ: Метод .subscribe ядра синхронно вызывает колбэк при монтировании
+    callbackSpy.mockClear()
+
+    await act(async () => {
+      // Нативно мутируем массив внутри сигнала и пинаем его сеттер
+      tagsSignal.value.push('typescript')
+      tagsSignal.value = tagsSignal.value
+
+      // Проталкиваем асинхронный автобатчинг ядра
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+    })
+
+    // Хук должен перехватить уведомление и дернуть коллбек на изменение состава
+    expect(callbackSpy).toHaveBeenCalledTimes(1)
+    expect(tagsSignal.value).toEqual(['javascript', 'typescript'])
+    await new Promise((r) => setImmediate(r))
+  })
+
+  it('должен автоматически триггерить callback при изменении computed-свойства, фильтрующего массив', async () => {
+    const engine = new ReactiveEngine()
+    const listSignal = engine.signal(['apple', 'banana', 'orange'])
+
+    // Создаем computed для фильтрации длинных слов
+    const longWords = engine.computed(() => {
+      return listSignal.value.filter(word => word.length > 5)
+    })
+
+    const callbackSpy = vi.fn()
+    renderHook(() => useReactiveSubscription(longWords, callbackSpy))
+
+    // ИЗОЛИРУЕМ СТАРТОВЫЙ ВЫЗОВ: Сбрасываем стартовый вызов .subscribe
+    callbackSpy.mockClear()
+
+    await act(async () => {
+      // Добавляем новый элемент и сбрасываем кэш компьютеда пинком сигнала
+      listSignal.value.push('pineapple')
+      listSignal.value = listSignal.value
+
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+    })
+
+    // Коллбек успешно вызвался, а компьютед вернул свежие отфильтрованные данные
+    expect(callbackSpy).toHaveBeenCalledTimes(1)
+    expect(longWords.value).toEqual(['banana', 'orange', 'pineapple'])
+    await new Promise((r) => setImmediate(r))
+  })
+
+  it('должен нативно перехватывать деструктивные методы Proxy-массивов (.push, .splice) в reactive() через скрытый __subscribe', async () => {
+    const engine = new ReactiveEngine()
+
+    // Создаем реактивный Proxy-объект средствами адаптера
+    const state = engine.reactive({
+      todos: ['Задача 1']
+    })
+
+    const callbackSpy = vi.fn()
+    renderHook(() => useReactiveSubscription(state as any, callbackSpy))
+
+    // Изоляция стартового вызова: Сбрасываем синхронный прогревочный вызов эффекта ядра при монтировании подписки
+    callbackSpy.mockClear()
+
+    await act(async () => {
+      // Множественные нативные мутации без spread-костылей
+      state.todos.push('Задача 2')
+      state.todos.push('Задача 3')
+      state.todos.splice(1, 1) // удалили 'Задача 2'
+
+      // Проталкиваем Proxy-автобатчинг ядра
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+    })
+
+    // Проверяем: благодаря нашему скрытому __subscribe геттеру во фреймворк-версии движка,
+    // множественные операции склеились в РОВНО 1 вызов callback для финального стейта!
+    expect(callbackSpy).toHaveBeenCalledTimes(1)
+    expect(state.todos).toEqual(['Задача 1', 'Задача 3'])
+    await new Promise((r) => setImmediate(r))
   })
 })

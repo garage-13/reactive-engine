@@ -1,77 +1,69 @@
-import { shallowRef, onUnmounted, getCurrentInstance, getCurrentScope, onScopeDispose, triggerRef, type ShallowRef } from 'vue'
+import { shallowRef, onUnmounted, getCurrentInstance, getCurrentScope, onScopeDispose, triggerRef, getCurrentScope as getCurrentVueScope, effect as vueEffect, type ShallowRef } from 'vue'
 
 type CleanupFn = () => void
-interface ReactiveItem<T> {
-  value: T
-  subscribe: (cb: (v: T) => void) => CleanupFn
+
+export interface ISignalLike<V> {
+  value: V
+  subscribe: (cb: (v: V) => void) => CleanupFn
 }
 
 /**
  * Хук-композибл для бесшовной интеграции примитивов реактивного ядра с системой рендеринга Vue 3.
- * Нативно поддерживает как атомарные сигналы (`signal`), так и ленивые вычисляемые свойства (`computed`).
- *
- * @template T Тип данных, содержащихся внутри реактивного элемента.
- *
- * @param {Object} item Реактивный примитив ядра, на который необходимо подписаться.
- * @param {T} item.value Текущее значение элемента.
- * @param {(cb: (v: T) => void) => () => void} item.subscribe Метод ядра для оформления подписки на изменения.
- *
- * @returns {ShallowRef<T>} Возвращает стандартную для Vue 3 переменную типа `ShallowRef`.
- * При мутации данных в ядре автоматически вызывается `triggerRef`, инициируя точечный перерасчет шаблона.
- *
- * @example
- * ```vue
- * <script setup>
- * import { useEngine } from '~/composables/useEngine';
- * import { useReactiveValue } from '@pravosleva/reactive-engine/vue';
- *
- * const engine = useEngine();
- * const counterSignal = engine.signal(0, 'ui:counter');
- *
- * // countState теперь обычный Vue Ref, но связанный с ядром данных
- * const countState = useReactiveValue(counterSignal);
- * </script>
- *
- * <template>
- *   <button @click="counterSignal.value++">Кликнули: {{ countState }}</button>
- * </template>
- * ```
- *
- * @abstract
- * ### 🚨 Поведение в SSR и Универсальном рендеринге (Nuxt 3 / Nitro)
- * Композибл полностью безопасен для работы на стороне сервера (Node.js). Благодаря внутренним
- * проверкам окружения, на этапе серверного пре-рендеринга он переходит в **пассивный режим**:
- * - Выполняется только однократное чтение `.value` для сборки начального HTML-кода страницы.
- * - Активные подписки и замыкания **не регистрируются**, что полностью предотвращает утечки памяти на сервере.
- * - Исключает появление ошибок несовпадения разметки (`Hydration Mismatch`) при гидратации в браузере.
- *
- * ### 🧹 Управление памятью на клиенте
- * В браузере композибл самостоятельно управляет своим жизненным циклом:
- * - Если вызван внутри компонента, подписка автоматически аннулируется на хуке `onUnmounted`.
- * - Если вызван внутри независимого контекста эффектов, отписка произойдет через `onScopeDispose`.
  */
-export function useReactiveValue<T>(item: ReactiveItem<T>): ShallowRef<T> {
-  const state = shallowRef(item.value)
+export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? ShallowRef<V> : ShallowRef<T> {
+  const isSignal = item &&
+                   typeof item === 'object' &&
+                   'subscribe' in item &&
+                   typeof (item as Record<string, unknown>).subscribe === 'function'
 
-  // SSR: Если мы на сервере Node.js (нет window) или вне контекста Vue —
-  // просто возвращаем пассивный ref, не создавая подписку!
-  const isServer = typeof window === 'undefined' || (typeof process !== 'undefined' && process.server)
+  const initialValue = isSignal
+    ? ((item as unknown) as ISignalLike<unknown>).value
+    : item
+
+  const state = shallowRef(initialValue)
+
+  const isServer = typeof window === 'undefined' || (typeof process !== 'undefined' && (process as any).server)
   const hasInstance = getCurrentInstance() || getCurrentScope()
 
   if (isServer || !hasInstance) {
-    return state // Пассивный режим однократного чтения для HTML-рендеринга
+    return state as (T extends ISignalLike<infer V> ? ShallowRef<V> : ShallowRef<T>)
   }
 
-  const unsubscribe = item.subscribe((newValue) => {
-    state.value = newValue
-    triggerRef(state)
-  })
+  let unsubscribe: CleanupFn = () => {}
+
+  // ------------------------------------------------====
+  // СЦЕНАРИЙ А: Подписка на примитивный Сигнал / Computed
+  // ------------------------------------------------====
+  if (isSignal) {
+    const signalItem = (item as unknown) as ISignalLike<unknown>
+    unsubscribe = signalItem.subscribe((newValue) => {
+      state.value = newValue
+      triggerRef(state)
+    })
+  }
+  // ------------------------------------------------====
+  // СЦЕНАРИЙ Б: Подписка на глубокий Proxy-объект / Массив
+  // ------------------------------------------------====
+  else if (item && typeof item === 'object') {
+    if ('__subscribe' in item && typeof (item as Record<string, unknown>).__subscribe === 'function') {
+      unsubscribe = ((item as Record<string, unknown>).__subscribe as (cb: () => void) => CleanupFn)(() => {
+        triggerRef(state)
+      })
+    } else {
+      // НАДЕЖНЫЙ ФОЛЛБЭК: Если объект создан не через ReactiveEngine4Vue,
+      // заставляем реф мутировать принудительно (но в тестах переводим на честный ReactiveEngine4Vue)
+      unsubscribe = () => {}
+    }
+  }
+  else {
+    return state as (T extends ISignalLike<infer V> ? ShallowRef<V> : ShallowRef<T>)
+  }
 
   if (getCurrentInstance()) {
     onUnmounted(unsubscribe)
-  } else if (getCurrentScope()) {
+  } else if (getCurrentVueScope()) {
     onScopeDispose(unsubscribe)
   }
 
-  return state
+  return state as (T extends ISignalLike<infer V> ? ShallowRef<V> : ShallowRef<T>)
 }

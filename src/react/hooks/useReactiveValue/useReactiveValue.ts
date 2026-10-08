@@ -1,93 +1,96 @@
-import { useSyncExternalStore, useCallback, useMemo, useEffect, useRef } from 'react'
-import { CleanupFn } from '../../../core'
+import { useSyncExternalStore, useCallback, useMemo, useEffect, useRef, useState } from 'react'
 
-interface ObservableItem<T> {
-  readonly value: T;
-  subscribe: (cb: (val: T) => void) => CleanupFn
+type CleanupFn = () => void
+
+// Описываем строгий контракт для примитивов реактивного ядра (Signals / Computed / Resources)
+export interface ISignalLike<V> {
+  readonly value: V;
+  subscribe: (cb: (val: V) => void) => CleanupFn
   destroy?: () => void
 }
 
-type ReactiveInput<T> = ObservableItem<T> | (() => ObservableItem<T>)
+type ReactiveInput<T> = ISignalLike<T> | (() => ISignalLike<T>) | object | (() => object)
 
 /**
  * Нативный React-хук для извлечения текущего значения из реактивных примитивов ядра
- * (Signal, Computed, Resource) и автоматического управления подпиской на рендеринг.
+ * (Signal, Computed, Resource) и глубоких реактивных Proxy-объектов (reactive).
  *
- * Опирается на каноничную шим-прослойку `useSyncExternalStore`, что гарантирует 100%
- * совместимость с механизмами батчинга обновлений React 18+ и Concurrent Mode (защита от Tearing).
- *
- * ### Особенности управления памятью:
- * 1. **Глобальные сигналы (Сервисы/Синглтоны):** При размонтировании компонента хук выполняет
- *    только стандартную отписку от обновлений. Метод `.destroy()` **не вызывается**,
- *    что сохраняет глобальное состояние системы в безопасности.
- * 2. **Локальные фабрики (`() => engine.computed(...)`):** Если в качестве аргумента передана
- *    функция-фабрика, хук понимает, что вычисление создано локально для этого экрана.
- *    При анмаунте компонента хук автоматически вызовет `.destroy()`, предотвращая утечки памяти в ядре.
- *
- * @template T - Тип данных, инкапсулированных внутри реактивного элемента.
- * @param {ReactiveInput<T>} input - Готовый реактивный элемент ядра или ленивая функция-фабрика, возвращающая его.
- * @returns {T} Актуальное синхронизированное значение реактивного элемента.
- *
- * @example
- * ```tsx
- * import { useReactiveValue } from '@pravosleva/reactive-engine/react';
- * import { userInfoService } from '~/store';
- *
- * // Сценарий 1: Прямая подписка на долгоживущий сигнал сервиса
- * export const CounterDisplay = () => {
- *   const counter = useReactiveValue(userInfoService.counter);
- *   return <span>Значение: {counter}</span>;
- * };
- *
- * // Сценарий 2: Использование ленивой фабрики для локальных вычислений (авто-очистка ядра при анмаунте)
- * export const FilteredList = ({ query }: { query: string }) => {
- *   const filteredData = useReactiveValue(() =>
- *     engine.computed(() => userInfoService.list.value.filter(item => item.includes(query)))
- *   );
- *   return <ul>{filteredData.map(item => <li key={item}>{item}</li>)}</ul>;
- * };
- * ```
+ * @template T - Тип входящих данных
+ * @param {ReactiveInput<any>} input - Готовый реактивный элемент ядра или функция-фабрика
+ * @returns {any} Актуальное синхронизированное значение элемента или сам прокси-объект
  */
-export const useReactiveValue = <T>(input: ReactiveInput<T>): T => {
+export const useReactiveValue = <T>(input: ReactiveInput<any>): any => {
   const isFactory = typeof input === 'function'
 
-  // NOTE: СТАБИЛИЗАЦИЯ ФАБРИКИ: Сохраняем ссылку на функцию в ref,
-  // чтобы не перезапускать вычисления, если разработчик передал инлайн-стрелочную функцию.
+  // Стабилизируем ссылку на фабрику
   const factoryRef = useRef(input)
   useEffect(() => {
     factoryRef.current = input
   }, [input])
 
-  // Вычисляем элемент строго один раз при инициализации, либо при изменении стабильной ссылки на готовый сигнал
+  // Вычисляем целевой элемент один раз
   const reactiveItem = useMemo(() => {
     if (typeof input === 'function') {
-      // Вызываем фабрику только при первом проходе
       return input()
     }
-    return input // Если передан готовый сигнал/ресурс — используем его напрямую
-  }, [isFactory ? undefined : input]) // Стабильный массив зависимостей для фабрик!
+    return input
+  }, [isFactory ? undefined : input])
 
+  // Определяем, является ли объект примитивом (Signal/Computed) или это Proxy-объект reactive()
+  const isSignal = reactiveItem &&
+                   typeof reactiveItem === 'object' &&
+                   'subscribe' in reactiveItem &&
+                   typeof (reactiveItem as Record<string, unknown>).subscribe === 'function'
+
+  // ------------------------------------------------====
+  // СЦЕНАРИЙ А: Работа с атомарными Сигналами / Computed (useSyncExternalStore)
+  // ------------------------------------------------====
   const subscribe = useCallback(
     (reactCallback: () => void) => {
-      return reactiveItem.subscribe(reactCallback)
+      if (isSignal) {
+        return (reactiveItem as ISignalLike<unknown>).subscribe(reactCallback)
+      }
+      return () => {}
     },
-    [reactiveItem]
+    [reactiveItem, isSignal]
   )
 
   const getSnapshot = useCallback(() => {
-    return reactiveItem.value
-  }, [reactiveItem])
+    if (isSignal) {
+      return (reactiveItem as ISignalLike<unknown>).value
+    }
+    return reactiveItem
+  }, [reactiveItem, isSignal])
 
-  // NOTE: БЕЗОПАСНАЯ ОЧИСТКА ПАМЯТИ:
-  // Вызываем .destroy() ТОЛЬКО если объект пришел из локальной фабрики `() => engine.computed(...)`.
-  // Если это глобальный сигнал из сервиса — мы делаем только стандартный unmount подписки через useSyncExternalStore.
+  // Безопасная очистка локальных фабрик ядра при размонтировании экрана
   useEffect(() => {
     return () => {
-      if (isFactory && reactiveItem && typeof reactiveItem.destroy === 'function') {
-        reactiveItem.destroy()
+      if (isFactory && reactiveItem && 'destroy' in reactiveItem && typeof (reactiveItem as any).destroy === 'function') {
+        (reactiveItem as any).destroy()
       }
     }
   }, [reactiveItem, isFactory])
 
-  return useSyncExternalStore(subscribe, getSnapshot)
+  // Если это сигнал — используем Concurrent-безопасныйuseSyncExternalStore
+  if (isSignal) {
+    return useSyncExternalStore(subscribe, getSnapshot)
+  }
+
+  // ------------------------------------------------====
+  // СЦЕНАРИЙ Б: Работа с глубокими Proxy-объектами / Массивами
+  // ------------------------------------------------====
+  // Для Proxy-объектовuseSyncExternalStore не подходит, так как у них нет .value.
+  // Мы создаем локальный forceUpdate и подписываем его через скрытый геттер __subscribe адаптера
+  const [, forceUpdate] = useState([])
+
+  useEffect(() => {
+    if (reactiveItem && '__subscribe' in reactiveItem && typeof (reactiveItem as any).__subscribe === 'function') {
+      const unsubscribe = (reactiveItem as any).__subscribe(() => {
+        forceUpdate([]) // Провоцируем ререндер компонента через автобатчинг микрозадач
+      })
+      return () => unsubscribe()
+    }
+  }, [reactiveItem])
+
+  return reactiveItem
 }
