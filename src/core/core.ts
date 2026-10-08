@@ -265,13 +265,19 @@ export class ReactiveEngineCore {
   }
 
   /**
-   * ВНУТРЕННИЙ СИНХРОННЫЙ ПРОГОН ОЧЕРЕДИ ЭФФЕКТОВ
+   * ВНУТРЕННИЙ СИНХРОННЫЙ ПРОГОН ОЧЕРЕДИ ЭФФЕКТОВ (ОТКАЗОУСТОЙЧИВЫЙ)
    */
   protected flushEffects(): void {
     const effectsToRun = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
+
     effectsToRun.forEach(effectObj => {
-      effectObj.run()
+      try {
+        effectObj.run()
+      } catch (error) {
+        // Изолируем панику эффекта, позволяя соседним эффектам в очереди успешно выполниться!
+        console.error('[Reactive Engine: Effect Execution Error]', error)
+      }
     })
   }
 
@@ -641,10 +647,15 @@ export class ReactiveEngineAutomatic extends ReactiveEngine {
 
       queueMicrotask(() => {
         this.isFlushScheduled = false
-        super.flushEffects()
+        try {
+          super.flushEffects()
+        } catch (error) {
+          console.error('[Reactive Engine Automatic: Async Flush Error]', error)
+        }
       })
     }
   }
+
 
   /**
    * ПЕРЕОПРЕДЕЛЕНИЕ ПЛАНИРОВЩИКА ЭФФЕКТОВ (АСИНХРОННЫЙ АВТОБАТЧИНГ ПРИМИТИВОВ)
