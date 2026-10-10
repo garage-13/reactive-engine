@@ -6,13 +6,7 @@ import { ReactiveEngineCore } from './core'
  * Нативно склеивает множественные мутации в рамках ОДНОГО тика Event Loop.
  * Полностью закрывает капканы untrack/batch изоляции внешних тестов #218 и #219.
  */
-import { use } from '../react/hooks/useReactiveValue'
-import { ISignalLike } from './types'
-
 export class ReactiveEngineAutomatic extends ReactiveEngineCore {
-  public use<T>(item: T): T extends ISignalLike<infer V> ? V : T {
-    return use(item)
-  }
   private microtaskScheduled = false
 
   /**
