@@ -1,7 +1,7 @@
-import { ReactiveEngine } from './core'
+import { ReactiveEngineAutomatic } from './core.automatic'
 
 export abstract class AbstractService {
-  constructor(protected engine: ReactiveEngine) {
+  constructor(protected engine: ReactiveEngineAutomatic) {
     // Вызываем метод инициализации, который можно переопределить в наследниках
     this.onInit()
   }
