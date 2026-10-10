@@ -1,4 +1,111 @@
 import { Signal, Computed, SignalOptions } from './types'
+import { LogEventType, LogRecord, TransactionContext } from './types'
+
+// Оригинальная палитра стилей для бэджей
+const badgeColors: Record<LogEventType, string> = {
+  signal: 'background: #007acc; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
+  computed: 'background: #42b883; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
+  effect: 'background: #e01e5a; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
+  batch: 'background: #7952b3; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
+  resource: 'background: #d97706; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
+  reactive: 'background: #007acc; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
+}
+
+// Внутреннее состояние логгера транзакций
+let currentTransaction: TransactionContext | null = null
+
+/**
+ * Безопасное приведение значения к строке для заголовка лога.
+ * Предотвращает случайный вызов геттеров у Proxy/Reactive объектов.
+ */
+function safeValueToString(value: unknown): string {
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  if (typeof value === 'object') {
+    // Не используем JSON.stringify глубоко, чтобы не стриггерить реактивность графа
+    return '{...}'
+  }
+  return String(value)
+}
+
+/**
+ * Добавляет запись в очередь текущей транзакции.
+ * Если транзакции нет, создает ее и планирует сброс логов в микрозадачу.
+ */
+export function queueLog(
+  type: LogEventType,
+  label: string,
+  details?: { from?: unknown; to?: unknown; payload?: unknown }
+): void {
+  if (!currentTransaction) {
+    currentTransaction = {
+      id: Math.random().toString(36).substring(2, 9),
+      pendingLogQueue: [],
+      isFlushing: false
+    }
+
+    // Батчинг: сброс произойдет строго один раз в конце текущего синхронного таска
+    queueMicrotask(() => {
+      flushLogs()
+    })
+  }
+
+  currentTransaction.pendingLogQueue.push({
+    type,
+    label,
+    from: details?.from,
+    to: details?.to,
+    payload: details?.payload,
+    timestamp: Date.now()
+  })
+}
+
+/**
+ * Склеивает и выводит всю накопленную очередь транзакции в консоль.
+ */
+export function flushLogs(): void {
+  if (!currentTransaction || currentTransaction.isFlushing) return
+
+  // Флаг защиты от рекурсивных вызовов во время вывода в консоль
+  currentTransaction.isFlushing = true
+
+  const queue = currentTransaction.pendingLogQueue
+  if (queue.length === 0) {
+    currentTransaction = null
+    return
+  }
+
+  // Общий заголовок фиолетовой мастер-группы транзакции
+  console.groupCollapsed(
+    `%cREACTIVE TRANSACTION%c [id: ${currentTransaction.id}] (${queue.length} operations)`,
+    'background: #7952b3; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
+    'color: #888; font-weight: normal;'
+  )
+
+  // Выводим каждую запись из очереди
+  for (const record of queue) {
+    const colorStyle = badgeColors[record.type]
+    const hasTransition = record.from !== undefined || record.to !== undefined
+
+    let logMessage = `%c${record.type.toUpperCase()}%c ${record.label}`
+    if (hasTransition) {
+      logMessage += ` (${safeValueToString(record.from)} → ${safeValueToString(record.to)})`
+    }
+
+    if (record.payload !== undefined) {
+      console.groupCollapsed(logMessage, colorStyle, 'color: inherit;')
+      console.log('Payload:', record.payload)
+      console.groupEnd()
+    } else {
+      console.log(logMessage, colorStyle, 'color: inherit;')
+    }
+  }
+
+  console.groupEnd()
+
+  // Полностью очищаем контекст для следующей транзакции
+  currentTransaction = null
+}
 
 /**
  * ⚡ REACTIVE ENGINE CORE (v1.9.1)

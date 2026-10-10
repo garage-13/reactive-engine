@@ -1,5 +1,25 @@
 import type { ReactiveEngineCore } from './core'
 
+// Описываем типы сущностей, которые мы пишем в лог
+export type LogEventType = 'signal' | 'computed' | 'effect' | 'batch' | 'resource' | 'reactive';
+
+// Интерфейс для одной атомарной записи внутри транзакции
+export interface LogRecord {
+  type: LogEventType;
+  label: string;
+  from?: unknown;
+  to?: unknown;
+  payload?: unknown;
+  timestamp: number;
+}
+
+// Контекст текущей выполняемой транзакции
+export interface TransactionContext {
+  id: string;
+  pendingLogQueue: LogRecord[];
+  isFlushing: boolean;
+}
+
 export type CleanupFn = () => void;
 export type EffectFn = () => CleanupFn | void;
 export type Token<T> = string | symbol | { new(engine: ReactiveEngineCore, ...args: any[]): T };

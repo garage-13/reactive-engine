@@ -83,6 +83,7 @@ echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в н�
 uv run --python 3.12 --with aider-chat aider \
     --model "$AIDER_MODEL" \
     --edit-format "$AIDER_EDIT_FORMAT" \
+    --read .aider.instructions.md \
     "$AIDER_COMMIT_FLAG" \
     --yes-always \
     --no-show-release-notes \
@@ -92,21 +93,21 @@ uv run --python 3.12 --with aider-chat aider \
 if [ $? -eq 0 ]; then
     echo -e "\n${YELLOW}[Пайплайн] Изменения успешно внесены ИИ-агентом.${RESET}"
     echo -e "${YELLOW}[Пайплайн] Фиксируем все созданные новые файлы в индекс Git...${RESET}"
-    
-    # Ставим абсолютно ВСЕ новые файлы (включая computed.md), 
+
+    # Ставим абсолютно ВСЕ новые файлы (включая computed.md),
     # которые сгенерировал ИИ, на учет перед снятием диффа!
     git add -A &>/dev/null
-    
+
     echo -e "${YELLOW}[Пайплайн] Сборка артефакта патча силами локального Git...${RESET}"
-    
-    # Снимаем глобальный diff со всего репозитория. 
+
+    # Снимаем глобальный diff со всего репозитория.
     # Флаг --staged заставит Git выгрузить в патч даже новые созданные файлы со всеми плюсами!
     git diff --staged > "$AIDER_OUTPUT_PATCH"
-    
+
     if [ -s "$AIDER_OUTPUT_PATCH" ]; then
         echo -e "${GREEN}[УСПЕХ] Индустриальный патч-файл успешно сформирован:${RESET}"
         echo -e "        ${GREEN}$PWD/$AIDER_OUTPUT_PATCH${RESET}"
-        
+
         # Полная бережная зачистка кодовой базы: стираем временные файлы и очищаем индекс Git,
         # оставляя на диске строго наш готовый патч-артефакт.
         git reset --hard HEAD &>/dev/null
