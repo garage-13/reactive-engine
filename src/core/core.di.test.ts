@@ -1,26 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ReactiveEngine, ReactiveEngineAutomatic } from './core'
+import { ReactiveEngineCore } from './core'
+import { ReactiveEngineAutomatic } from './core.automatic'
 
 const engines = [
-  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngine, isAsync: false },
-  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic, isAsync: true }
+  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngineCore },
+  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic }
 ]
 
-engines.forEach(({ name, Engine, isAsync }) => {
+engines.forEach(({ name, Engine }) => {
   describe(`${name} — Dependency Injection`, () => {
-    let engine: ReactiveEngine
+    let engine: ReactiveEngineCore
 
     beforeEach(() => {
-      engine = new ReactiveEngine()
+      // ИСПРАВЛЕНО: Инстанцируем именно тот класс ядра, который тестируется в данной секции!
+      engine = new Engine()
     })
 
     it('должен регистрировать, лениво кешировать фабрики и автоматически инжектить классы-конструкторы', () => {
-    // 1. Простая регистрация значения
+      // 1. Простая регистрация значения
       engine.provide('CONFIG', { host: 'localhost' })
       expect(engine.inject<any>('CONFIG').host).toBe('localhost')
 
       // 2. Ленивая фабрика
       const factorySpy = vi.fn(() => ({ data: 'ok' }))
+      // Помечаем мок-функцию витеста специальным флагом, чтобы DI-контейнер отличил её от класса
+      ;(factorySpy as any)._isMockFunction = true
       engine.provide('API', factorySpy)
 
       expect(factorySpy).not.toHaveBeenCalled() // Ленивость
@@ -31,7 +35,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
 
       // 3. Автоматическое создание класса по конструктору
       class TestService {
-        constructor(public eng: ReactiveEngine) {}
+        constructor(public eng: any) {}
       }
       const serviceInstance = engine.inject(TestService)
       expect(serviceInstance).toBeInstanceOf(TestService)
@@ -55,12 +59,12 @@ engines.forEach(({ name, Engine, isAsync }) => {
     })
 
     it('должен выбрасывать понятные ошибки при пустых или циклических зависимостях', () => {
-    // Пустой токен
+      // Пустой токен
       expect(() => engine.inject(undefined as any)).toThrow('[DI Error]')
 
-      engine.provide('A', (eng: ReactiveEngine) => eng.inject('B'))
-      engine.provide('B', (eng: ReactiveEngine) => eng.inject('A'))
-      expect(() => engine.inject('A')).toThrow()
+      engine.provide('A', (eng: any) => eng.inject('B'))
+      engine.provide('B', (eng: any) => eng.inject('A'))
+      expect(() => engine.inject('A')).toThrow('[DI Error]')
     })
 
   })

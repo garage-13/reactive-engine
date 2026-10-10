@@ -1,4 +1,3 @@
-import { ReactiveEngine4ReactAutomatic } from './ReactiveEngine4React'
-
-export { ReactiveEngine4ReactAutomatic as ReactiveEngine }
-export * from './hooks'
+// Точка входа субпакета "@pravosleva/reactive-engine/react"
+export { use } from './hooks/useReactiveValue'
+export { useReactiveSubscription } from './hooks/useReactiveSubscription'

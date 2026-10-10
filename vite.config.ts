@@ -1,4 +1,4 @@
-import { defineConfig, UserConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
@@ -97,4 +97,13 @@ export default defineConfig({
       },
     }
   },
-} satisfies UserConfig)
+  test: {
+    // Добавляем сабмодуль бенчмарка в список исключений!
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      // Полностью блокируем сканирование и запуск тестов внутри папки сабмодуля
+      '**/report/reactive-framework-test-suite/**',
+    ],
+  },
+})

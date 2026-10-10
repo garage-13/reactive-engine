@@ -1,17 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ReactiveEngine, ReactiveEngineAutomatic } from './core'
+import { ReactiveEngineCore } from './core'
+import { ReactiveEngineAutomatic } from './core.automatic'
 
 const engines = [
-  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngine, isAsync: false },
-  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic, isAsync: true }
+  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngineCore },
+  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic }
 ]
 
-engines.forEach(({ name, Engine, isAsync }) => {
+engines.forEach(({ name, Engine }) => {
   describe(`${name} — Асинхронные ресурсы (resource)`, () => {
-    let engine: ReactiveEngine
+    // Типизируем как базовый класс, чтобы полиморфно подходили оба
+    let engine: ReactiveEngineCore
 
     beforeEach(() => {
-      engine = new ReactiveEngine()
+      // ИСПРАВЛЕНО: Инстанцируем именно тот конструктор ядра, который идет в текущей итерации!
+      engine = new Engine()
     })
 
     it('должен корректно отрабатывать жизненный цикл загрузки данных', async () => {
@@ -37,7 +40,10 @@ engines.forEach(({ name, Engine, isAsync }) => {
       const fetcher = vi.fn(async (_src, signal: AbortSignal) => {
         return new Promise((resolve, reject) => {
           const t = setTimeout(() => resolve('ok'), 50)
-          signal.addEventListener('abort', () => { clearTimeout(t); reject(new Error('aborted')) })
+          signal.addEventListener('abort', () => {
+            clearTimeout(t)
+            reject(new Error('aborted'))
+          })
         })
       })
 

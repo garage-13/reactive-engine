@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ReactiveEngine, ReactiveEngineAutomatic } from './core'
+import { ReactiveEngineCore } from './core'
+import { ReactiveEngineAutomatic } from './core.automatic'
 
 const engines = [
-  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngine, isAsync: false },
+  { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngineCore, isAsync: false },
   { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic, isAsync: true }
 ]
 
 engines.forEach(({ name, Engine, isAsync }) => {
   describe(`${name} — Синхронные Сигналы и Эффекты`, () => {
-    let engine: ReactiveEngine
+    let engine: ReactiveEngineCore
 
     beforeEach(() => {
-      engine = new ReactiveEngine()
+      engine = new ReactiveEngineCore()
     })
     it('должен сохранять начальное значение, обновлять его и запускать эффект', async () => {
       const engine = new Engine()

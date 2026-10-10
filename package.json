@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "1.8.3-beta",
+  "version": "2.0.0-beta",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -57,7 +57,7 @@
     "build:modules": "vite build",
     "build:umd": "vite build --config vite.config.umd.ts",
     "build": "yarn build:modules && yarn build:umd",
-    "test": "NODE_OPTIONS='--expose-gc' vitest run",
+    "test": "NODE_OPTIONS='--expose-gc' vitest run --exclude '**/report/reactive-framework-test-suite/**'",
     "test:ui": "NODE_OPTIONS='--expose-gc' vitest --ui",
     "test:watch": "vitest",
     "preversion": "npm run test",
@@ -66,7 +66,8 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
-    "_docs:pwa-gen": "npx pwa-asset-generator docs/public/rocket-thruster-120x120.svg docs/public/pwa/ --manifest docs/public/manifest.json --base /reactive-engine/pwa/ --background \"#1a1a24\" --padding \"15%\""
+    "_docs:pwa-gen": "npx pwa-asset-generator docs/public/rocket-thruster-120x120.svg docs/public/pwa/ --manifest docs/public/manifest.json --base /reactive-engine/pwa/ --background \"#1a1a24\" --padding \"15%\"",
+    "report:matrix": "node report/update-readme.js"
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",

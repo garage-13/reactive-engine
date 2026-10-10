@@ -11,7 +11,8 @@ export default [
       'dist/**',
       'node_modules/**',
       'build/**',
-      '**/*.umd.js'
+      '**/*.umd.js',
+      'report/reactive-framework-test-suite/**'
     ]
   },
   {

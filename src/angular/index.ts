@@ -1,3 +1,1 @@
-import { ReactiveEngine4AngularAutomatic } from './ReactiveEngine4Angular'
-
-export { ReactiveEngine4AngularAutomatic as ReactiveEngine }
+export { toAngularSignal } from './core.angular-adapter'

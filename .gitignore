@@ -38,3 +38,10 @@ docs/.vitepress/cache/*
 *.patch
 .aider.*
 .aider*
+
+# Временные файлы и отчеты бенчмарка в подмодуле
+report/reactive-framework-test-suite/node_modules/
+report/reactive-framework-test-suite/dist/
+report/reactive-framework-test-suite/report.json
+report/reactive-framework-test-suite/src/reactiveEngine.test.ts
+report/reactive-framework-test-suite/.vitest-result/

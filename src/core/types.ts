@@ -1,9 +1,9 @@
-import type { ReactiveEngine } from './core'
+import type { ReactiveEngineCore } from './core'
 
 export type CleanupFn = () => void;
 export type EffectFn = () => CleanupFn | void;
-export type Token<T> = string | symbol | { new(engine: ReactiveEngine, ...args: any[]): T };
-export type Factory<T> = (engine: ReactiveEngine) => T;
+export type Token<T> = string | symbol | { new(engine: ReactiveEngineCore, ...args: any[]): T };
+export type Factory<T> = (engine: ReactiveEngineCore) => T;
 
 /**
  * Интерфейс атомарного Сигнала графа.
@@ -133,4 +133,9 @@ export interface LogDetailMap {
   batch: BatchLogDetail;
   resource: ResourceLogDetail;
   reactive: ReactiveDetail;
+}
+
+export interface ISignalLike<V> {
+  value: V;
+  subscribe: (cb: (v: V) => void) => CleanupFn;
 }

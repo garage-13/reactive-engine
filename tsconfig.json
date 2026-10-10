@@ -22,7 +22,7 @@
       "react"
     ],
     "lib": [
-      "ES2022",
+      "ES2023",
       "DOM",
       "DOM.Iterable"
     ],
@@ -45,7 +45,8 @@
   },
   "include": [
     "src",
-    "examples/mocks.msw"
+    "examples/mocks.msw",
+    "report/reactive-framework-test-suite"
   ],
   "exclude": [
     "node_modules",
