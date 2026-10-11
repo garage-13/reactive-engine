@@ -24,7 +24,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       vi.restoreAllMocks()
     })
 
-    it.skip('должен выполнить первый вызов мгновенно (Leading edge) без ожидания', async () => {
+    it('должен выполнить первый вызов мгновенно (Leading edge) без ожидания', async () => {
       const mockFetcher = vi.fn().mockResolvedValue('immediate-data')
       const throttledFetcher = withThrottle(mockFetcher, { limit: 300 })
       const controller = new AbortController()
@@ -35,7 +35,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(result).toBe('immediate-data')
     })
 
-    it.skip('должен заблокировать промежуточные вызовы, но выполнить последний на хвосте (Trailing edge)', async () => {
+    it('должен заблокировать промежуточные вызовы, но выполнить последний на хвосте (Trailing edge)', async () => {
       const mockFetcher = vi.fn().mockResolvedValue('final-data')
       const throttledFetcher = withThrottle(mockFetcher, { limit: 300 })
 
@@ -72,7 +72,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(result3).toBe('final-data')
     })
 
-    it.skip('новый прямой вызов по истечении лимита должен выполняться мгновенно как Leading', async () => {
+    it('новый прямой вызов по истечении лимита должен выполняться мгновенно как Leading', async () => {
       const mockFetcher = vi.fn().mockResolvedValue('fresh')
       const throttledFetcher = withThrottle(mockFetcher, { limit: 300 })
 
@@ -110,7 +110,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
     // ====================================================
     describe('withThrottle — Работа с массивами и коллекциями', () => {
 
-      it.skip('должен корректно троттлить вызовы при быстрой смене иммутабельных массивов-зависимостей', async () => {
+      it('должен корректно троттлить вызовы при быстрой смене иммутабельных массивов-зависимостей', async () => {
         const mockFetcher = vi.fn().mockResolvedValue('array-throttled')
         const throttledFetcher = withThrottle(mockFetcher, { limit: 300 })
 
@@ -145,7 +145,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
         expect(result).toBe('array-throttled')
       })
 
-      it.skip('должен нативно извлекать свежий состав Proxy-массива на Trailing edge при его мутациях .push()', async () => {
+      it('должен нативно извлекать свежий состав Proxy-массива на Trailing edge при его мутациях .push()', async () => {
         const engine = new ReactiveEngine()
         const mockFetcher = vi.fn().mockImplementation(async (arr: string[]) => `length:${arr.length}`)
         const throttledFetcher = withThrottle(mockFetcher, { limit: 300 })

@@ -56,8 +56,8 @@ describe('React Adapter Hooks — Синхронный движок (Synchronous
 
     expect(result.current).toEqual(['banana', 'orange', 'pineapple'])
   })
-  // TODO:
-  it.skip('должен нативно отслеживать деструктивные методы Proxy-массивов (.push, .splice) ровно в 1 ререндер', () => {
+
+  it('должен нативно отслеживать деструктивные методы Proxy-массивов (.push, .splice) ровно в 1 ререндер', () => {
     const state = engine.reactive({
       todos: ['Купить молоко']
     })

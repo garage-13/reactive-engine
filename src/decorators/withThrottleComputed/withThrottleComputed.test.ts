@@ -21,7 +21,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       vi.useRealTimers()
     })
 
-    it.skip('должен синхронно возвращать стартовое значение при инициализации', () => {
+    it('должен синхронно возвращать стартовое значение при инициализации', () => {
       const rawSignal = engine.signal<number>(10, 'raw')
 
       const throttled = withThrottleComputed(
@@ -34,7 +34,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(throttled.value).toBe(10)
     })
 
-    it.skip('должен мгновенно пропустить первое изменение и задроттлить последующий спам (Лимит времени)', async () => {
+    it('должен мгновенно пропустить первое изменение и задроттлить последующий спам (Лимит времени)', async () => {
       const rawSignal = engine.signal<number>(0, 'raw')
 
       const throttled = withThrottleComputed(
@@ -60,7 +60,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(throttled.value).toBe(1)
     })
 
-    it.skip('должен гарантированно выполнить хвостовой вызов (Trailing Edge) последнего значения после лимита', async () => {
+    it('должен гарантированно выполнить хвостовой вызов (Trailing Edge) последнего значения после лимита', async () => {
       const rawSignal = engine.signal<number>(0, 'raw')
 
       const throttled = withThrottleComputed(
@@ -88,7 +88,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(throttled.value).toBe(42)
     })
 
-    it.skip('должен корректно вызывать подписки фреймворков при обновлении затроттленного значения', async () => {
+    it('должен корректно вызывать подписки фреймворков при обновлении затроттленного значения', async () => {
       const rawSignal = engine.signal<number>(0, 'raw')
       const spyCallback = vi.fn()
 
@@ -118,7 +118,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(spyCallback).toHaveBeenCalledTimes(2)
     })
 
-    it.skip('должен очищать внутренние таймеры setTimeout при вызове метода destroy', async () => {
+    it('должен очищать внутренние таймеры setTimeout при вызове метода destroy', async () => {
       const rawSignal = engine.signal<number>(0, 'raw')
 
       const throttled = withThrottleComputed(
@@ -148,7 +148,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
     // ====================================================
     describe('withThrottleComputed — Работа с массивами и коллекциями', () => {
 
-      it.skip('должен отслеживать изменения массивов в Сигналах и прогонять их через Trailing edge при пинке сеттера самому себе', async () => {
+      it('должен отслеживать изменения массивов в Сигналах и прогонять их через Trailing edge при пинке сеттера самому себе', async () => {
         const tagsSignal = engine.signal(['js'])
 
         const throttled = withThrottleComputed(
@@ -181,7 +181,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
         expect(throttled.value).toEqual(['js', 'ts', 'vue', 'angular'])
       })
 
-      it.skip('должен нативно трекать деструктивные мутации Proxy-массивов (.push) и отдавать актуальный срез данных на хвосте таймера', async () => {
+      it('должен нативно трекать деструктивные мутации Proxy-массивов (.push) и отдавать актуальный срез данных на хвосте таймера', async () => {
         const state = engine.reactive({
           todos: ['Task 1']
         })
@@ -213,7 +213,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
         expect(throttled.value).toEqual(['Task 1', 'Task 2', 'Task 3', 'Task 4'])
       })
 
-      it.skip('должен корректно обновлять затроттленный computed, если он зависит от обычного computed, фильтрующего массив', async () => {
+      it('должен корректно обновлять затроттленный computed, если он зависит от обычного computed, фильтрующего массив', async () => {
         const listSignal = engine.signal(['apple', 'banana', 'orange'])
 
         const longWords = engine.computed(() => {

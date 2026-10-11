@@ -24,7 +24,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       vi.restoreAllMocks()
     })
 
-    it.skip('должен делать реальный запрос при самом первом вызове (кэш пуст)', async () => {
+    it('должен делать реальный запрос при самом первом вызове (кэш пуст)', async () => {
       const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000 })
       const abortSignal = new AbortController().signal
 
@@ -33,7 +33,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(fetcherSpy).toHaveBeenCalledTimes(1)
     })
 
-    it.skip('должен возвращать stale-данные из кэша при ошибке или отмене повторного вызова, если их TTL валиден', async () => {
+    it('должен возвращать stale-данные из кэша при ошибке или отмене повторного вызова, если их TTL валиден', async () => {
       const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000, isLogsEnabled: false })
       const abortSignal = new AbortController().signal
 
@@ -53,7 +53,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(fetcherSpy).toHaveBeenCalledTimes(2)
     })
 
-    it.skip('должен полностью стирать кэш и делать честный жесткий запрос, если TTL истек', async () => {
+    it('должен полностью стирать кэш и делать честный жесткий запрос, если TTL истек', async () => {
       const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000 })
       const abortSignal = new AbortController().signal
 
@@ -73,7 +73,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
     // ====================================================
     describe('withStaleWhileRevalidate — Работа с массивами и коллекциями', () => {
 
-      it.skip('должен успешно отдавать stale-кэш для массивов при сетевом сбое, если у них одинаковое содержимое (Структурный SWR-ключ)', async () => {
+      it('должен успешно отдавать stale-кэш для массивов при сетевом сбое, если у них одинаковое содержимое (Структурный SWR-ключ)', async () => {
         const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000, isLogsEnabled: false })
         const abortSignal = new AbortController().signal
 
@@ -93,7 +93,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
         expect(fetcherSpy).toHaveBeenCalledTimes(2)
       })
 
-      it.skip('должен прокидывать ошибку дальше и не возвращать stale-кэш, если внутри Proxy-массива произошла мутация .push()', async () => {
+      it('должен прокидывать ошибку дальше и не возвращать stale-кэш, если внутри Proxy-массива произошла мутация .push()', async () => {
         const engine = new ReactiveEngine()
         const cachedFetcher = withStaleWhileRevalidate(fetcherSpy, { ttl: 5000, isLogsEnabled: false })
         const abortSignal = new AbortController().signal

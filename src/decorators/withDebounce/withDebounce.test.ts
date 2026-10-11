@@ -19,7 +19,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       vi.restoreAllMocks()
     })
 
-    it.skip('должен успешно выполнить запрос после окончания задержки', async () => {
+    it('должен успешно выполнить запрос после окончания задержки', async () => {
       const mockFetcher = vi.fn().mockResolvedValue('success-data')
       const debouncedFetcher = withDebounce(mockFetcher, { delay: 300 })
       const controller = new AbortController()
@@ -35,7 +35,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(result).toBe('success-data')
     })
 
-    it.skip('должен игнорировать промежуточные вызовы и выполнить только последний (Debounce эффект)', async () => {
+    it('должен игнорировать промежуточные вызовы и выполнить только последний (Debounce эффект)', async () => {
       const mockFetcher = vi.fn().mockResolvedValue('fresh-data')
       const debouncedFetcher = withDebounce(mockFetcher, { delay: 300 })
 
@@ -62,7 +62,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(result).toBe('fresh-data')
     })
 
-    it.skip('должен мгновенно прерывать ожидание, если нативный AbortSignal отменили до окончания таймаута', async () => {
+    it('должен мгновенно прерывать ожидание, если нативный AbortSignal отменили до окончания таймаута', async () => {
       const mockFetcher = vi.fn().mockResolvedValue('data')
       const debouncedFetcher = withDebounce(mockFetcher, { delay: 300 })
       const controller = new AbortController()
@@ -77,7 +77,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(mockFetcher).not.toHaveBeenCalled()
     })
 
-    it.skip('должен корректно прокидывать наверх ошибку, если оригинальный фетчер упал', async () => {
+    it('должен корректно прокидывать наверх ошибку, если оригинальный фетчер упал', async () => {
       const mockError = new Error('Сбой сервера 500')
       const mockFetcher = vi.fn().mockRejectedValue(mockError)
       const debouncedFetcher = withDebounce(mockFetcher, { delay: 300 })
@@ -94,7 +94,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
     // ====================================================
     describe('withDebounce — Работа с массивами и коллекциями', () => {
 
-      it.skip('должен корректно дебаунсить запросы при быстрой смене иммутабельных массивов-фильтров', async () => {
+      it('должен корректно дебаунсить запросы при быстрой смене иммутабельных массивов-фильтров', async () => {
         const mockFetcher = vi.fn().mockResolvedValue('filtered-data')
         const debouncedFetcher = withDebounce(mockFetcher, { delay: 300 })
 
@@ -115,7 +115,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
         expect(result).toBe('filtered-data')
       })
 
-      it.skip('должен корректно дебаунсить вызовы при нативных мутациях .push() одного Proxy-массива в ядре', async () => {
+      it('должен корректно дебаунсить вызовы при нативных мутациях .push() одного Proxy-массива в ядре', async () => {
         const engine = new ReactiveEngine()
         const mockFetcher = vi.fn().mockImplementation(async (arr: string[]) => `len_${arr.length}`)
         const debouncedFetcher = withDebounce(mockFetcher, { delay: 300 })
