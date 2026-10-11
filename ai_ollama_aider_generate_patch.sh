@@ -87,16 +87,23 @@ echo -e "${YELLOW}[Пайплайн] Снимок Git: Сбрасываем ст
 git checkout -- . &>/dev/null
 git clean -fd &>/dev/null
 
-echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в неинтерактивном режиме...${RESET}"
-
-# Трансформируем список файлов в цепочку флагов --file (например: --file src/core/core.ts --file src/core/types.ts)
+# Трансформируем список файлов в цепочку индивидуальных CLI флагов --file
 AIDER_FILES_ARGS=""
 for file in $CLEANED_FILES; do
     AIDER_FILES_ARGS="$AIDER_FILES_ARGS --file $file"
 done
 
-# 7. Вызов Aider через менеджер uv со стабильным Python 3.12
+echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в неинтерактивном TDD-режиме...${RESET}"
+
+# 7. Чистый атомарный вызов Aider без использования стороннего экспорта
+# Переменные прокси сбрасываются инлайново (в начале строки) специально для httpx/litellm
+HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
 uv run --python 3.12 --with aider-chat aider \
+    --model "$AIDER_MODEL" \
+    --openai-api-base "$AIDER_OLLAMA_API_BASE" \
+    --edit-format "$AIDER_EDIT_FORMAT" \
+    --map-tokens "$AIDER_MAP_TOKENS" \
+    --test "npx yarn test" \
     $AIDER_READ_INSTRUCTIONS_FLAG \
     "$AIDER_COMMIT_FLAG" \
     --yes-always \
