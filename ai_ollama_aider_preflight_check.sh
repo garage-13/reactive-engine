@@ -12,14 +12,19 @@ ENV_FILE=".env.development"
 echo -e "${BLUE}=== ЗАПУСК ПРЕДСТАРТОВОЙ ПРОВЕРКИ ОКРУЖЕНИЯ ===${RESET}"
 FAILED_CHECK=0
 
-# 1. Загрузка конфигурационного файла
-if [ ! -f "$ENV_FILE" ]; then
-    echo -e "${RED}[КРИТИЧЕСКАЯ ОШИБКА] Конфигурационный файл $ENV_FILE не найден в корне проекта!${RESET}"
+# 1. Безопасная загрузка конфигурационного файла без xargs
+if [ -f "$ENV_FILE" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Пропускаем пустые строки и комментарии
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line//[:space:]/}" ]] && continue
+        # Экспортируем переменную целиком, сохраняя кавычки и пробелы
+        export "$line"
+    done < "$ENV_FILE"
+else
+    echo -e "${RED}[КРИТИЧЕСКОЕ ПОЛОЖЕНИЕ] Файл конфигурации $ENV_FILE не найден!${RESET}"
     exit 1
 fi
-
-# Экспортируем переменные, очищая от комментариев
-export $(grep -v '^#' "$ENV_FILE" | xargs)
 
 # Выставляем дефолтные значения, если они не заданы в .env
 API_BASE="${AIDER_OLLAMA_API_BASE:-http://127.0.0.1:11434}"
@@ -41,21 +46,24 @@ fi
 # 3. Проверка менеджера пакетов uv от Astral
 if ! command -v uv &> /dev/null; then
     echo -e "${RED}[КРИТИЧЕСКОЕ ПОЛОЖЕНИЕ] Менеджер пакетов 'uv' на Rust не найден!${RESET}"
-    echo -e "${YELLOW}👉 Выполните установку: curl -LsSf https://astral.sh | sh${RESET}"
+    echo -e "${YELLOW}👉 Выполните установку: curl -LsSf https://astral.sh/uv/install.sh | sh${RESET}"
     FAILED_CHECK=1
 fi
 
 # 4. Проверка и пинг LLM-сервера на основе параметров из конфига
 echo -e "${BLUE}[Диагностика] Проверяем подключение к ИИ-серверу по адресу: $API_BASE...${RESET}"
 
-if ! curl -s --connect-timeout 3 "$API_BASE/api/tags" > /dev/null; then
-    echo -e "${RED}[ОШИБКА ПОДКЛЮЧЕНИЯ] ИИ-сервер по адресу $API_BASE недоступен!${RESET}"
+# Отрезаем /v1 с конца, если он там есть, чтобы корректно пинговать нативный эндпоинт Ollama
+PURE_PING_BASE=$(echo "$API_BASE" | sed 's|/v1$||')
+
+if ! curl -s --connect-timeout 3 "$PURE_PING_BASE/api/tags" > /dev/null; then
+    echo -e "${RED}[ОШИБКА ПОДКЛЮЧЕНИЯ] ИИ-сервер по адресу $PURE_PING_BASE недоступен!${RESET}"
     echo -e "${YELLOW}👉 Убедитесь, что Ollama запущена, или проверьте параметр AIDER_OLLAMA_API_BASE в $ENV_FILE.${RESET}"
     FAILED_CHECK=1
 else
     # Проверяем наличие конкретной скачанной модели, указанной в конфиге
-    if ! curl -s "$API_BASE/api/tags" | grep -q "$PURE_MODEL"; then
-        echo -e "${RED}[ВНИМАНИЕ] Модель '$PURE_MODEL' не найдена в кэше вашего сервера $API_BASE!${RESET}"
+    if ! curl -s "$PURE_PING_BASE/api/tags" | grep -q "$PURE_MODEL"; then
+        echo -e "${RED}[ВНИМАНИЕ] Модель '$PURE_MODEL' не найдена в кэше вашего сервера $PURE_PING_BASE!${RESET}"
         echo -e "${YELLOW}👉 Выполните скачивание: ollama pull $PURE_MODEL${RESET}"
         FAILED_CHECK=1
     fi
