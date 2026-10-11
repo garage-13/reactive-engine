@@ -37,7 +37,7 @@ CLEANED_FILES=$(echo "$AIDER_FILES" | sed 's/[[:space:]]*,[[:space:]]*/,/g' | tr
 # Экспортируем все конфигурационные параметры напрямую в окружение Aider
 export OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE"
 export AIDER_MODEL="$AIDER_MODEL"
-export AIDER_EDIT_FORMAT="$AIDER_EDIT_FORMAT"
+export AIDER_CHAT_MODE="$AIDER_CHAT_MODE"
 export AIDER_MAP_TOKENS="$AIDER_MAP_TOKENS"
 
 # Формируем динамический флаг коммитов
@@ -70,7 +70,7 @@ if [ "$DRY_RUN" = true ]; then
     echo -e "\n${BLUE}======================= ОТЛАДОЧНЫЙ СНИМОК DRY-RUN =======================${RESET}"
     echo -e "${GREEN}Модель (API_BASE):${RESET}  $AIDER_OLLAMA_API_BASE"
     echo -e "${GREEN}Модель (модель):${RESET}    $AIDER_MODEL"
-    echo -e "${GREEN}Формат правок:${RESET}      $AIDER_EDIT_FORMAT"
+    echo -e "${GREEN}Режим чата (Mode):${RESET}  $AIDER_CHAT_MODE"
     echo -e "${GREEN}Токены карты (Map):${RESET}  $AIDER_MAP_TOKENS"
     echo -e "${GREEN}Файл инструкций:${RESET}    ${AIDER_READ_INSTRUCTIONS_FLAG:-Отсутствует}"
     echo -e "${GREEN}Флаг коммитов:${RESET}      $AIDER_COMMIT_FLAG"
