@@ -17,14 +17,14 @@ if [ "$1" == "--dry-run" ]; then
 fi
 
 # 2. Запуск внешней изолированной проверки окружения
-if [ -f "./ai_preflight_check.sh" ]; then
-    chmod +x ./ai_preflight_check.sh
-    ./ai_preflight_check.sh
+if [ -f "./ai_ollama_aider_preflight_check.sh" ]; then
+    chmod +x ./ai_ollama_aider_preflight_check.sh
+    ./ai_ollama_aider_preflight_check.sh
     if [ $? -ne 0 ]; then
         exit 1
     fi
 else
-    echo -e "${RED}[Ошибка] Скрипт ai_preflight_check.sh не найден!${RESET}"
+    echo -e "${RED}[Ошибка] Скрипт ai_ollama_aider_preflight_check.sh не найден!${RESET}"
     exit 1
 fi
 
