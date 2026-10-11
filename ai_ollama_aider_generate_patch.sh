@@ -95,21 +95,20 @@ done
 
 echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в неинтерактивном TDD-режиме...${RESET}"
 
-# 7. Чистый атомарный вызов Aider без использования стороннего экспорта
-# Переменные прокси сбрасываются инлайново (в начале строки) специально для httpx/litellm
-HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
+# 7. Изолированный вызов Aider через утилиту env (срез прокси без потери переменных CLI)
+env HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
 uv run --python 3.12 --with aider-chat aider \
-    --model "$AIDER_MODEL" \
-    --openai-api-base "$AIDER_OLLAMA_API_BASE" \
-    --edit-format "$AIDER_EDIT_FORMAT" \
-    --map-tokens "$AIDER_MAP_TOKENS" \
-    --test "npx yarn test" \
-    $AIDER_READ_INSTRUCTIONS_FLAG \
-    "$AIDER_COMMIT_FLAG" \
-    --yes-always \
-    --no-show-release-notes \
-    --message "$AIDER_TASK" \
-    $AIDER_FILES_ARGS
+  --model "$AIDER_MODEL" \
+  --openai-api-base "$AIDER_OLLAMA_API_BASE" \
+  --edit-format "$AIDER_EDIT_FORMAT" \
+  --map-tokens "$AIDER_MAP_TOKENS" \
+  --test "npx yarn test" \
+  $AIDER_READ_INSTRUCTIONS_FLAG \
+  "$AIDER_COMMIT_FLAG" \
+  --yes-always \
+  --no-show-release-notes \
+  --message "$AIDER_TASK" \
+  $AIDER_FILES_ARGS
 
 if [ $? -eq 0 ]; then
     echo -e "\n${YELLOW}[Пайплайн] Изменения успешно внесены ИИ-агентом.${RESET}"
