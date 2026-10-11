@@ -95,13 +95,14 @@ done
 
 echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в неинтерактивном TDD-режиме...${RESET}"
 
-# 7. Изолированный вызов Aider через утилиту env (срез прокси без потери переменных CLI)
-env HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
+# 7. Финальный вызов с жестко прописанными текстовыми флагами формата и карты токенов
+# Прокси сбрасывается инлайново, а критические параметры не зависят от багов парсинга .env
+HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
 uv run --python 3.12 --with aider-chat aider \
   --model "$AIDER_MODEL" \
   --openai-api-base "$AIDER_OLLAMA_API_BASE" \
-  --edit-format "$AIDER_EDIT_FORMAT" \
-  --map-tokens "$AIDER_MAP_TOKENS" \
+  --edit-format whole \
+  --map-tokens 0 \
   --test "npx yarn test" \
   $AIDER_READ_INSTRUCTIONS_FLAG \
   "$AIDER_COMMIT_FLAG" \
