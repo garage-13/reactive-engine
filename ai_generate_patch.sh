@@ -63,6 +63,7 @@ if [ "$DRY_RUN" = true ]; then
     echo -e "${GREEN}Модель (API_BASE):${RESET}  $AIDER_OLLAMA_API_BASE"
     echo -e "${GREEN}Модель (модель):${RESET}    $AIDER_MODEL"
     echo -e "${GREEN}Формат правок:${RESET}      $AIDER_EDIT_FORMAT"
+    echo -e "${GREEN}Токены карты (Map):${RESET}  $AIDER_MAP_TOKENS"
     echo -e "${GREEN}Флаг коммитов:${RESET}      $AIDER_COMMIT_FLAG"
     echo -e "${GREEN}Итоговый патч:${RESET}      $AIDER_OUTPUT_PATCH"
     echo -e "${GREEN}Список файлов:${RESET}      $CLEANED_FILES"
@@ -83,6 +84,7 @@ echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в н�
 uv run --python 3.12 --with aider-chat aider \
     --model "$AIDER_MODEL" \
     --edit-format "$AIDER_EDIT_FORMAT" \
+    --map-tokens 0 \
     --read .aider.instructions.md \
     "$AIDER_COMMIT_FLAG" \
     --yes-always \
