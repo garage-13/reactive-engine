@@ -8,7 +8,7 @@ const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 export const Example201 = () => {
   const _userInfo = useUserInfoService()
-  const personList = useR(_userInfo.personList)
+  const personList = useR<{ id: number, name: string }[]>(_userInfo.personList)
   const activePersonId = useR(_userInfo.activePersonId)
   const firstlyState = useR(_userInfo.apiState)
 
@@ -57,11 +57,11 @@ export const Example201 = () => {
       <div className={baseClasses.unitInternalWrapper}>
         <div className={baseClasses.stack2}>
           <div>{firstlyState.loading ? '🟡 loading...' : !!firstlyState.data ? '🟢 ok' : !!firstlyState.error ? `🔴 err | ${firstlyState.error?.message || 'No error msg'}` : '⚪'}</div>
-          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data: firstlyState.data }, null, 2)}</pre>
+          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ firstlyState }, null, 2)}</pre>
         </div>
         <div className={baseClasses.stack2}>
           <div>{secondaryApiState.loading ? '🟡 loading...' : !!secondaryApiState.data ? '🟢 ok' : !!secondaryApiState.error ? `🔴 err | ${secondaryApiState.error?.message || 'No error msg'}` : '⚪'}</div>
-          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data: secondaryApiState.data }, null, 2)}</pre>
+          <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ secondaryApiState }, null, 2)}</pre>
         </div>
       </div>
     </div>

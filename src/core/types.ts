@@ -76,7 +76,7 @@ export interface SignalOptions<T> {
 export interface ResourceState<T> {
   data: T | null;
   loading: boolean;
-  error: Error | null;
+  error: string | null;
   isRetrying?: boolean;
 }
 
