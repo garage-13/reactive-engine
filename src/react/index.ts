@@ -10,4 +10,5 @@ class ExtendedReactiveEngine extends ReactiveEngineAutomatic {
 }
 
 export { ExtendedReactiveEngine as ReactiveEngine, use }
+export { use as useReactiveValue }
 export { useReactiveSubscription } from './hooks/useReactiveSubscription'

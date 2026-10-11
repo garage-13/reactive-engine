@@ -40,17 +40,26 @@ export interface Computed<T> {
   readonly value: T;
   subscribe: (cb: (val: T) => void) => CleanupFn;
   destroy: () => void;
+  _isDirty?: () => boolean
+  dependencies?: Set<any>
+  run?: () => void;
+  type?: any
 }
 
 /**
  * Интерфейс побочного Эффекта планировщика.
  */
 export interface IEffect {
-  id: number;
-  run: () => void;
-  markDirty: () => void;
-  cleanups: Set<CleanupFn>;
-  label?: string;
+  id: number
+  run: () => void
+  markDirty: () => void
+  cleanups: Set<CleanupFn>
+  label?: string
+  isDirty?: boolean
+  isDisposed?: boolean
+  execute?: () => void
+  fn?: () => void
+  _node?: any
 }
 
 /**
