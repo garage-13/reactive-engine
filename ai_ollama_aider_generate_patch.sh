@@ -90,8 +90,8 @@ git clean -fd &>/dev/null
 echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в неинтерактивном режиме...${RESET}"
 
 # 7. Вызов Aider через менеджер uv со стабильным Python 3.12
-# Убраны дублирующие CLI-флаги, параметры берутся из окружения экспорта
 uv run --python 3.12 --with aider-chat aider \
+    --test "yarn test" \
     $AIDER_READ_INSTRUCTIONS_FLAG \
     "$AIDER_COMMIT_FLAG" \
     --yes-always \
