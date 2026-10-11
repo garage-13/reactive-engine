@@ -89,15 +89,20 @@ git clean -fd &>/dev/null
 
 echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в неинтерактивном режиме...${RESET}"
 
+# Трансформируем список файлов в цепочку флагов --file (например: --file src/core/core.ts --file src/core/types.ts)
+AIDER_FILES_ARGS=""
+for file in $CLEANED_FILES; do
+    AIDER_FILES_ARGS="$AIDER_FILES_ARGS --file $file"
+done
+
 # 7. Вызов Aider через менеджер uv со стабильным Python 3.12
 uv run --python 3.12 --with aider-chat aider \
-    --test "yarn test" \
     $AIDER_READ_INSTRUCTIONS_FLAG \
     "$AIDER_COMMIT_FLAG" \
     --yes-always \
     --no-show-release-notes \
     --message "$AIDER_TASK" \
-    $CLEANED_FILES
+    $AIDER_FILES_ARGS
 
 if [ $? -eq 0 ]; then
     echo -e "\n${YELLOW}[Пайплайн] Изменения успешно внесены ИИ-агентом.${RESET}"
