@@ -34,14 +34,22 @@ source "$ENV_FILE"
 # Трансформируем список файлов (меняем запятые на пробелы)
 CLEANED_FILES=$(echo "$AIDER_FILES" | sed 's/[[:space:]]*,[[:space:]]*/,/g' | tr ',' ' ')
 
-# Конфигурируем прокси-переменные для Aider API
+# Экспортируем все конфигурационные параметры напрямую в окружение Aider
 export OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE"
 export AIDER_MODEL="$AIDER_MODEL"
+export AIDER_EDIT_FORMAT="$AIDER_EDIT_FORMAT"
+export AIDER_MAP_TOKENS="$AIDER_MAP_TOKENS"
 
 # Формируем динамический флаг коммитов
 AIDER_COMMIT_FLAG="--auto-commits"
 if [ "$AIDER_DISABLE_AUTO_COMMITS" = "true" ]; then
     AIDER_COMMIT_FLAG="--no-auto-commits"
+fi
+
+# Проверяем файл глобальных инструкций, если он задан
+AIDER_READ_INSTRUCTIONS_FLAG=""
+if [ -f ".aider.instructions.md" ]; then
+    AIDER_READ_INSTRUCTIONS_FLAG="--read .aider.instructions.md"
 fi
 
 # 4. Валидация существования базовых файлов
@@ -64,6 +72,7 @@ if [ "$DRY_RUN" = true ]; then
     echo -e "${GREEN}Модель (модель):${RESET}    $AIDER_MODEL"
     echo -e "${GREEN}Формат правок:${RESET}      $AIDER_EDIT_FORMAT"
     echo -e "${GREEN}Токены карты (Map):${RESET}  $AIDER_MAP_TOKENS"
+    echo -e "${GREEN}Файл инструкций:${RESET}    ${AIDER_READ_INSTRUCTIONS_FLAG:-Отсутствует}"
     echo -e "${GREEN}Флаг коммитов:${RESET}      $AIDER_COMMIT_FLAG"
     echo -e "${GREEN}Итоговый патч:${RESET}      $AIDER_OUTPUT_PATCH"
     echo -e "${GREEN}Список файлов:${RESET}      $CLEANED_FILES"
@@ -81,11 +90,9 @@ git clean -fd &>/dev/null
 echo -e "${YELLOW}[Пайплайн] Запуск ИИ-агента Aider в неинтерактивном режиме...${RESET}"
 
 # 7. Вызов Aider через менеджер uv со стабильным Python 3.12
+# Убраны дублирующие CLI-флаги, параметры берутся из окружения экспорта
 uv run --python 3.12 --with aider-chat aider \
-    --model "$AIDER_MODEL" \
-    --edit-format "$AIDER_EDIT_FORMAT" \
-    --map-tokens 0 \
-    --read .aider.instructions.md \
+    $AIDER_READ_INSTRUCTIONS_FLAG \
     "$AIDER_COMMIT_FLAG" \
     --yes-always \
     --no-show-release-notes \
@@ -96,22 +103,16 @@ if [ $? -eq 0 ]; then
     echo -e "\n${YELLOW}[Пайплайн] Изменения успешно внесены ИИ-агентом.${RESET}"
     echo -e "${YELLOW}[Пайплайн] Фиксируем все созданные новые файлы в индекс Git...${RESET}"
 
-    # Ставим абсолютно ВСЕ новые файлы (включая computed.md),
-    # которые сгенерировал ИИ, на учет перед снятием диффа!
     git add -A &>/dev/null
 
     echo -e "${YELLOW}[Пайплайн] Сборка артефакта патча силами локального Git...${RESET}"
 
-    # Снимаем глобальный diff со всего репозитория.
-    # Флаг --staged заставит Git выгрузить в патч даже новые созданные файлы со всеми плюсами!
     git diff --staged > "$AIDER_OUTPUT_PATCH"
 
     if [ -s "$AIDER_OUTPUT_PATCH" ]; then
         echo -e "${GREEN}[УСПЕХ] Индустриальный патч-файл успешно сформирован:${RESET}"
         echo -e "        ${GREEN}$PWD/$AIDER_OUTPUT_PATCH${RESET}"
 
-        # Полная бережная зачистка кодовой базы: стираем временные файлы и очищаем индекс Git,
-        # оставляя на диске строго наш готовый патч-артефакт.
         git reset --hard HEAD &>/dev/null
         git clean -fd &>/dev/null
     else
