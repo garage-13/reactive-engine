@@ -74,6 +74,50 @@ export class AngularCounterComponent implements OnInit {
 }
 ```
 
+Пример, если вам нужно задебаунсить ввод пользователя перед отправкой на бэкенд, вы вешаете декоратор прямо на функцию `fetcher` внутри `engine.resource`:
+```ts
+import { Component } from '@angular/core'
+import { AbstractService, withDebounce } from '@pravoslava/reactive-engine'
+import { ReactiveEngine as ReactiveEngine4Angular } from '@pravoslava/reactive-engine/angular'
+
+export class SearchLogic extends AbstractService {
+  // 1. Стрим ввода пользователя (синхронный)
+  public query = this.createSignal<string>('', 'search:query')
+
+  // 2. Ресурс с дебаунсом сетевых запросов в 300мс
+  public searchResource = this.engine.resource(
+    withDebounce(async (searchQuery, abortSignal) => {
+      const res = await fetch(`/api/search?q=${searchQuery}`, { signal: abortSignal })
+      return res.json()
+    }, { delay: 300 }),
+    this.query,
+    { name: 'search:resource' }
+  )
+}
+
+@Component({
+  selector: 'app-search-example',
+  standalone: true,
+  template: `
+    <input [value]="query()" (input)="logic.query.value = $any($event.target).value" />
+    
+    <!-- Шаблон Angular нативно и плавно реагирует на задебаунсенный стейт -->
+    <div *ngIf="search().loading">🟡 Поиск...</div>
+    <ul *ngIf="search().data">
+      <li *ngFor="let item of search().data">{{ item.name }}</li>
+    </ul>
+  `
+})
+export class SearchComponent {
+  private engine = new ReactiveEngine4Angular()
+  public logic = this.engine.inject(SearchLogic)
+
+  // 3. Конвертируем в нативные Angular Signals для шаблона
+  public query = this.engine.use(this.logic.query)
+  public search = this.engine.use(this.logic.searchResource)
+}
+```
+
 ### Архитектурные преимущества интеграции:
 * **Стратегия Change Detection**: Метод `.use()` возвращает стандартный `Signal<T>`. Это позволяет без ограничений включать в компонентах Angular оптимизированную стратегию `ChangeDetectionStrategy.OnPush`.
 * **Совместимость с Reactive Graph**: Полученный сигнал Angular можно без проблем комбинировать со встроенными утилитами Angular — вычисляемыми сигналами `computed(() => ...)` и сайд-эффектами `effect(() => ...)`.
