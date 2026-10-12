@@ -17,7 +17,7 @@ testEngines.forEach(({ name, createEngine }) => {
       engine = createEngine()
     })
 
-    it.skip('должен автоматически перевычислять цепочки computed-свойства на массивах', async () => {
+    it('должен автоматически перевычислять цепочки computed-свойства на массивах', async () => {
       // Теперь дженерик <string[]> применится идеально, так как метод .signal типизирован в ReactiveEngineCore!
       const listSignal = engine.signal<string[]>(['apple', 'banana', 'orange'])
 

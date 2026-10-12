@@ -28,14 +28,14 @@ const testEngines = [
 ]
 
 testEngines.forEach(({ name, createEngine }) => {
-  describe.skip(`Angular Adapter — Интеграция с ${name}`, () => {
+  describe(`Angular Adapter — Интеграция с ${name}`, () => {
     let engine: ReactiveEngineCore
 
     beforeEach(() => {
       engine = createEngine()
     })
 
-    it.skip('должен успешно конвертировать Сигналы ядра в нативные Angular Signals', () => {
+    it('должен успешно конвертировать Сигналы ядра в нативные Angular Signals', () => {
       const sig = engine.signal('angular-16')
       const mockDestroy = new MockDestroyRef()
 
@@ -49,7 +49,7 @@ testEngines.forEach(({ name, createEngine }) => {
       mockDestroy.destroy()
     })
 
-    it.skip('должен синхронизировать изменения примитивных сигналов ядра', () => {
+    it('должен синхронизировать изменения примитивных сигналов ядра', () => {
       const sig = engine.signal(100)
       const mockDestroy = new MockDestroyRef()
       const ngSig = toAngularSignal(sig, mockDestroy)
@@ -62,7 +62,7 @@ testEngines.forEach(({ name, createEngine }) => {
       mockDestroy.destroy()
     })
 
-    it.skip('должен автоматически триггерить изменения Angular Signal при инвалидации computed-цепочек массивов', () => {
+    it('должен автоматически триггерить изменения Angular Signal при инвалидации computed-цепочек массивов', () => {
       const listSignal = engine.signal<string[]>(['apple', 'banana'])
       const mockDestroy = new MockDestroyRef()
 
@@ -81,7 +81,7 @@ testEngines.forEach(({ name, createEngine }) => {
       mockDestroy.destroy()
     })
 
-    it.skip('должен автоматически отписываться от сигнала ядра при вызове onDestroy в Angular', () => {
+    it('должен автоматически отписываться от сигнала ядра при вызове onDestroy в Angular', () => {
       const sig = engine.signal('alive')
       const mockDestroy = new MockDestroyRef()
 
