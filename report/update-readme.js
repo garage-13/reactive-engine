@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const readmePath = path.resolve(__dirname, 'reactive-framework-test-suite', 'README.md')
-const resultsDir = path.resolve(__dirname, './reactive-framework-test-suite/.test-results')
+const resultsDir = path.resolve(__dirname, '_test-results.copy')
 
 function generateMatrixReport() {
   try {
