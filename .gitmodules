@@ -1,4 +1,0 @@
-[submodule "report/reactive-framework-test-suite"]
-	path = report/reactive-framework-test-suite
-	url = https://github.com/johnsoncodehk/reactive-framework-test-suite.git
-  ignore = dirty
