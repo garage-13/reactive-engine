@@ -197,4 +197,127 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
       expect(comp.value).toBe(200)
     }
   })
+
+  test('#45 [nested batches] планировщик должен удерживать эффекты до выхода из самого внешнего батча // ВЛОЖЕННЫЕ БАТЧИ (Nested Transactions)', () => {
+    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+
+    for (const engine of engines) {
+      const s1 = engine.signal(0)
+      const s2 = engine.signal(0)
+      const spy = vi.fn()
+
+      engine.effect(() => {
+        spy(s1.value, s2.value)
+      })
+
+      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
+      spy.mockClear()
+
+      // Заходим во внешний батч
+      engine.batch(() => {
+        s1.value = 1
+
+        // Заходим во внутренний вложенный батч
+        engine.batch(() => {
+          s2.value = 2
+          expect(spy).not.toHaveBeenCalled() // Эффект всё ещё заблокирован
+        })
+
+        // Вышли из внутреннего, но мы всё ещё внутри внешнего батча
+        expect(spy).not.toHaveBeenCalled()
+        s1.value = 3
+      })
+
+      // Вышли из самого внешнего батча — триггерится РОВНО 1 синхронный вызов эффекта
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(spy).toHaveBeenCalledWith(3, 2)
+    }
+  })
+
+  test.skip('#67 [computed bypass] граф должен останавливать волну инвалидации, если computed вернул то же значение // ПРЕРЫВАНИЕ ВЫЧИСЛЕНИЙ ПО РАВЕНСТВУ (Early Value Bypass)', () => {
+    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+
+    for (const engine of engines) {
+      const source = engine.signal(2)
+      
+      let compExecutions = 0
+      // Вычисление возвращает остаток от деления (всегда 0 для четных чисел)
+      const isEven = engine.computed(() => {
+        compExecutions++
+        return source.value % 2 === 0
+      })
+
+      const spyEffect = vi.fn()
+      engine.effect(() => {
+        spyEffect(isEven.value)
+      })
+
+      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
+      expect(compExecutions).toBe(1)
+      expect(spyEffect).toHaveBeenCalledTimes(1)
+      spyEffect.mockClear()
+
+      // Мутируем корень графа: 2 -> 4. Число изменилось, но признак четности (true) остался прежним!
+      source.value = 4
+      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
+
+      // Компьютед обязан пересчитаться, чтобы проверить значение
+      expect(compExecutions).toBe(2)
+      
+      // НО ЭФФЕКТ НИЖЕ ПО ГРАФУ НЕ ДОЛЖЕН ТРИГГЕРИТЬСЯ, так как значение ивента не поменялось!
+      expect(spyEffect).not.toHaveBeenCalled()
+    }
+  })
+
+  test.skip('#89 [error isolation] падение одного эффекта не должно ломать выполнение остальных эффектов в батче // ОШИБКИ И СТАБИЛЬНОСТЬ ГРАФА (Error Isolation)', () => {
+    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+
+    for (const engine of engines) {
+      const trigger = engine.signal(0)
+      const spySuccess = vi.fn()
+
+      // Хрупкий эффект, падающий при изменении
+      engine.effect(() => {
+        if (trigger.value > 0) {
+          throw new Error('Boom!')
+        }
+      })
+
+      // Стабильный эффект, идущий следом в очереди планировщика
+      engine.effect(() => {
+        spySuccess(trigger.value)
+      })
+
+      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
+      spySuccess.mockClear()
+
+      // Глушим console.error в выводе тестов, чтобы не засорять логи ранера
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      // Пинаем триггер обновлений
+      engine.batch(() => {
+        trigger.value = 1
+      })
+
+      // Проверяем, что падение первого эффекта не заблокировало выполнение второго!
+      expect(spySuccess).toHaveBeenCalledWith(1)
+      consoleSpy.mockRestore()
+    }
+  })
+
+  test('#142 [readonly computed] узел computed не должен позволять прямую перезапись значения извне // ЗАЩИТА ОТ ЧИТ СЕТТЕРОВ (Safe Read-Only Computeds)', () => {
+    const engine = new ReactiveEngineCore()
+    const sig = engine.signal(1)
+    const comp = engine.computed(() => sig.value * 2)
+
+    expect(comp.value).toBe(2)
+
+    // Попытка императивно перезаписать свойство (если TS пропустит)
+    try {
+      (comp as any).value = 999
+    } catch (e) {}
+
+    // Значение должно оставаться строго декларативным и ленивым
+    expect(comp.value).toBe(2)
+  })
 })

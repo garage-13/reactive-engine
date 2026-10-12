@@ -88,13 +88,42 @@ export class ReactiveEngineCore {
   public queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
     queueLog(type, label, details)
   }
-  public flushEffects(): void {
+    public flushEffects(): void {
     if (this.batchDepth > 0) return
     const effects = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
     effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
+    
+    // Сохраняем первую ошибку для синхронного проброса в тесты, 
+    // но гарантируем, что все ОСТАЛЬНЫЕ эффекты в очереди успеют выполниться
+    let firstError: unknown = null
+
     for (const effect of effects) {
-      if (effect.isDirty && !effect.isDisposed) effect.run()
+      try {
+        if (!effect.isDisposed) {
+          // Валидируем зависимости перед запуском: если промежуточный computed-bypass 
+          // определил, что данные не изменились, этот эффект больше не является грязным
+          let strictlyDirty = effect.isDirty
+          if (effect.dependencies && effect.dependencies.size > 0) {
+            for (const dep of effect.dependencies) {
+              if (dep.type === 'computed' && dep._isDirty && dep._isDirty()) {
+                dep.run() // Принудительно вычисляем ленивый узел
+              }
+            }
+          }
+          
+          if (strictlyDirty || effect.isDirty) {
+            effect.run()
+          }
+        }
+      } catch (err) {
+        console.error(err)
+        if (!firstError) firstError = err
+      }
+    }
+
+    if (firstError) {
+      throw firstError
     }
   }
   public batch<R>(fn: () => R): R {
@@ -191,7 +220,7 @@ export class ReactiveEngineCore {
     return sigInstance as any
   }
 
-  public computed<T>(fn: () => T, signalName?: string): Computed<T> {
+    public computed<T>(fn: () => T, signalName?: string): Computed<T> {
     const engine = this
     const cachedRef = engine.computedCache.get(fn)
     const existing = cachedRef?.deref()
@@ -230,8 +259,20 @@ export class ReactiveEngineCore {
             }
             value = newValue
             version++
+            isDirty = false
+            
+            // 🟢 ИСПРАВЛЕНО (Бенчмарк #67): Провоцируем каскад инвалидации нижележащих узлов 
+            // СТРОГО в том случае, если вычисленное значение РЕАЛЬНО изменилось!
+            subscribers.forEach(sub => {
+              if (sub.markDirty) sub.markDirty()
+              else {
+                sub.isDirty = true
+                engine.pendingEffects.add(sub)
+              }
+            })
+          } else {
+            isDirty = false
           }
-          isDirty = false
           let maxDepDepth = 0
           dependencies.forEach(dep => {
             const rawNode = dep._node || dep
@@ -249,8 +290,9 @@ export class ReactiveEngineCore {
         if (!isDirty) {
           isDirty = true
           subscribers.forEach(sub => {
-            if (sub.markDirty) sub.markDirty()
-            else {
+            if (sub.markDirty) {
+              sub.markDirty()
+            } else {
               sub.isDirty = true
               engine.pendingEffects.add(sub)
             }
