@@ -36,6 +36,7 @@ import { Throttle2DExample as Example212 } from './212-resource-withThrottleComp
 import { ThrottleCacheExample as Example213 } from './213-resource-withThrottleAndCache'
 // import { LiveNotificationsExample as Example214 } from './214-long-polling-as-while'
 import { LiveNotificationsExample as Example215 } from './215-resource-withLongPolling'
+import { Example254 } from './254-form-wizard-validation-d-withValidation/Example254'
 
 export const App = () => {
   return (
@@ -270,6 +271,12 @@ export const App = () => {
             description='Resource & withLongPolling decorator (experimental)'
           >
             <Example215 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 254'
+            description='Form wizard validation DI (& withValidation decorator)'
+          >
+            <Example254 />
           </CardModalWrapper>
         </div>
       </div>

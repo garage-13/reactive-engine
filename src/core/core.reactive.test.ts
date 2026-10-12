@@ -111,5 +111,38 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(consoleSpy).toHaveBeenCalled()
       consoleSpy.mockRestore()
     })
+
+    it('(See also: #renderHook) должен нативно трекать глубокие мутации Proxy-объектов и массивов внутри batch ровно в 1 вызов эффекта', () => {
+      const state = engine.reactive({
+        user: {
+          name: 'Иван',
+          todos: ['Купить молоко']
+        }
+      })
+      
+      const spy = vi.fn()
+
+      // Регистрируем канонический эффект ядра для глубокого Proxy-объекта
+      engine.effect(() => {
+        // Явно считываем глубокие свойства, чтобы граф зафиксировал зависимости
+        spy(state.user.name, [...state.user.todos])
+      })
+      
+      // Сбрасываем стартовый вызов эффекта при инициализации
+      spy.mockClear()
+
+      // Выполняем точечную мутацию свойства и деструктивный push массива внутри batch
+      engine.batch(() => {
+        state.user.name = 'Алексей'
+        state.user.todos.push('Написать тесты подписки')
+
+        // Внутри батча эффект еще заблокирован планировщиком
+        expect(spy).not.toHaveBeenCalled()
+      })
+
+      // На выходе из батча эффект обязан выполниться СИНХРОННО и РОВНО 1 раз с финальным стейтом!
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(spy).toHaveBeenCalledWith('Алексей', ['Купить молоко', 'Написать тесты подписки'])
+    })
   })
 })

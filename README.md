@@ -184,3 +184,274 @@ export class AngularCounterComponent {
 
 </details>
 </div>
+
+
+## Core Architecture: Push/Pull & Atomic Scheduling
+The engine utilizes a hybrid Push/Pull topology paired with an Atomic Transaction Scheduler to guarantee glitch-free propagation, automated cleanup, and maximum runtime performance.
+```
+[ Mutate Signal ] ──( Synchronous Push )──> [ Mark Nodes Dirty ]
+                                                   │
+   ┌───────────────────────────────────────────────┘
+   ▼
+[ Atomic Scheduler ] ──( Microtask/Batch Flush )──> [ Trigger Effects ]
+                                                           │
+   ┌───────────────────────────────────────────────────────┘
+   ▼
+[ Lazy Pull Evaluation ] ──( Computed Derivations )──> [ Framework Bridges ]
+```
+
+• Synchronous Push (Invalidation): Mutating a signal triggers a cascade that immediately flags dependent `computed` and `effect` nodes as dirty.
+• Lazy Pull (Evaluation): Values are computed only when explicitly read, using cached execution tracks.
+• Atomic Batching: State changes made inside an `engine.batch` transaction are collapsed. Effects fire exactly once at the end of the batch block, avoiding intermediate cascade states and rendering glitches.
+
+## Canonical Performance Patterns
+
+1. State Mirroring Anti-Pattern vs. Lazy Derivations
+
+Copying external async state directly into local mutable signals introduces synchronization traps, rendering loops, and memory overhead. The engine enforces a Zero-Copy Architecture through memoized computations.
+```ts
+// ❌ Mirroring Trap (Causes redundant pushes & recursion)
+engine.effect(() => {
+  const data = apiResource.data
+  if (data) localSignal.value = data 
+})
+
+// 🟢 Canonical Pattern (Pure Lazy Derivation)
+const validData = engine.computed(() => {
+  return apiResource.data?.filter(item => item.isValid) ?? []
+})
+```
+
+2. Segmented Micro-Inputs Pattern
+
+To eliminate parent re-renders in deep form trees, push state subscriptions down to individual inputs. The parent controls global layouts by observing only top-level boundary states (like current step counters), while input fields mutate and observe point signals independently.
+
+## Architecture-Grade Form Wizard (Example 254)
+This enterprise-ready multi-step form implementation demonstrates absolute separation of concerns: state, cross-step validation schemas, and API fetch mechanics are completely decoupled from React.
+
+1. Action Validation Decorators (`withValidation.ts`)
+```ts
+import { Signal } from '@pravosleva/reactive-engine'
+
+export type ValidationSchema<T> = {
+  [K in keyof T]?: (value: T[K], state: T) => string | true
+}
+
+export interface ValidationOptions<T> {
+  schema: ValidationSchema<T>
+  errorsSignal: Signal<Record<string, string>>
+}
+
+export const withValidation = <T, Args extends any[], R>(
+  targetAction: (...args: Args) => R,
+  options: ValidationOptions<T>
+) => {
+  return (currentState: T, ...args: Args): R | void => {
+    const { schema, errorsSignal } = options
+    const nextErrors: Record<string, string> = {}
+    let hasErrors = false
+
+    for (const key in schema) {
+      const validator = schema[key]
+      if (typeof validator === 'function') {
+        const result = validator(currentState[key], currentState)
+        if (typeof result === 'string') {
+          nextErrors[key] = result
+          hasErrors = true
+        }
+      }
+    }
+
+    errorsSignal.value = nextErrors
+    if (hasErrors) return
+
+    return targetAction(...args)
+  }
+}
+
+export const withResourceValidation = <S, T>(
+  fetcher: (source: S, signal: AbortSignal) => Promise<T>,
+  options: ValidationOptions<S>
+) => {
+  return async (sourceValue: S, abortSignal: AbortSignal): Promise<T> => {
+    const { schema, errorsSignal } = options
+    const nextErrors: Record<string, string> = {}
+    let hasErrors = false
+
+    for (const key in schema) {
+      const validator = schema[key]
+      if (typeof validator === 'function') {
+        const result = validator(sourceValue[key], sourceValue)
+        if (typeof result === 'string') {
+          nextErrors[key] = result
+          hasErrors = true
+        }
+      }
+    }
+
+    errorsSignal.value = nextErrors
+    if (hasErrors) throw new Error('Validation failed')
+
+    return fetcher(sourceValue, abortSignal)
+  }
+}
+```
+2. Domain & Validation Service (`FormWizardLogic.ts`)
+```tsx
+import { AbstractService } from '@pravosleva/reactive-engine'
+import { withValidation, withResourceValidation, ValidationSchema } from './withValidation'
+
+export interface WizardState {
+  step: number
+  account: { email: string; phone: string }
+  profile: { firstName: string; lastName: string }
+}
+
+export class ApiService {
+  public async submitWizard(data: WizardState['profile']): Promise<{ success: boolean }> {
+    return new Promise(resolve => setTimeout(() => resolve({ success: true }), 1000))
+  }
+}
+
+export class FormWizardLogic extends AbstractService {
+  private api = this.engine.inject(ApiService)
+
+  public currentStep = this.createSignal<number>(1)
+  public errors = this.createSignal<Record<string, string>>({})
+
+  public formData = this.engine.reactive<WizardState>({
+    step: 1,
+    account: { email: '', phone: '' },
+    profile: { firstName: '', lastName: '' }
+  })
+
+  private accountSchema: ValidationSchema<WizardState['account']> = {
+    email: (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val) ? true : 'Invalid email pattern',
+    phone: (val) => val.length >= 10 ? true : 'Phone must be at least 10 digits'
+  }
+
+  private profileSchema: ValidationSchema<WizardState['profile']> = {
+    firstName: (val) => val.trim() ? true : 'First name is required',
+    lastName: (val) => val.trim() ? true : 'Last name is required'
+  }
+
+  public isWizardValid = this.engine.computed<boolean>(() => {
+    const { email, phone } = this.formData.account
+    const { firstName, lastName } = this.formData.profile
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email) && phone.length >= 10 && !!firstName.trim() && !!lastName.trim()
+  })
+
+  private profileSource = this.engine.computed(() => this.formData.profile)
+
+  public nextToProfileStep = () => {
+    const action = withValidation(() => {
+      this.currentStep.value = 2
+    }, { schema: this.accountSchema, errorsSignal: this.errors })
+    
+    action(this.formData.account)
+  }
+
+  public submitWizardForm = this.engine.resource(
+    withResourceValidation(
+      async (profileData, abortSignal) => {
+        return this.api.submitWizard(profileData)
+      },
+      { schema: this.profileSchema, errorsSignal: this.errors }
+    ),
+    this.profileSource
+  )
+
+  public prevStep = () => {
+    this.errors.value = {}
+    this.currentStep.value = 1
+  }
+}
+```
+3. Framework Representation (`Example254.tsx`)
+The React tier remains completely stateless, eliminating all hook declaration chains. Prop-drilling the stable `logic` context doesn't trigger parent updates, providing maximum render insulation.
+```tsx
+import React from 'react'
+import { ReactiveEngine, use } from '@pravosleva/reactive-engine/react'
+import { FormWizardLogic } from './FormWizardLogic'
+
+const engine = new ReactiveEngine()
+
+export const Example254 = () => {
+  const logic = engine.inject(FormWizardLogic)
+  const step = use(logic.currentStep)
+  const errors = use(logic.errors)
+  const isFormValid = use(logic.isWizardValid)
+  const submitState = use(logic.submitWizardForm)
+  const form = use(logic.formData)
+
+  return (
+    <div className="wizard-container">
+      {step === 1 && (
+        <div className="step-pane">
+          <h3>Step 1: Account Setup</h3>
+          <input
+            value={form.account.email}
+            onChange={(e) => {
+              logic.formData.account.email = e.target.value
+              if (errors.email) logic.errors.value = { ...errors, email: '' }
+            }}
+            placeholder="Email (user@domain.com)"
+          />
+          {errors.email && <span className="err-label">{errors.email}</span>}
+
+          <input
+            value={form.account.phone}
+            onChange={(e) => {
+              logic.formData.account.phone = e.target.value.replace(/\D/g, '')
+              if (errors.phone) logic.errors.value = { ...errors, phone: '' }
+            }}
+            placeholder="Phone (digits only)"
+          />
+          {errors.phone && <span className="err-label">{errors.phone}</span>}
+
+          <button onClick={logic.nextToProfileStep}>Next</button>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="step-pane">
+          <h3>Step 2: Personal Profile</h3>
+          <input
+            value={form.profile.firstName}
+            onChange={(e) => {
+              logic.formData.profile.firstName = e.target.value
+              if (errors.firstName) logic.errors.value = { ...errors, firstName: '' }
+            }}
+            placeholder="First Name"
+          />
+          {errors.firstName && <span className="err-label">{errors.firstName}</span>}
+
+          <button onClick={logic.prevStep}>Back</button>
+          <button onClick={() => logic.submitWizardForm.refetch()} disabled={submitState.loading}>
+            {submitState.loading ? 'Submitting...' : 'Finish'}
+          </button>
+        </div>
+      )}
+
+      <div className="status-footer">
+        <div>Validation Boundary: {isFormValid ? '🟢 Valid' : '🔴 Missing Criteria'}</div>
+        {submitState.data?.success && <div className="success">Form successfully submitted!</div>}
+      </div>
+    </div>
+  )
+}
+```
+
+## Unified Framework Bridges
+### Angular 16+ Integration (`src/angular/index.ts`)
+Converts push/pull graph nodes synchronously into standard immutable read-only Angular Signals. Includes auto-unsubscribing lifecycle hooks tied to DestroyRef with injection safety.
+```ts
+const engine = new ReactiveEngine4Angular()
+const searchLogic = engine.inject(SearchLogic)
+
+// Exposed directly to Angular HTML template as search()
+public search = this.engine.use(this.searchLogic.searchResource)
+```
+### Vue 3 Integration (`src/vue/index.ts`)
+Exposes full integration with the Vue Composition API via deep proxy snapshots, supporting on-demand computed triggers and automated component scope teardowns.

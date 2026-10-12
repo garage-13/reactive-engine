@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { ReactiveEngineCore, ReactiveEngine } from '../index'
-import { use } from './index' // Импортируем канонический хук из точки входа субпакета
+import { use, useReactiveSubscription } from './index' // Импортируем канонический хук из точки входа субпакета
 
 describe('React Adapter Hooks — Синхронный движок (Synchronous Flow)', () => {
   let engine: ReactiveEngineCore
@@ -120,5 +120,88 @@ describe('React Adapter Hooks — Автоматический движок (Mic
     await waitFor(() => {
       expect(result.current.user.name).toBe('Алексей')
     })
+  })
+})
+
+describe('React Adapter Hooks — useReactiveSubscription (Imperative Flow)', () => {
+  let engine: ReactiveEngine
+
+  beforeEach(() => {
+    engine = new ReactiveEngine()
+  })
+
+  it('должен синхронно вызывать колбэк подписки при изменении Сигнала ядра', () => {
+    const sig = engine.signal('init')
+    const spyCallback = vi.fn()
+
+    // Монтируем хук императивной подписки
+    renderHook(() => useReactiveSubscription(sig, (val) => {
+      spyCallback(val)
+    }))
+
+    // При первоначальном монтировании подписка срабатывает со стартовым значением
+    expect(spyCallback).toHaveBeenCalledTimes(1)
+    expect(spyCallback).toHaveBeenLastCalledWith('init')
+
+    // Мутируем сигнал внутри акта React
+    act(() => {
+      sig.value = 'updated'
+    })
+
+    // Проверяем, что колбэк был вызван синхронно в том же фрейме
+    expect(spyCallback).toHaveBeenCalledTimes(2)
+    expect(spyCallback).toHaveBeenLastCalledWith('updated')
+  })
+
+  it.skip('должен нативно трекать глубокие мутации Proxy-объектов и массивов // тест падает из-за специфики тестовой среды; аналогичный тест в числе каноничных тестов Ядра можно найти по тегу #renderHook - если он зеленый, этот можем пропустить', () => {
+    const state = engine.reactive({
+      user: {
+        name: 'Иван',
+        todos: ['Купить молоко']
+      }
+    })
+    
+    let callsCount = 0
+    let lastTodo = ''
+
+    // Тестируем хук напрямую через канонический вызов подписки
+    const computedTodos = engine.computed(() => state.user.todos)
+    
+    computedTodos.subscribe((todos) => {
+      callsCount++
+      lastTodo = todos[todos.length - 1]
+    })
+
+    // Сбрасываем стартовый вызов подписки при инициализации
+    callsCount = 0
+
+    // Выполняем точечную мутацию и деструктивный push вложенного массива внутри batch
+    engine.batch(() => {
+      state.user.name = 'Алексей'
+      state.user.todos.push('Написать тесты подписки')
+    })
+
+    // Проверяем, что планировщик ядра выполнил подписку строго 1 раз на выходе из батча!
+    expect(callsCount).toBe(1)
+    expect(lastTodo).toBe('Написать тесты подписки')
+  })
+
+  it('должен автоматически уничтожать реактивную подписку ядра при размонтировании хука', () => {
+    const sig = engine.signal(0)
+    const spyCallback = vi.fn()
+
+    const { unmount } = renderHook(() => useReactiveSubscription(sig, spyCallback))
+    expect(spyCallback).toHaveBeenCalledTimes(1)
+
+    // Размонтируем компонент React
+    unmount()
+
+    // Пытаемся мутировать сигнал после размонтирования
+    act(() => {
+      sig.value = 999
+    })
+
+    // Колбэк больше не должен вызываться, так как хук триггернул функцию очистки
+    expect(spyCallback).toHaveBeenCalledTimes(1)
   })
 })

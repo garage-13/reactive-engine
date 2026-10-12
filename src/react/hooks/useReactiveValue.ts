@@ -12,19 +12,11 @@ export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? V
     version: number
     unsubscribe: (() => void) | null
     listeners: Set<() => void>
-    lastLocalVersion: number
-    cachedResult: any
-    subCleanups: Set<() => void>
-    isPendingUpdate: boolean
-      }>({
-        version: 0,
-        unsubscribe: null,
-        listeners: new Set(),
-        lastLocalVersion: -1,
-        cachedResult: null,
-        subCleanups: new Set(),
-        isPendingUpdate: false
-      })
+  }>({
+    version: 0,
+    unsubscribe: null,
+    listeners: new Set()
+  })
 
   const subscribeStore = (cb: () => void) => {
     storeRef.current.listeners.add(cb)
@@ -34,59 +26,15 @@ export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? V
 
       const triggerUpdate = () => {
         if (isInitializing) return
-
-        // Синхронно накапливаем инкремент версий, гарантируя, что useSyncExternalStore
-        // зафиксирует изменения, но блокируем повторные вызовы listeners до выхода из батча
-        if (storeRef.current.isPendingUpdate) {
-          storeRef.current.version++
-          return
-        }
-
-        storeRef.current.isPendingUpdate = true
         storeRef.current.version++
         storeRef.current.listeners.forEach(listener => listener())
-
-        // Сбрасываем защёлку строго на следующем микрошаге Event Loop
-        Promise.resolve().then(() => {
-          storeRef.current.isPendingUpdate = false
-        })
       }
 
       if (isSignal) {
         storeRef.current.unsubscribe = (item as any).subscribe(triggerUpdate)
-      } else {
-        const setupDeepSubscriptions = (obj: any) => {
-          if (obj === null || typeof obj !== 'object') return
-
-          if ('__subscribe' in obj && typeof obj.__subscribe === 'function') {
-            const mainUnsub = obj.__subscribe(triggerUpdate)
-            storeRef.current.subCleanups.add(mainUnsub)
-          }
-
-          for (const key in obj) {
-            try {
-              const val = obj[key]
-              if (val !== null && typeof val === 'object') {
-                if ('__subscribe' in val && typeof (val as any).__subscribe === 'function') {
-                  const subUnsub = (val as any).__subscribe(triggerUpdate)
-                  storeRef.current.subCleanups.add(subUnsub)
-                }
-                const rawArray = obj[key]
-                if (Array.isArray(rawArray) && '__subscribe' in rawArray) {
-                  const arrayUnsub = (rawArray as any).__subscribe(triggerUpdate)
-                  storeRef.current.subCleanups.add(arrayUnsub)
-                }
-              }
-            } catch (e) {}
-          }
-        }
-
-        setupDeepSubscriptions(item)
-
-        storeRef.current.unsubscribe = () => {
-          storeRef.current.subCleanups.forEach(unsub => unsub())
-          storeRef.current.subCleanups.clear()
-        }
+      } else if ('__subscribe' in item && typeof (item as any).__subscribe === 'function') {
+        // Нативно подписываемся на сквозной эмиттер Proxy-коллекции ядра
+        storeRef.current.unsubscribe = (item as any).__subscribe(triggerUpdate)
       }
 
       isInitializing = false
@@ -97,13 +45,12 @@ export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? V
       if (storeRef.current.listeners.size === 0 && storeRef.current.unsubscribe) {
         storeRef.current.unsubscribe()
         storeRef.current.unsubscribe = null
-        storeRef.current.cachedResult = null
-        storeRef.current.lastLocalVersion = -1
       }
     }
   }
 
-  const currentLocalVersion = useSyncExternalStore(
+  // useSyncExternalStore реагирует строго на инкремент версии, перезапуская ререндер
+  useSyncExternalStore(
     subscribeStore,
     () => storeRef.current.version,
     () => storeRef.current.version
@@ -111,41 +58,6 @@ export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? V
 
   const rawValue = isSignal ? (item as any).value : item
 
-  if (rawValue === null || (typeof rawValue !== 'object' && typeof rawValue !== 'function')) {
-    return rawValue as any
-  }
-
-  if (storeRef.current.lastLocalVersion !== currentLocalVersion || !storeRef.current.cachedResult) {
-    storeRef.current.lastLocalVersion = currentLocalVersion
-
-    if (Array.isArray(rawValue)) {
-      storeRef.current.cachedResult = [...rawValue]
-    } else {
-      // Создаем динамический прокси-снимок кадра.
-      // Геттеры прокси всегда будут читать СВЕЖИЕ данные из rawValue в реальном времени,
-      // полностью аннулируя внутреннее кэширование свойств утилиты renderHook!
-      storeRef.current.cachedResult = new Proxy(rawValue, {
-        get(target, prop, receiver) {
-          const value = Reflect.get(target, prop, receiver)
-          if (Array.isArray(value)) {
-            return [...value]
-          }
-          return value
-        },
-        ownKeys(target) {
-          return Reflect.ownKeys(target)
-        },
-        getOwnPropertyDescriptor(target, prop) {
-          return {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: (target as any)[prop]
-          }
-        }
-      })
-    }
-  }
-
-  return storeRef.current.cachedResult as any
+  // Возвращаем оригинальный Proxy-объект напрямую! Ссылочная идентичность инпутов в React сохраняется на 100%
+  return rawValue as any
 }
