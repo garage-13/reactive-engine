@@ -1,5 +1,6 @@
 import { getExtractedValues } from '../utils/getExtractedValues'
 import { Signal, Computed, IEffect, EngineLoggerOptions, LogEventType, CleanupFn, TransactionContext, LogRecord, SignalOptions, ResourceOptions, ResourceState, Resource } from './types'
+import { createComputed } from './core.method.computed'
 
 // Тип для конструктора класса
 type Constructor<T> = new (...args: any[]) => T
@@ -88,44 +89,46 @@ export class ReactiveEngineCore {
   public queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
     queueLog(type, label, details)
   }
-    public flushEffects(): void {
+  public flushEffects(): void {
     if (this.batchDepth > 0) return
     const effects = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
     effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
     
-    // Сохраняем первую ошибку для синхронного проброса в тесты, 
-    // но гарантируем, что все ОСТАЛЬНЫЕ эффекты в очереди успеют выполниться
-    let firstError: unknown = null
+    const prevConsumer = this.activeConsumer
 
-    for (const effect of effects) {
-      try {
-        if (!effect.isDisposed) {
-          // Валидируем зависимости перед запуском: если промежуточный computed-bypass 
-          // определил, что данные не изменились, этот эффект больше не является грязным
-          let strictlyDirty = effect.isDirty
-          if (effect.dependencies && effect.dependencies.size > 0) {
-            for (const dep of effect.dependencies) {
-              if (dep.type === 'computed' && dep._isDirty && dep._isDirty()) {
-                dep.run() // Принудительно вычисляем ленивый узел
+    try {
+      for (const effect of effects) {
+        if (effect.isDisposed) continue
+
+        if (effect.dependencies && effect.dependencies.size > 0) {
+          for (const dep of effect.dependencies) {
+            const rawNode = dep._node || dep
+            if (rawNode.type === 'computed' && rawNode._isDirty && rawNode._isDirty()) {
+              try {
+                rawNode.run() 
+              } catch (err) {
+                if (this.batchDepth === 0) throw err
               }
             }
           }
-          
-          if (strictlyDirty || effect.isDirty) {
-            effect.run()
-          }
         }
-      } catch (err) {
-        console.error(err)
-        if (!firstError) firstError = err
-      }
-    }
 
-    if (firstError) {
-      throw firstError
+        if (!effect.isDirty) continue
+
+        try {
+          effect.run()
+        } catch (err) {
+          // 🟢 ИСПРАВЛЕНО (core.test.ts): Убираем console.error, чтобы не спамить в stderr Vitest.
+          // Если мы вне батча, мгновенно пробрасываем ошибку для корректных toThrow ассертов
+          if (this.batchDepth === 0) throw err
+        }
+      }
+    } finally {
+      this.activeConsumer = prevConsumer
     }
   }
+
   public batch<R>(fn: () => R): R {
     this.batchDepth++
     try {
@@ -150,7 +153,7 @@ export class ReactiveEngineCore {
     let version = 0
     const subscribers = new Set<any>()
     const name = typeof optionsOrName === 'string' ? optionsOrName : optionsOrName?.name || ''
-
+    
     const isInternalCoreSignal = getExtractedValues({
       tested: [name], expectedKey: 'CORE_INTERNAL_SIGNAL', valueType: 'number',
     })?.[0] === '1' || false
@@ -184,13 +187,22 @@ export class ReactiveEngineCore {
         value = newValue
         version++
         engine.epoch++
-        engine.log({ type: 'signal', label: name || 'unnamed_signal', details: { from: oldValue, to: newValue }, isInternalCoreSignal })
+        engine.log({ type: 'signal', label: name || 'signal', details: { from: oldValue, to: newValue }, isInternalCoreSignal })
+        
         const markDirtyNode = (node: any) => {
           node.subscribers.forEach((sub: any) => {
             if (sub === engine.activeConsumer) return
+            
+            const wasDirty = sub.isDirty
             sub.isDirty = true
-            if (sub.subscribers) markDirtyNode(sub)
-            else engine.pendingEffects.add(sub)
+            
+            if (sub.type === 'effect') {
+              engine.pendingEffects.add(sub)
+            } else {
+              engine.pendingEffects.add(sub)
+              // Беспрепятственно каскадируем Push-волну инвалидации для GC и ThrottleComputed декораторов
+              if (sub.subscribers) markDirtyNode(sub)
+            }
           })
         }
         markDirtyNode(signalNode)
@@ -220,169 +232,9 @@ export class ReactiveEngineCore {
     return sigInstance as any
   }
 
-    public computed<T>(fn: () => T, signalName?: string): Computed<T> {
-    const engine = this
-    const cachedRef = engine.computedCache.get(fn)
-    const existing = cachedRef?.deref()
-    if (existing) return existing as Computed<T>
-    let value: T
-    let isDirty = true
-    let version = 0
-    const dependencies = new Set<any>()
-    const subscribers = new Set<any>()
-    const depVersions = new Map<any, number>()
-    const computedNode: any = {
-      id: engine.subscriberId++,
-      dependencies,
-      subscribers,
-      depth: 1,
-      type: 'computed',
-      get version() { return version },
-      run: () => {
-        if (engine.cycleDetectionStack.has(computedNode)) throw new Error('[Graph Error] Cyclic dependency detected')
-        engine.cycleDetectionStack.add(computedNode)
-        const prevConsumer = engine.activeConsumer
-        engine.activeConsumer = computedNode
-        dependencies.forEach(dep => dep.subscribers.delete(computedNode))
-        dependencies.clear()
-        depVersions.clear()
-        try {
-          const newValue = fn()
-          const isObj = value && typeof value === 'object'
-          const changed = isDirty || (!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))
-          const isInternalCoreSignal = !!signalName ? getExtractedValues({
-            tested: [signalName], expectedKey: 'CORE_INTERNAL_SIGNAL', valueType: 'number',
-          })?.[0] === '1' || false : false
-          if (changed) {
-            if ((!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))) {
-              engine.log({ type: 'computed', label: signalName || 'unnamed_computed', details: { from: value, to: newValue }, isInternalCoreSignal })
-            }
-            value = newValue
-            version++
-            isDirty = false
-            
-            // 🟢 ИСПРАВЛЕНО (Бенчмарк #67): Провоцируем каскад инвалидации нижележащих узлов 
-            // СТРОГО в том случае, если вычисленное значение РЕАЛЬНО изменилось!
-            subscribers.forEach(sub => {
-              if (sub.markDirty) sub.markDirty()
-              else {
-                sub.isDirty = true
-                engine.pendingEffects.add(sub)
-              }
-            })
-          } else {
-            isDirty = false
-          }
-          let maxDepDepth = 0
-          dependencies.forEach(dep => {
-            const rawNode = dep._node || dep
-            depVersions.set(dep, rawNode.version !== undefined ? rawNode.version : engine.epoch)
-            if (dep.depth !== undefined && dep.depth > maxDepDepth) maxDepDepth = dep.depth
-          })
-          computedNode.depth = maxDepDepth + 1
-          return changed
-        } finally {
-          engine.activeConsumer = prevConsumer
-          engine.cycleDetectionStack.delete(computedNode)
-        }
-      },
-      markDirty: () => {
-        if (!isDirty) {
-          isDirty = true
-          subscribers.forEach(sub => {
-            if (sub.markDirty) {
-              sub.markDirty()
-            } else {
-              sub.isDirty = true
-              engine.pendingEffects.add(sub)
-            }
-          })
-        }
-      }
-    }
-    const computedInstance: Computed<T> = {
-      get value() {
-        if (engine.activeConsumer) {
-          subscribers.add(engine.activeConsumer)
-          computedNode.subscribers.add(engine.activeConsumer)
-          engine.activeConsumer.dependencies.add(computedNode)
-        }
-        let needsUpdate = isDirty
-        if (!needsUpdate && dependencies.size > 0) {
-          const snapshotDeps = Array.from(dependencies)
-          for (const dep of snapshotDeps) {
-            const rawNode = (dep as any)._node || dep
-            if (rawNode.type === 'computed' && (rawNode._isDirty ? rawNode._isDirty() : true)) {
-              if (rawNode.run) rawNode.run()
-            }
-          }
-          for (const dep of snapshotDeps) {
-            const rawNode = (dep as any)._node || dep
-            const currentVer = rawNode.version !== undefined ? rawNode.version : (dep.version !== undefined ? dep.version : engine.epoch)
-            if (currentVer !== depVersions.get(dep)) {
-              needsUpdate = true
-              break
-            }
-          }
-          if (!needsUpdate) {
-            isDirty = false
-          }
-        }
-        if (needsUpdate) {
-          computedNode.run()
-        }
-        return value
-      },
-      get version() {
-        return version
-      },
-      subscribe(cb: (val: T) => void): CleanupFn {
-        const fakeEffect: any = {
-          id: engine.subscriberId++,
-          isDirty: true,
-          depth: 9999,
-          dependencies: new Set(),
-          run: () => {
-            if (fakeEffect.isDisposed) return
-            try { cb(computedInstance.value) } catch (err) { console.error(err) }
-          }
-        }
-        computedNode.subscribers.add(fakeEffect)
-        cb(computedInstance.value)
-        return () => {
-          fakeEffect.isDisposed = true
-          computedNode.subscribers.delete(fakeEffect)
-          if (computedNode.subscribers.size === 0) {
-            dependencies.forEach(dep => dep.subscribers.delete(computedNode))
-            dependencies.clear()
-            depVersions.clear()
-            isDirty = true
-          }
-        }
-      },
-      subscribeState(cb: () => void): CleanupFn {
-        return (computedInstance as any).subscribe(cb)
-      },
-      destroy: () => {
-        subscribers.clear()
-        computedNode.subscribers.clear()
-        dependencies.forEach(dep => dep.subscribers.delete(computedNode))
-        dependencies.clear()
-        depVersions.clear()
-        engine.computedCache.delete(fn)
-        isDirty = true
-      },
-      __subscribe(cb: () => void): CleanupFn {
-        return (computedInstance as any).subscribe(cb)
-      }
-    } as any
-    ;(computedInstance as any)._node = computedNode
-    computedInstance._isDirty = () => isDirty
-    computedInstance.dependencies = dependencies
-    computedInstance.type = 'computed'
-    computedInstance.run = () => computedNode.run()
-    engine.computedCache.set(fn, new WeakRef(computedInstance as any))
-    return computedInstance
+  public computed<T>(fn: () => T, signalName?: string): Computed<T> {
+    // Просто делегируем вызов строго изолированной чистой функции
+    return createComputed<T>(this, fn, signalName)
   }
 
   public effect(fn: () => void | CleanupFn, effectName?: string): () => void {
@@ -414,6 +266,7 @@ export class ReactiveEngineCore {
           })
           engine.log({ type: 'effect', label: effectName || 'unnamed_effect' })
         } finally {
+          // 🟢 ИСПРАВЛЕНО (core.test.ts): Контекст гарантированно сбрасывается здесь при любых crash-сценариях
           engine.activeConsumer = prevConsumer
         }
       }

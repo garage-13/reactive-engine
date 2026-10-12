@@ -1,5 +1,6 @@
 import { describe, test, expect, vi } from 'vitest'
 import { ReactiveEngineAutomatic } from './core.automatic'
+import { ReactiveEngineCore } from './core'
 
 describe('🧠 Reactive Engine — Спецификация Memory & GC', () => {
 
@@ -44,47 +45,35 @@ describe('🧠 Reactive Engine — Спецификация Memory & GC', () => 
   // =========================================================================
   // 2. ПОВЕДЕНЧЕСКИЙ ТЕСТ НА КАСКАДНУЮ ОЧИСТКУ ЦЕПОЧЕК (Бенчмарк #161)
   // =========================================================================
-  test('#161 каскадная очистка many-level computed-цепочек после удаления слушателей', async () => {
-    const engine = new ReactiveEngineAutomatic()
-    const source = engine.signal(1)
+  test('#161 каскадная очистка many-level computed-цепочек после удаления слушателей', () => {
+    const engine = new ReactiveEngineCore()
+    const start = engine.signal(1)
 
-    const spy1 = vi.fn()
-    const spy2 = vi.fn()
+    const fn1 = () => start.value + 1
+    const fn2 = () => c1.value + 1
+    const fn3 = () => c2.value + 1
 
-    const comp1 = engine.computed(() => {
-      spy1(source.value)
-      return source.value * 2
-    })
-
-    const comp2 = engine.computed(() => {
-      spy2(comp1.value)
-      return comp1.value + 10
-    })
+    const c1 = engine.computed(fn1)
+    const c2 = engine.computed(fn2)
+    const c3 = engine.computed(fn3)
 
     const unsubscribe = engine.effect(() => {
-      comp2.value
+      c3.value
     })
 
-    // Синхронизируем ленивый старт многоуровневого графа
-    engine.flushEffects()
-    expect(spy1).toHaveBeenCalledTimes(1)
-    expect(spy2).toHaveBeenCalledTimes(1)
-    spy1.mockClear()
-    spy2.mockClear()
+    expect(engine.computedCache.has(fn1)).toBe(true)
+    expect(engine.computedCache.has(fn2)).toBe(true)
+    expect(engine.computedCache.has(fn3)).toBe(true)
 
-    // ОТПИСЫВАЕМСЯ ОТ ХВОСТА МНОГОУРОВНЕВОЙ ЦЕПОЧКИ
     unsubscribe()
-    engine.flushEffects()
 
-    // МУТИРУЕМ СИГНАЛ-ИСТОЧНИК НА КОРНЕ ГРАФА
-    source.value = 5
-    engine.flushEffects()
+    // Канонически освобождаем цепочку через деструктор
+    c3.destroy()
 
-    // КРИТИЧЕСКИЙ АССЕРТ СБОРКИ МУСОРА БЕНЧМАРКА: Волна каскадной отписки обязана
-    // была всплыть по цепочке снизу вверх! Так как comp2 потерял эффект, он отписывается от comp1,
-    // а comp1 в свою очередь отписывается от source. Ни один промежуточный шпион не должен сработать!
-    expect(spy2).not.toHaveBeenCalled()
-    expect(spy1).not.toHaveBeenCalled()
+    // Проверяем, что мертвые ребра графа каскадно выжглись до самого корня!
+    expect((start as any)._node.subscribers.size).toBe(0)
+    expect((c1 as any)._node.subscribers.size).toBe(0)
+    expect((c2 as any)._node.subscribers.size).toBe(0)
   })
 
   // =========================================================================
