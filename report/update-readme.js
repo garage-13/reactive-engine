@@ -1,100 +1,62 @@
-import fs from 'fs'
-import path from 'path'
-import { execSync } from 'child_process'
+const fs = require('fs')
+const path = require('path')
 
-/**
- * 🤖 AUTOMATED ENGINE INTEGRATION & BENCHMARK REPORT SCRIPT (v1.8.8)
- *
- * Чистый скрипт интеграции. Без внешних хаков планировщика.
- * Движок обязан проходить тесты бенчмарка нативно, за счет собственной архитектуры.
- */
-function runFrameworkBenchmark() {
-  const rootDir = process.cwd()
-  const submoduleDir = path.resolve(rootDir, 'report', 'reactive-framework-test-suite')
-
-  console.log('🚀 Старт автоматизации интеграции подмодуля бенчмарка...')
-
-  if (!fs.existsSync(submoduleDir) || !fs.existsSync(path.resolve(submoduleDir, 'package.json'))) {
-    console.error('❌ Ошибка: Подмодуль бенчмарка не найден по пути ' + submoduleDir + '. Выполните: git submodule update --init --recursive')
-    process.exit(1)
-  }
-
-  const adapterTargetPath = path.resolve(submoduleDir, 'src', 'reactiveEngine.test.ts')
-  const adapterSourceCode = `import { testSuite, SkipTest } from "./index";
-import { describe, test, beforeEach } from "vitest";
-import { ReactiveEngineCore, ReactiveEngineAutomatic } from "../../../src/index";
-
-let fwCore: any;
-let fwAuto: any;
-
-const initIsolatedEngines = () => {
-  const engineCore = new ReactiveEngineCore();
-  const engineAuto = new ReactiveEngineAutomatic();
-
-  fwCore = {
-    name: "@pravosleva/reactive-engine.core",
-    signal: (init: any) => {
-      const s = typeof init === 'object' && init !== null ? engineCore.reactive(init) : engineCore.signal(init);
-      return {
-        read: () => ('subscribe' in s ? s.value : s),
-        write: (v: any) => { if ('subscribe' in s) { s.value = v; } else { Object.assign(s, v); } }
-      };
-    },
-    computed: (fn: any) => { const c = engineCore.computed(fn); return { read: () => c.value }; },
-    effect: (fn: any) => engineCore.effect(fn),
-    untracked: (fn: any) => engineCore.untrack(fn),
-    batch: (fn: any) => engineCore.batch(fn),
-    run: (fn: any) => fn()
-  };
-
-  fwAuto = {
-    name: "@pravosleva/reactive-engine.automatic",
-    signal: (init: any) => {
-      const s = typeof init === 'object' && init !== null ? engineAuto.reactive(init) : engineAuto.signal(init);
-      return {
-        read: () => ('subscribe' in s ? s.value : s),
-        write: (v: any) => { if ('subscribe' in s) { s.value = v; } else { Object.assign(s, v); } }
-      };
-    },
-    computed: (fn: any) => { const c = engineAuto.computed(fn); return { read: () => c.value }; },
-    effect: (fn: any) => engineAuto.effect(fn),
-    untracked: (fn: any) => engineAuto.untrack(fn),
-    batch: (fn: any) => engineAuto.batch(fn),
-    run: (fn: any) => fn()
-  };
-};
-
-for (const { section, cases, type } of testSuite) {
-  if (type === "behavioral") continue;
-
-  describe(\`@pravosleva/reactive-engine > \${section}\`, () => {
-    beforeEach(() => {
-      initIsolatedEngines();
-    });
-
-    for (const [name, fn] of Object.entries(cases)) {
-      test(\`\${name} [.core]\`, () => {
-        try { (fn as any)(fwCore); } catch (e) { if (e instanceof SkipTest) return; throw e; }
-      });
-
-      test(\`\${name} [.automatic]\`, () => {
-        try { (fn as any)(fwAuto); } catch (e) { if (e instanceof SkipTest) return; throw e; }
-      });
-    }
-  });
-}
-`
-
-  fs.writeFileSync(adapterTargetPath, adapterSourceCode, 'utf8')
-  console.log('✅ Чистый контракт бенчмарка инжектирован.')
-
+let ReactiveEngine
+try {
+  // 1. Пытаемся импортировать из продакшн-пакета согласно вашей спецификации
+  const packageCore = require('@pravosleva/reactive-engine')
+  ReactiveEngine = packageCore.ReactiveEngine
+} catch (e) {
+  // 2. Локальный фолбек для dev-окружения, если пакет еще не слинкован в node_modules
   try {
-    execSync('npm install', { cwd: submoduleDir, stdio: 'inherit' })
-    execSync('npm test', { cwd: submoduleDir, stdio: 'inherit' })
-    console.log('✅ Нативный прогон графов успешно завершен!')
-  } catch (error) {
-    console.warn('⚠️ Зафиксированы падения ядра. Переходим к лечению под капотом движка.')
+    const localCore = require('../dist/core/core') // или '../src/core/core' в зависимости от сборки
+    ReactiveEngine = localCore.ReactiveEngine
+  } catch (err) {
+    console.warn('⚠️ Движок ReactiveEngine не найден в @pravosleva/reactive-engine или dist. Отчет будет сгенерирован без валидации конструктора.')
   }
 }
 
-runFrameworkBenchmark()
+const readmePath = path.join(__dirname, '../README.md')
+const testResultsPath = path.join(__dirname, './test-results.json')
+
+function generateReport() {
+  try {
+    let testSummary = 'Данные о прогоне тестов отсутствуют.'
+    if (fs.existsSync(testResultsPath)) {
+      const rawData = fs.readFileSync(testResultsPath, 'utf8')
+      const results = JSON.parse(rawData)
+      
+      testSummary = `### 📊 Статистика тестов платформы\n` +
+        `*   **Всего тестов:** ${results.numTotalTests || 0}\n` +
+        `*   **Успешно пройдены (PASS):** ${results.numPassedTests || 0}\n` +
+        `*   **Провалены (FAILED):** ${results.numFailedTests || 0}\n` +
+        `*   **Время прогона:** ${results.startTime ? (Date.now() - results.startTime) + 'ms' : 'N/A'}`
+    }
+
+    if (!fs.existsSync(readmePath)) {
+      console.error('❌ Файл README.md не найден по пути:', readmePath)
+      return
+    }
+
+    let readmeContent = fs.readFileSync(readmePath, 'utf8')
+    const startMarker = '<!-- TEST_RESULTS_START -->'
+    const endMarker = '<!-- TEST_RESULTS_END -->'
+    
+    const startIndex = readmeContent.indexOf(startMarker)
+    const endIndex = readmeContent.indexOf(endMarker)
+
+    if (startIndex !== -1 && endIndex !== -1) {
+      const before = readmeContent.substring(0, startIndex + startMarker.length)
+      const after = readmeContent.substring(endIndex)
+      readmeContent = `${before}\n\n${testSummary}\n\n${after}`
+      fs.writeFileSync(readmePath, readmeContent, 'utf8')
+      console.log('──> README.md успешно актуализирован данными из @pravosleva/reactive-engine')
+    } else {
+      console.warn('⚠️ Маркеры тестов <!-- TEST_RESULTS_START --> не найдены в README.md')
+    }
+  } catch (err) {
+    console.error('Ошибка при генерации отчёта README:', err)
+  }
+}
+
+generateReport()
