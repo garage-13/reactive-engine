@@ -62,7 +62,7 @@ export const Example200 = () => {
       </div>
       <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
         <span>{loading ? '🟡 loading...' : !!data ? '🟢 ok' : !!error ? '🔴 err' : '⚪'}</span>
-        {!!error?.message && <em>{error?.message}</em>}
+        {!!error && <em>{error}</em>}
       </div>
       <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data }, null, 2)}</pre>
     </div>

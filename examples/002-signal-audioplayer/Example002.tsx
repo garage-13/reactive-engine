@@ -72,7 +72,7 @@ export const AudioPlayerExample = () => {
 
           {error && (
             <div style={{ color: '#ef5350', width: '100%', textAlign: 'center' }}>
-              Error: {error.message}
+              Error: {error}
             </div>
           )}
 

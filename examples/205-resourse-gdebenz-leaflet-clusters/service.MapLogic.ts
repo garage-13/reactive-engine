@@ -3,7 +3,8 @@ import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import { AbstractService, withDebounce, withStaleWhileRevalidate } from '@pravosleva/reactive-engine'
+import { AbstractService } from '../../src/core'
+import { withDebounce, withStaleWhileRevalidate } from '../../src/decorators'
 
 export interface Station {
   id: number
@@ -43,7 +44,6 @@ export class MapLogic extends AbstractService {
     }
   )
 
-  private validStationsSignal = this.createSignal<Station[]>([], 'map:signal:valid-stations')
   private markerCache = new Map<number, L.Marker>()
   private displayedMarkers = new Set<L.Marker>()
 
@@ -58,37 +58,13 @@ export class MapLogic extends AbstractService {
   private effectCleanup: (() => void) | null = null
   private globalPopup: L.Popup | null = null
 
-  public markers = this.engine.computed<L.Marker[]>(() => {
-    const stations = this.validStationsSignal.value
-
-    const currentIds = new Set(stations.map(s => s.id))
-    for (const cachedId of this.markerCache.keys()) {
-      if (!currentIds.has(cachedId)) {
-        this.markerCache.delete(cachedId)
-      }
-    }
-
-    return stations
-      .filter(station => station.lat && station.lng)
-      .map(station => {
-        if (this.markerCache.has(station.id)) {
-          return this.markerCache.get(station.id)!
-        }
-
-        // Мы НЕ вызываем .bindPopup() на самом маркере.
-        // Маркер остается «чистым» для плагина кластеризации, что исключает любые Race Conditions.
-        const newMarker = L.marker([station.lat, station.lng])
-
-        // Перехватываем клик по маркеру
-        newMarker.on('click', (e) => {
-          L.DomEvent.stopPropagation(e)
-          this.openGlobalPopupForStation(station)
-        })
-
-        this.markerCache.set(station.id, newMarker)
-        return newMarker
-      })
-  }, 'map:computed:markers')
+  // Ленивый компьютед возвращает ТОЛЬКО чистые отфильтрованные данные станций из ресурса,
+  // полностью исключая Race Conditions и создание тяжелых DOM-объектов Leaflet внутри графа
+  public validMarkersData = this.engine.computed<Station[]>(() => {
+    const resData = this.stationsResource.data
+    if (!resData || !Array.isArray(resData)) return []
+    return resData.filter(station => station.lat && station.lng)
+  }, 'map:computed:valid-stations-data')
 
   public initializeMap = (container: HTMLDivElement) => {
     if (this.map) return
@@ -102,13 +78,11 @@ export class MapLogic extends AbstractService {
       attribution: '© OpenStreetMap contributors'
     }).addTo(this.map)
 
-    // Создаем независимый инстанс глобального попапа
     this.globalPopup = L.popup({
       autoClose: false,
       closeOnClick: false
     })
 
-    // Следим за тем, когда пользователь закрывает попап крестиком
     this.map.on('popupclose', (e) => {
       if (e.popup === this.globalPopup) {
         this.activeStationId.value = null
@@ -122,13 +96,11 @@ export class MapLogic extends AbstractService {
       chunkedLoading: true
     })
 
-    // Перехватываем клики по маркерам, даже когда они находятся внутри нераскрытых кластеров
     this.clusterGroup.on('click', (a) => {
       const marker = a.layer as L.Marker
-      // Ищем станцию по координатам маркера в кэше
       for (const [id, cachedMarker] of this.markerCache.entries()) {
         if (cachedMarker === marker) {
-          const stations = this.validStationsSignal.value
+          const stations = this.validMarkersData.value
           const targetStation = stations.find(s => s.id === id)
           if (targetStation) {
             this.openGlobalPopupForStation(targetStation)
@@ -141,19 +113,38 @@ export class MapLogic extends AbstractService {
     this.map.addLayer(this.clusterGroup)
     this.map.on('moveend', this.handleMapMoveEnd)
 
-    this.engine.effect(() => {
-      const resData = this.stationsResource.data
-      if (resData && Array.isArray(resData)) {
-        this.validStationsSignal.value = resData
-      }
-    }, 'map:effect:sync-resource-to-signal')
-
+    // Императивная синхронизация маркеров Leaflet с реактивными данными кадра
+    // выполняется строго внутри изолированного эффекта, гарантируя O(1) доступ и защиту стека
     if (!this.effectCleanup) {
       this.effectCleanup = this.engine.effect(() => {
-        this.syncClusterLayers(this.markers.value)
+        const stations = this.validMarkersData.value
+        const nextMarkers: L.Marker[] = []
+
+        const currentIds = new Set(stations.map(s => s.id))
+        for (const cachedId of this.markerCache.keys()) {
+          if (!currentIds.has(cachedId)) {
+            this.markerCache.delete(cachedId)
+          }
+        }
+
+        stations.forEach(station => {
+          if (this.markerCache.has(station.id)) {
+            nextMarkers.push(this.markerCache.get(station.id)!)
+            return
+          }
+
+          const newMarker = L.marker([station.lat, station.lng])
+          newMarker.on('click', (e) => {
+            L.DomEvent.stopPropagation(e)
+            this.openGlobalPopupForStation(station)
+          })
+
+          this.markerCache.set(station.id, newMarker)
+          nextMarkers.push(newMarker)
+        })
+
+        this.syncClusterLayers(nextMarkers)
       }, 'map:effect:sync-markers')
-    } else {
-      this.syncClusterLayers(this.markers.value)
     }
 
     // Реактивный эффект для удержания попапа на карте при обновлении данных
@@ -161,13 +152,12 @@ export class MapLogic extends AbstractService {
       const activeId = this.activeStationId.value
       if (!activeId || !this.map || !this.globalPopup) return
 
-      const stations = this.validStationsSignal.value
+      const stations = this.validMarkersData.value
       const currentActiveStation = stations.find(s => s.id === activeId)
 
-      // Если станция всё еще есть в активном bbox — гарантируем, что попап открыт
       if (currentActiveStation) {
         this.globalPopup
-          .setLatLng([currentActiveStation.lat, currentActiveStation.lng || currentActiveStation.lng])
+          .setLatLng([currentActiveStation.lat, currentActiveStation.lng])
           .setContent(`<b>${currentActiveStation.title || currentActiveStation.name}</b><br>ID: ${currentActiveStation.id}`)
 
         if (!this.map.hasLayer(this.globalPopup)) {
@@ -177,7 +167,6 @@ export class MapLogic extends AbstractService {
     }, 'map:effect:keep-popup-alive')
   }
 
-  // Логика открытия глобального независимого попапа
   private openGlobalPopupForStation(station: Station) {
     if (!this.map || !this.globalPopup) return
 
@@ -206,11 +195,9 @@ export class MapLogic extends AbstractService {
     this.globalPopup = null
     this.markerCache.clear()
     this.displayedMarkers.clear()
-    this.validStationsSignal.value = []
     this.activeStationId.value = null
   }
 
-  // Чистый, стандартный метод синхронизации слоев без костылей с вырезанием маркеров
   private syncClusterLayers(nextMarkers: L.Marker[]) {
     if (!this.clusterGroup || !this.map) return
 

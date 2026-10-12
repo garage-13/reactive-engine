@@ -19,7 +19,7 @@ export const MapExample = () => {
   // Достаем состояние ресурса АЗС для декларативного отображения статуса в UI
   const { loading, error } = useReactiveValue(logic.stationsResource)
 
-  const markersCount = engine.use(logic.markers).length // По аналогии с Example100
+  const markersCount = engine.use(logic.validMarkersData).length// По аналогии с Example100
 
   /**
    * Callback Ref для управления жизненным циклом DOM-ноды карты.

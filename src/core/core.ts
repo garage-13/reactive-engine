@@ -20,7 +20,13 @@ let currentTransaction: TransactionContext | null = null
 function safeValueToString(value: unknown): string {
   if (value === null) return 'null'
   if (value === undefined) return 'undefined'
-  if (typeof value === 'object') return JSON.stringify(value)
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch (e) {
+      return '[Cyclic Object or Layer]'
+    }
+  }
   return String(value)
 }
 export function queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
@@ -100,12 +106,9 @@ export class ReactiveEngineCore {
       if (this.batchDepth === 0) this.flushEffects()
     }
   }
-  private log ({ type, label, details }: { type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown } }) {
+  private log ({ type, label, details, isInternalCoreSignal = false }: { type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }, isInternalCoreSignal?: boolean }) {
     const isEnabled = this.logger.isEnabled
     const isCoreOptimizationDebugEnabled = this.logger.isCoreOptimizationDebugEnabled
-    const isInternalCoreSignal = getExtractedValues({
-      tested: [label], expectedKey: 'CORE_INTERNAL_SIGNAL', valueType: 'number',
-    })?.[0] === '1' || false
     if (isEnabled) {
       if (isInternalCoreSignal) {
         if (isCoreOptimizationDebugEnabled) queueLog(type, label, details)
@@ -118,6 +121,11 @@ export class ReactiveEngineCore {
     let version = 0
     const subscribers = new Set<any>()
     const name = typeof optionsOrName === 'string' ? optionsOrName : optionsOrName?.name || ''
+
+    const isInternalCoreSignal = getExtractedValues({
+      tested: [name], expectedKey: 'CORE_INTERNAL_SIGNAL', valueType: 'number',
+    })?.[0] === '1' || false
+
     const signalNode = {
       subscribers,
       id: engine.subscriberId++,
@@ -147,7 +155,7 @@ export class ReactiveEngineCore {
         value = newValue
         version++
         engine.epoch++
-        engine.log({ type: 'signal', label: name || 'signal', details: { from: oldValue, to: newValue } })
+        engine.log({ type: 'signal', label: name || 'unnamed_signal', details: { from: oldValue, to: newValue }, isInternalCoreSignal })
         const markDirtyNode = (node: any) => {
           node.subscribers.forEach((sub: any) => {
             if (sub === engine.activeConsumer) return
@@ -182,6 +190,7 @@ export class ReactiveEngineCore {
     ;(sigInstance as any)._node = signalNode
     return sigInstance as any
   }
+
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
     const engine = this
     const cachedRef = engine.computedCache.get(fn)
@@ -212,9 +221,12 @@ export class ReactiveEngineCore {
           const newValue = fn()
           const isObj = value && typeof value === 'object'
           const changed = isDirty || (!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))
+          const isInternalCoreSignal = !!signalName ? getExtractedValues({
+            tested: [signalName], expectedKey: 'CORE_INTERNAL_SIGNAL', valueType: 'number',
+          })?.[0] === '1' || false : false
           if (changed) {
             if ((!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))) {
-              engine.log({ type: 'computed', label: signalName || 'unnamed_computed', details: { from: value, to: newValue } })
+              engine.log({ type: 'computed', label: signalName || 'unnamed_computed', details: { from: value, to: newValue }, isInternalCoreSignal })
             }
             value = newValue
             version++
@@ -410,7 +422,10 @@ export class ReactiveEngineCore {
           signalsMap.set(prop, sig)
         }
         const val = sig.value
-        if (engine.activeConsumer) engine.log({ type: 'reactive', label: `Read ${name || ''}.${String(prop)}`, details: { to: val } })
+        const isInternalCoreSignal = !!name ? getExtractedValues({
+          tested: [name], expectedKey: 'CORE_INTERNAL_SIGNAL', valueType: 'number',
+        })?.[0] === '1' || false : false
+        if (engine.activeConsumer) engine.log({ type: 'reactive', label: `Read ${name || ''}.${String(prop)}`, details: { to: val }, isInternalCoreSignal })
         if (val !== null && typeof val === 'object') return engine.reactive(val, name ? `${name}.${String(prop)}` : String(prop))
         return val
       },
