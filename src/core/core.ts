@@ -1,6 +1,11 @@
 import { getExtractedValues } from '../utils/getExtractedValues'
 import { Signal, Computed, IEffect, EngineLoggerOptions, LogEventType, CleanupFn, TransactionContext, LogRecord, SignalOptions, ResourceOptions, ResourceState, Resource } from './types'
 import { createComputed } from './core.method.computed'
+import { createSignal } from './core.method.signal'
+import { executeBatch } from './core.method.batch'
+import { executeUntrack } from './core.method.untrack'
+import { createReactive } from './core.method.reactive'
+import { createEffect } from './core.method.effect'
 
 // Тип для конструктора класса
 type Constructor<T> = new (...args: any[]) => T
@@ -83,12 +88,15 @@ export class ReactiveEngineCore {
   private proxyTargets = new WeakSet<object>()
   private reactiveSignals = new WeakMap<object, Map<string | symbol, any>>()
   private cycleDetectionStack = new Set<unknown>()
+
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
   }
+
   public queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
     queueLog(type, label, details)
   }
+
   public flushEffects(): void {
     if (this.batchDepth > 0) return
     const effects = Array.from(this.pendingEffects)
@@ -129,15 +137,10 @@ export class ReactiveEngineCore {
     }
   }
 
-  public batch<R>(fn: () => R): R {
-    this.batchDepth++
-    try {
-      return fn()
-    } finally {
-      this.batchDepth--
-      if (this.batchDepth === 0) this.flushEffects()
-    }
+  public batch<T>(fn: () => T): T {
+    return executeBatch<T>(this, fn)
   }
+
   private log ({ type, label, details, isInternalCoreSignal = false }: { type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }, isInternalCoreSignal?: boolean }) {
     const isEnabled = this.logger.isEnabled
     const isCoreOptimizationDebugEnabled = this.logger.isCoreOptimizationDebugEnabled
@@ -147,89 +150,9 @@ export class ReactiveEngineCore {
       } else queueLog(type, label, details)
     }
   }
-  public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
-    const engine = this
-    let value = initialValue
-    let version = 0
-    const subscribers = new Set<any>()
-    const name = typeof optionsOrName === 'string' ? optionsOrName : optionsOrName?.name || ''
-    
-    const isInternalCoreSignal = getExtractedValues({
-      tested: [name], expectedKey: 'CORE_INTERNAL_SIGNAL', valueType: 'number',
-    })?.[0] === '1' || false
 
-    const signalNode = {
-      subscribers,
-      id: engine.subscriberId++,
-      depth: 0,
-      type: 'signal',
-      get version() { return version }
-    }
-    const sigInstance = {
-      get value() {
-        if (engine.activeConsumer) {
-          subscribers.add(engine.activeConsumer)
-          engine.activeConsumer.dependencies.add(signalNode)
-        }
-        return value
-      },
-      set value(newValue: T) {
-        const isObj = value && typeof value === 'object'
-        if (value === newValue && !isObj) return
-        if (optionsOrName && typeof optionsOrName === 'object' && optionsOrName.validate) {
-          const validation = optionsOrName.validate(newValue)
-          if (validation !== true) {
-            console.error(typeof validation === 'string' ? validation : '[Validation Error]')
-            return
-          }
-        }
-        const oldValue = value
-        value = newValue
-        version++
-        engine.epoch++
-        engine.log({ type: 'signal', label: name || 'signal', details: { from: oldValue, to: newValue }, isInternalCoreSignal })
-        
-        const markDirtyNode = (node: any) => {
-          node.subscribers.forEach((sub: any) => {
-            if (sub === engine.activeConsumer) return
-            
-            const wasDirty = sub.isDirty
-            sub.isDirty = true
-            
-            if (sub.type === 'effect') {
-              engine.pendingEffects.add(sub)
-            } else {
-              engine.pendingEffects.add(sub)
-              // Беспрепятственно каскадируем Push-волну инвалидации для GC и ThrottleComputed декораторов
-              if (sub.subscribers) markDirtyNode(sub)
-            }
-          })
-        }
-        markDirtyNode(signalNode)
-        if (engine.batchDepth === 0) engine.flushEffects()
-      },
-      get version() { return version },
-      subscribe(cb: (val: T) => void): CleanupFn {
-        const fakeEffect: any = {
-          id: engine.subscriberId++,
-          isDirty: true,
-          depth: 9999,
-          dependencies: new Set(),
-          run: () => {
-            if (fakeEffect.isDisposed) return
-            try { cb(value) } catch (err) { console.error(err) }
-          }
-        }
-        subscribers.add(fakeEffect)
-        cb(value)
-        return () => {
-          fakeEffect.isDisposed = true
-          subscribers.delete(fakeEffect)
-        }
-      }
-    }
-    ;(sigInstance as any)._node = signalNode
-    return sigInstance as any
+  public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
+    return createSignal<T>(this, initialValue, optionsOrName)
   }
 
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
@@ -238,111 +161,15 @@ export class ReactiveEngineCore {
   }
 
   public effect(fn: () => void | CleanupFn, effectName?: string): () => void {
-    const engine = this
-    const cleanups = new Set<CleanupFn>()
-    const dependencies = new Set<any>()
-    const effectNode: any = {
-      id: engine.subscriberId++,
-      isDirty: true,
-      depth: 1000,
-      dependencies,
-      cleanups,
-      type: 'effect',
-      run: () => {
-        if (effectNode.isDisposed) return
-        if (effectNode === engine.activeConsumer) return
-        const prevConsumer = engine.activeConsumer
-        engine.activeConsumer = effectNode
-        const prevDeps = new Set(dependencies)
-        dependencies.clear()
-        try {
-          cleanups.forEach(cb => { try { cb() } catch (err) { console.error(err) } })
-          cleanups.clear()
-          const cleanup = fn()
-          if (typeof cleanup === 'function') cleanups.add(cleanup)
-          effectNode.isDirty = false
-          prevDeps.forEach(dep => {
-            if (!dependencies.has(dep)) dep.subscribers.delete(effectNode)
-          })
-          engine.log({ type: 'effect', label: effectName || 'unnamed_effect' })
-        } finally {
-          // 🟢 ИСПРАВЛЕНО (core.test.ts): Контекст гарантированно сбрасывается здесь при любых crash-сценариях
-          engine.activeConsumer = prevConsumer
-        }
-      }
-    }
-    effectNode.run()
-    return () => {
-      effectNode.isDisposed = true
-      cleanups.forEach(cb => { try { cb() } catch (err) { console.error(err) } })
-      cleanups.clear()
-      dependencies.forEach(dep => dep.subscribers.delete(effectNode))
-      dependencies.clear()
-      engine.pendingEffects.delete(effectNode)
-    }
+    return createEffect(this, fn, effectName)
   }
 
-  public untrack<R>(fn: () => R): R {
-    const prev = this.activeConsumer
-    this.activeConsumer = null
-    try {
-      return fn()
-    } finally {
-      this.activeConsumer = prev
-    }
+  public untrack<T>(fn: () => T): T {
+    return executeUntrack<T>(this, fn)
   }
 
   public reactive<T extends object>(target: T, name?: string): T {
-    const engine = this
-    if (engine.proxyTargets.has(target)) return target
-    if (engine.proxyCache.has(target)) return engine.proxyCache.get(target)
-    if (!engine.reactiveSignals.has(target)) engine.reactiveSignals.set(target, new Map())
-    const signalsMap = engine.reactiveSignals.get(target)!
-    const handler: ProxyHandler<T> = {
-      get(t: T, prop: string | symbol, receiver: any) {
-        if (prop === '__subscribe' && Array.isArray(t)) {
-          return (cb: () => void) => {
-            let lengthSig = signalsMap.get('length')
-            if (!lengthSig) {
-              lengthSig = engine.signal(t.length)
-              signalsMap.set('length', lengthSig)
-            }
-            return lengthSig.subscribe(cb)
-          }
-        }
-        if (typeof prop === 'symbol' || prop === 'constructor' || prop === 'toJSON') return Reflect.get(t, prop, receiver)
-        let sig = signalsMap.get(prop)
-        if (!sig) {
-          sig = engine.signal(Reflect.get(t, prop))
-          signalsMap.set(prop, sig)
-        }
-        const val = sig.value
-        if (engine.activeConsumer) engine.log({ type: 'reactive', label: `Read ${name || ''}.${String(prop)}`, details: { to: val } })
-        if (val !== null && typeof val === 'object') return engine.reactive(val, name ? `${name}.${String(prop)}` : String(prop))
-        return val
-      },
-      set(t: T, prop: string | symbol, value: any, receiver: any) {
-        const rawValue = engine.proxyTargets.has(value) ? value : value
-        const oldValue = Reflect.get(t, prop)
-        if (oldValue === rawValue && prop !== 'length') return true
-        Reflect.set(t, prop, rawValue)
-        let sig = signalsMap.get(prop)
-        if (!sig) {
-          sig = engine.signal(oldValue)
-          signalsMap.set(prop, sig)
-        }
-        sig.value = rawValue
-        if (Array.isArray(t) && prop !== 'length') {
-          let lengthSig = signalsMap.get('length')
-          if (lengthSig) lengthSig.value = t.length
-        }
-        return true
-      }
-    }
-    const proxy = new Proxy(target, handler)
-    engine.proxyCache.set(target, proxy)
-    engine.proxyTargets.add(proxy)
-    return proxy
+    return createReactive<T>(this, target, name)
   }
 
   public provide<T>(token: InjectionToken<T>, valueOrFactory: T | Factory<T>): void {
