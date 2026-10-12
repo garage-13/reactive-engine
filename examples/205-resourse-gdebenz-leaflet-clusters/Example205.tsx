@@ -75,7 +75,7 @@ export const MapExample = () => {
                 ? '🔴 Ошибка запроса'
                 : '⚪'}
         </span>
-        {error?.message && <em style={{ color: 'red' }}>{error.message}</em>}
+        {error && <em style={{ color: 'red' }}>{error}</em>}
       </div>
     </div>
   )

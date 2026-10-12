@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import baseClasses from '~/ui.common.module.scss'
 import btnClasses from '~/shared/Button/ui.button.module.scss'
 import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
-import { MapLogic, Station } from './service.MapLogic'
+import { MapLogic } from './service.MapLogic'
 import clsx from 'clsx'
 import { Input } from '~/shared/Input'
 import { Select } from '~/shared/Select'
@@ -12,7 +12,7 @@ const engine = new ReactiveEngine()
 export const MapExample = () => {
   const logic = engine.inject(MapLogic)
 
-  const { loading, data: stations, error } = useReactiveValue<{ data: Station[] | null; error: null | Error; loading: boolean }>(logic.stationsResource)
+  const { loading, data: stations, error } = useReactiveValue(logic.stationsResource)
   const selectedStation = engine.use(logic.selectedStation)
   const currentCityId = engine.use(logic.currentCityId)
 
@@ -134,7 +134,7 @@ export const MapExample = () => {
           <span>
             {loading ? '🟡 Получение АЗС...' : stations ? `🟢 Найдено АЗС: ${stations.length}` : error ? '🔴 Ошибка запроса' : '⚪'}
           </span>
-          {error?.message && <em style={{ color: 'red' }}>{error.message}</em>}
+          {error && <em style={{ color: 'red' }}>{error}</em>}
         </div>
       )}
 

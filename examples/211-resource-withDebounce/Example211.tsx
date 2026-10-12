@@ -44,7 +44,7 @@ export const SearchExample = () => {
               ? <span>Печатайте дальше...</span>
               : <span>Печатайте дальше...</span>
         }
-        {error && <span style={{ color: '#ef5350' }}>❌ Ошибка: {error.message}</span>}
+        {error && <span style={{ color: '#ef5350' }}>❌ Ошибка: {error}</span>}
       </div>
 
       {/* Отрендеренный список результатов */}

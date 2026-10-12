@@ -1,5 +1,13 @@
 import { getExtractedValues } from '../utils/getExtractedValues'
 import { Signal, Computed, IEffect, EngineLoggerOptions, LogEventType, CleanupFn, TransactionContext, LogRecord, SignalOptions, ResourceOptions, ResourceState, Resource } from './types'
+
+// Тип для конструктора класса
+type Constructor<T> = new (...args: any[]) => T
+// Тип для фабричной функции зависимостей
+type Factory<T> = (engine: any) => T
+// Универсальный тип токена DI
+type InjectionToken<T> = Constructor<T> | Factory<T> | symbol | string
+
 const badgeColors: Record<LogEventType, string> = {
   signal: 'background: #007acc; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
   computed: 'background: #42b883; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
@@ -12,7 +20,7 @@ let currentTransaction: TransactionContext | null = null
 function safeValueToString(value: unknown): string {
   if (value === null) return 'null'
   if (value === undefined) return 'undefined'
-  if (typeof value === 'object') return JSON.stringify(value) // '{...}'
+  if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
 export function queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
@@ -67,7 +75,7 @@ export class ReactiveEngineCore {
   private proxyCache = new WeakMap<object, any>()
   private proxyTargets = new WeakSet<object>()
   private reactiveSignals = new WeakMap<object, Map<string | symbol, any>>()
-  private cycleDetectionStack = new Set<any>()
+  private cycleDetectionStack = new Set<unknown>()
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
   }
@@ -203,7 +211,6 @@ export class ReactiveEngineCore {
         try {
           const newValue = fn()
           const isObj = value && typeof value === 'object'
-          // -- TODO: Review
           const changed = isDirty || (!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))
           if (changed) {
             if ((!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))) {
@@ -212,7 +219,6 @@ export class ReactiveEngineCore {
             value = newValue
             version++
           }
-          // --
           isDirty = false
           let maxDepDepth = 0
           dependencies.forEach(dep => {
@@ -221,7 +227,6 @@ export class ReactiveEngineCore {
             if (dep.depth !== undefined && dep.depth > maxDepDepth) maxDepDepth = dep.depth
           })
           computedNode.depth = maxDepDepth + 1
-          // engine.log({ type: 'computed', label: signalName || 'computed', details: { to: newValue } })
           return changed
         } finally {
           engine.activeConsumer = prevConsumer
@@ -328,7 +333,7 @@ export class ReactiveEngineCore {
 
   public effect(fn: () => void | CleanupFn, effectName?: string): () => void {
     const engine = this
-    const cleanups = new Set<any>()
+    const cleanups = new Set<CleanupFn>()
     const dependencies = new Set<any>()
     const effectNode: any = {
       id: engine.subscriberId++,
@@ -419,7 +424,6 @@ export class ReactiveEngineCore {
           sig = engine.signal(oldValue)
           signalsMap.set(prop, sig)
         }
-        // engine.log({ type: 'reactive', label: `Update ${name || ''}.${String(prop)}`, details: { from: oldValue, to: rawValue } })
         sig.value = rawValue
         if (Array.isArray(t) && prop !== 'length') {
           let lengthSig = signalsMap.get('length')
@@ -433,13 +437,12 @@ export class ReactiveEngineCore {
     engine.proxyTargets.add(proxy)
     return proxy
   }
-
-  public provide(token: unknown, valueOrFactory: any): void {
+  public provide<T>(token: InjectionToken<T>, valueOrFactory: T | Factory<T>): void {
     this.diRegistry.set(token, valueOrFactory)
     this.diCache.delete(token)
   }
 
-  public inject<T = any>(token: unknown): T {
+  public inject<T>(token: InjectionToken<T>): T {
     if (token === undefined || token === null) throw new Error('[DI Error] Token is empty')
     if (this.diCache.has(token)) return this.diCache.get(token) as T
     if (this.cycleDetectionStack.has(token)) throw new Error('[DI Error] Cyclic dependency detected')
@@ -449,26 +452,26 @@ export class ReactiveEngineCore {
         const entry = this.diRegistry.get(token)
         if (typeof entry === 'function') {
           if ((entry as any)._isMockFunction) {
-            const mockRes = (entry as any)(this)
+            const mockRes = (entry as Function)(this)
             if (mockRes !== undefined) {
               this.diCache.set(token, mockRes)
-              return mockRes
+              return mockRes as T
             }
-            return entry as T
+            return entry as unknown as T
           }
           const str = entry.toString()
           const isClass = str.startsWith('class ') || str.startsWith('class{') || (entry.prototype && entry.prototype.constructor === entry && !str.startsWith('function') && !str.includes('=>'))
           if (!isClass) {
-            const resolved = (entry as (eng: this) => T)(this)
+            const resolved = (entry as Factory<T>)(this)
             this.diCache.set(token, resolved)
             return resolved
           }
-          return entry as T
+          return entry as unknown as T
         }
         return entry as T
       }
       if (typeof token === 'function') {
-        const resolved = new (token as any)(this)
+        const resolved = new (token as Constructor<T>)(this)
         this.diCache.set(token, resolved)
         return resolved
       }
@@ -477,16 +480,7 @@ export class ReactiveEngineCore {
       this.cycleDetectionStack.delete(token)
     }
   }
-  // -- v1.5.x-short (legacy - скоро перепишем) Taken from here: https://github.com/garage-13/reactive-engine/blob/84508b8dfe280a385eb6be284faa03e9fea43099/src/core/core.ts
-  /**
-   * Вспомогательная функция для задержки (sleep), чувствительная к AbortSignal
-   *
-   * Вызов new DOMException('Aborted', 'AbortError') гарантирует,
-   * что ваша кастомная пауза между ретраями this.delay притворяется для движка JavaScript
-   * точно таким же нативным процессом отмены, как и fetch().
-   * Это делает реактивное ядро бесшовным и избавляет от необходимости
-   * писать кучу разных проверок под каждый тип ошибки.
-   */
+
   private delay(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) {
@@ -499,70 +493,14 @@ export class ReactiveEngineCore {
       }, ms)
 
       const onAbort = () => {
-        clearTimeout(timeoutId) // СИНХРОННО УБИВАЕТ ТАЙМЕР. В Vitest это заставит таймер исчезнуть из очереди прокрутки
+        clearTimeout(timeoutId)
         reject(new DOMException('Aborted', 'AbortError'))
       }
 
       signal.addEventListener('abort', onAbort, { once: true })
     })
   }
-  /**
-   * Создание асинхронного ресурса. Типы на входе: <T - формат ответа, S - источник изменений (сигнал либо computed-кортеж из зачений сигналов через конструкцию `.value`)>
-   *
-   * Explained 👉 {@link https://github.com/garage-13/reactive-engine/blob/main/README_EN.md#1-async-resources-dependent-on-multiple-signals}
-   *
-   * @template T, S
-   * @see {@link https://github.com/garage-13/reactive-engine/blob/main/examples/200-resource/Example200.tsx Реализация базового компонента Example200}
-   * @see {@link https://github.com/garage-13/reactive-engine/blob/main/examples/201-multi-resource/service.secondary.ts Сложный пример зависимости ресурсов через computed}
-   * @function resource
-   * @param {Function} fetcher - Асинхронная функция для загрузки данных.
-   * @param {{ value: S }} [source] - Источник данных.
-   * @param {string | ResourceOptions<T>} [optionsOrName] - Имя сигнала или объект конфигурации `{ name: string; validate: (res) => boolean | string; resetDataOnSourceChange?: boolean }`.
-   * @returns {Resource<T>} - Асинхронный ресурс.
-   *
-   * @example
-   * // Базовый вызов со строкой (обратная совместимость):
-   * const res = engine.resource(fetcher, source, 'my-resource-name');
-   *
-   * @example
-   * // Современный вызов с валидацией ответа:
-   * const res = engine.resource(fetcher, source, {
-   *   name: 'my-resource-name',
-   *   resetDataOnSourceChange: true, // true by default
-   *   responseValidate: (data) => !!data || 'Данные пусты', // Проверяйте формат в соотв. с дженериком
-   * });
-   *
-   * @example
-   * // (Экспериментальная фича)
-   * // В теле fetcher можно выкинуть ошибку в виде
-   * // `throw new Error('[THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY=1][MESSAGE=Your msg]')`
-   * // Причина: Особенности внутренней реализации определения харакрера ошибки и необходимость делать retry (если такая опция передана)
-   * // Рекомендуем вместо этого использовать `validateBeforeFetch` в опциях при создании ресурса.
-   * const res = engine.resource(
-   *   async (counterValue, abortSignal) => {
-   *     if (counterValue === 0)
-   *       throw new Error([
-   *         '[THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY=1]', // Иначе запустится механизм retry (напр. по причине отсутствия сети, далее в этом же примере)
-   *         `[MESSAGE=Stop for count value ${counterValue} - excepted from fetcher fn body]`,
-   *       ].join(' '))
-   *     const res = await fetch(
-   *       [
-   *         `${BASE_API_URL}/profile/search`,
-   *         '?',
-   *         [
-   *           `counter=${counterValue}`,
-   *           '_responseDelay=2000',
-   *         ].join('&')
-   *       ].join(''),
-   *       { signal: abortSignal }
-   *     )
-   *     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
-   *     return res.json()
-   *   },
-   *   this.counter,
-   * )
-   * @source
-   */
+
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
     source?: { value: S },
@@ -580,20 +518,16 @@ export class ReactiveEngineCore {
     const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true
     const responseValidate = options.responseValidate
     const validateBeforeFetch = options.validateBeforeFetch
-    // -- NOTE: Hardcoded yet
-    const retryCount = 1
+    const retryCount = 0
     const baseDelay = 1000
     const useExponential = true
     const maxRetryDelay = 1000 * 60 * 5
     const timeoutMs = 1000
-    // --
-    // Оставляем префикс метаданных для внутренней подсистемы логгера
     const state = this.signal<ResourceState<T>>(
       { data: null, loading: true, error: null, isRetrying: false },
       `[CORE_INTERNAL_SIGNAL=1]:resource:state:${resourceSignalName}`
     )
 
-    // Внутренний метод для безопасного обновления стейта и отправки лога
     const updateResourceState = (nextState: ResourceState<T>) => {
       this.log({ type: 'resource', label: resourceSignalName, details: { to: nextState, from: state.value } })
       state.value = nextState
@@ -601,8 +535,7 @@ export class ReactiveEngineCore {
 
     const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
       if (effectSignal.aborted) return
-
-      // const isValid = options.validateBeforeFetch ? options.validateBeforeFetch(sValue) : true;
+      const isValid = options.validateBeforeFetch ? options.validateBeforeFetch(sValue) : true
 
       /**
        * 🧐 WIP_CORE: Есть два пути, ни один не будет ошибкой, если разкомментировать код ниже. Чуть бозже добавлю опци для более тонкой отладки ядра.
@@ -611,31 +544,30 @@ export class ReactiveEngineCore {
        * - НЕАКТИВНО: Более очевидное логирование процессов пре-валидации (выставление ошибок и мониторинг разработчиком)
       */
       // --
-      // if (isValid === false) {
-      //   // Если валидатор вернул строго false — мы тихо блокируем старт фетчера,
-      //   // переводя ресурс в состояние ПОКОЯ (loading: false, error: null).
-      //   // Это полностью ликвидирует генерацию ложных ошибок при монтировании!
-      //   state.value = {
-      //     loading: false,
-      //     data: null,
-      //     error: null, // 🟢 ФИКС: Ошибки нет! Стейт стабилен.
-      //     isRetrying: false
-      //   };
-      //   return;
-      // }
-      // if (typeof isValid === 'string') {
-      //   // Если валидатор вернул строку — это боевая декларативная ошибка валидации формы.
-      //   // Здесь мы честно переводим ресурс в стейт ошибки, как и требовалось ранее.
-      //   state.value = {
-      //     loading: false,
-      //     data: null,
-      //     error: new Error(isValid),
-      //     isRetrying: false
-      //   };
-      //   return;
-      // }
+      if (isValid === false) {
+        // Если валидатор вернул строго false — мы тихо блокируем старт фетчера,
+        // переводя ресурс в состояние ПОКОЯ (loading: false, error: null).
+        // Это полностью ликвидирует генерацию ложных ошибок при монтировании!
+        state.value = {
+          loading: false,
+          data: null,
+          error: null, // Ошибки нет! Стейт стабилен.
+          isRetrying: false
+        }
+        return
+      }
+      if (typeof isValid === 'string') {
+        // Если валидатор вернул строку — это боевая декларативная ошибка валидации формы.
+        // Здесь мы честно переводим ресурс в стейт ошибки, как и требовалось ранее.
+        state.value = {
+          loading: false,
+          data: null,
+          error: 'Core internal stopper',
+          isRetrying: false
+        }
+        return
+      }
       // --
-
       if (validateBeforeFetch) {
         const preValidationResult = validateBeforeFetch(sValue)
         if (preValidationResult === false || typeof preValidationResult === 'string') {
@@ -656,10 +588,6 @@ export class ReactiveEngineCore {
         if (effectSignal.aborted) return
         let combinedSignal = effectSignal
         try {
-          // if (timeoutMs && timeoutMs > 0) {
-          //   const timeoutSignal = AbortSignal.timeout(timeoutMs)
-          //   combinedSignal = AbortSignal.any([effectSignal, timeoutSignal])
-          // }
           const data = await fetcher(sValue, combinedSignal)
           if (effectSignal.aborted) return
           if (combinedSignal.aborted) {
@@ -675,7 +603,6 @@ export class ReactiveEngineCore {
             }
           }
           if (effectSignal.aborted) return
-          // Успешное завершение запроса
           updateResourceState({ data, loading: false, error: null, isRetrying: false })
           return
         } catch (e: unknown) {
@@ -699,7 +626,6 @@ export class ReactiveEngineCore {
                 ? new Error(customValidationErrorMessage, { cause: e })
                 : e
 
-            // Фиксация финальной ошибки
             updateResourceState({
               data: null, loading: false,
               error: finalError instanceof Error ? finalError.message : typeof finalError === 'string' ? finalError : `typeof finalError is ${typeof finalError}`,
@@ -712,7 +638,6 @@ export class ReactiveEngineCore {
             currentDelay = Math.min(currentDelay, maxRetryDelay)
             const jitter = Math.random() * 200
             currentDelay = currentDelay + jitter
-            // Безопасное обновление статуса ретрая с логгированием фазы повтора
             updateResourceState({ data: state.value.data, loading: true, error: null, isRetrying: true })
             const logReason = isTimeout ? 'таймауту' : 'ошибке сети'
             console.warn(`[Resource Retry] "${resourceSignalName}" сбой по ${logReason}. Попытка ${attempt + 1}/${retryCount > 0 ? retryCount + 1 : attempt + 1}...`)
@@ -756,7 +681,6 @@ export class ReactiveEngineCore {
       subscribe: (cb: (val: ResourceState<T>) => void) => state.subscribe(cb)
     }
   }
-  // --
 }
 
 export { ReactiveEngineCore as ReactiveEngine, ReactiveEngineCore as ReactiveEngineAutomatic }

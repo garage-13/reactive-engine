@@ -22,8 +22,8 @@ import { Example117 } from './117-engine-instances-1'
 import { Example118 } from './118-reactive-form-3'
 import { Example200 } from './200-resource'
 import { Example201 } from './201-multi-resource'
-import { Example202 } from './202-resource-exponential-backoff'
-import { Example203 } from './203-resource-timeout'
+// import { Example202 } from './202-resource'
+// import { Example203 } from './203-resource-timeout'
 import { MapExample as Example204 } from './204-resource-gdebenz-leaflet'
 import { MapExample as Example205 } from './205-resourse-gdebenz-leaflet-clusters'
 import { MapExample as Example206 } from './206-resource-gdebenz-leaflet-clusters'
@@ -185,20 +185,20 @@ export const App = () => {
           >
             <Example201 />
           </CardModalWrapper>
-          <CardModalWrapper
-            title='Example 202'
+          {/* <CardModalWrapper
+            title='Example 202 [legacy; resource method should be pure]'
             description='Resource exponential backoff example (incorrect url)'
             footerText='Incorrect url 👉 Retry x3 👉 HTTP error 404'
           >
             <Example202 />
-          </CardModalWrapper>
-          <CardModalWrapper
-            title='Example 203'
+          </CardModalWrapper> */}
+          {/* <CardModalWrapper
+            title='Example 203 [legacy; resource method should be pure]'
             description='Resource timeout example (response delay 15s)'
             footerText='4 requests (1 start + 3 retry) of 2.5 seconds each + ~7 seconds of total sleep in between 👉 Total error after ~17 seconds'
           >
             <Example203 />
-          </CardModalWrapper>
+          </CardModalWrapper> */}
           <CardModalWrapper
             title='Example 204'
             description='Leaflet'

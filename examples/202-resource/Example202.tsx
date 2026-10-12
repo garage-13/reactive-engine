@@ -26,11 +26,7 @@ class Logic extends AbstractService {
     },
     this.counter,
     {
-      name: 'example-202:resource:exp-backoff-exp',
-      retryCount: 3,
-      retryDelay: 1000,
-      isExponentialBackoffEnabled: true,
-      maxRetryDelay: 10000,
+      name: 'example-202:resource',
       validateBeforeFetch: (counterValue) => {
         if (counterValue === 0) {
           return `Not started (pre-validation before fetch) for count value ${counterValue}`
@@ -69,7 +65,7 @@ export const Example202 = () => {
       </div>
       <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
         <span>{loading ? '🟡 loading...' : !!data ? '🟢 ok' : !!error ? '🔴 err' : '⚪'} | isRetrying: {String(isRetrying)}</span>
-        {!!error?.message && <em>{error?.message}</em>}
+        {!!error && <em>{error}</em>}
       </div>
       <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ data }, null, 2)}</pre>
     </div>

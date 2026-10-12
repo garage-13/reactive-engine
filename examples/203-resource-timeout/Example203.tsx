@@ -29,11 +29,13 @@ class Logic extends AbstractService {
     this.counter,
     {
       name: 'example-203:resource:timeout-and-retry',
-      timeout: 2500,               // Прервать запрос, если сервер не отвечает более 2.5 секунд
-      retryCount: 3,               // Сделать до 3 повторных попыток после каждого таймаута
-      retryDelay: 1000,            // Базовая задержка между попытками
-      isExponentialBackoffEnabled: true, // Прогрессивно увеличивать паузу (~1с -> ~2с -> ~4с)
-      maxRetryDelay: 5000,         // Ограничить максимальное время ожидания 5 секундами
+      // -- Legacy
+      // timeout: 2500,               // Прервать запрос, если сервер не отвечает более 2.5 секунд
+      // retryCount: 3,               // Сделать до 3 повторных попыток после каждого таймаута
+      // retryDelay: 1000,            // Базовая задержка между попытками
+      // isExponentialBackoffEnabled: true, // Прогрессивно увеличивать паузу (~1с -> ~2с -> ~4с)
+      // maxRetryDelay: 5000,         // Ограничить максимальное время ожидания 5 секундами
+      // --
       validateBeforeFetch: (counterValue) => {
         if (counterValue === 0) {
           return `Not started (pre-validation before fetch) for count value ${counterValue}`
@@ -90,7 +92,7 @@ export const Example203 = () => {
           </span>
 
           {/* Текст ошибки выводим только тогда, когда движок исчерпал все попытки и окончательно сдался */}
-          {!isRetrying && !!error?.message && <em>{error?.message}</em>}
+          {!isRetrying && !!error && <em>{error}</em>}
         </div>
       </div>
 

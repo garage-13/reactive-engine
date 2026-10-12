@@ -50,7 +50,7 @@ export class LiveNotificationsLogic extends AbstractService {
   public notificationsResource = this.engine.resource<ServerResponse | null, TPollingDeps>(
     withLongPolling(
       async (deps, abortSignal) => {
-        const [isLoopActive, pollingTick, isTabActive] = deps
+        const [_isLoopActive, pollingTick, _isTabActive] = deps
 
         if (!this.isServerOnline.value) {
           this.currentStatus.value = `🚨 Ошибка 502: Нет связи. Буферизируем...`
@@ -121,7 +121,7 @@ export class LiveNotificationsLogic extends AbstractService {
           return 'Некорректная структура JSON ответа'
         }
 
-        const activeSession = this.feedSessionId.value
+        // const activeSession = this.feedSessionId.value
 
         // Сначала жестко проверяем наличие элементов в прилетевшей пачке бэкенда.
         // Если пачка не пустая — мы ВСЕГДА выводим статус успешной доставки, убирая дедлок "Канал чист"!

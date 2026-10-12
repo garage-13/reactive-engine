@@ -34,7 +34,7 @@ export const withThrottleAndCache = <S, T>(
   return (source: S, signal: AbortSignal): Promise<T> => {
     const now = Date.now()
     const remainingTime = limit - (now - lastExecutionTime)
-    const cacheKey = getCacheKey(source)
+    // const cacheKey = getCacheKey(source)
 
     const onAbort = () => {
       if (throttleTimeoutId) { clearTimeout(throttleTimeoutId); throttleTimeoutId = null }
@@ -118,7 +118,7 @@ export class ThrottleCacheLogic extends AbstractService {
    */
   public gridResource = this.engine.resource(
     withThrottleAndCache(
-      async (coords, abortSignal) => {
+      async (coords, _abortSignal) => {
         // Увеличиваем счетчик реальных обращений
         this.fetchCount.value += 1
 

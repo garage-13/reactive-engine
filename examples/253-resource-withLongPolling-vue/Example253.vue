@@ -143,7 +143,7 @@ const error = computed(() => pollingResourceState.value?.error)
       <span>
         Статус: {{ loading ? `🟡 запрос (Такт: ${pollingTick})...` : data ? '🟢 активен' : error ? '🔴 ошибка' : '⚪ спит' }}
       </span>
-      <em v-if="error?.message" style="color: red;">{{ error.message }}</em>
+      <em v-if="error" style="color: red;">{{ error }}</em>
     </div>
 
     <!-- Вывод полученных данных -->

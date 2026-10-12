@@ -86,7 +86,7 @@ const isRetrying = computed(() => apiResourceState.value?.isRetrying)
         {{ loading ? '🟡 loading...' : data ? '🟢 ok' : error ? '🔴 err' : '⚪' }}
         | isRetrying: {{ String(isRetrying) }}
       </span>
-      <em v-if="error?.message">{{ error.message }}</em>
+      <em v-if="error">{{ error }}</em>
     </div>
 
     <pre :class="baseClasses.preNormalizedMin">{{ JSON.stringify({ data }, null, 2) }}</pre>

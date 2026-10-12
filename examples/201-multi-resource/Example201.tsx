@@ -8,7 +8,9 @@ const BASE_API_URL = import.meta.env.VITE_BASE_API_URL
 
 export const Example201 = () => {
   const _userInfo = useUserInfoService()
-  const personList = useR<{ id: number, name: string }[]>(_userInfo.personList)
+  
+  // Убран явный дженерик, тип TPerson[] выводится автоматически из Computed
+  const personList = useR(_userInfo.personList) || []
   const activePersonId = useR(_userInfo.activePersonId)
   const firstlyState = useR(_userInfo.apiState)
 
@@ -35,32 +37,40 @@ export const Example201 = () => {
           Refresh account data
         </button>
         {
-          personList.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => _userInfo.setActivePersonId(p.id)}
-              className={
-                clsx(
-                  btnClasses.btn,
-                  btnClasses.neonBtn,
-                  btnClasses['neonBtn--secondary'],
-                  {
-                    [btnClasses['neonBtn--contained']]: !!activePersonId && p.id === activePersonId,
-                    [btnClasses['neonBtn--outlined']]: p.id !== activePersonId,
-                  },
-                )
-              }
-            >{p.name}</button>
-          ))
+          personList.map((p) => {
+            // Приведение ID к строке (или числу), чтобы исключить ошибку "no overlap" с activePersonId
+            const isCurrentActive = activePersonId !== null && String(p.id) === String(activePersonId)
+
+            return (
+              <button
+                key={p.id}
+                // Передаем значение в соответствии с ожидаемым типом метода (при необходимости String(p.id))
+                onClick={() => _userInfo.setActivePersonId(p.id)}
+                className={
+                  clsx(
+                    btnClasses.btn,
+                    btnClasses.neonBtn,
+                    btnClasses['neonBtn--secondary'],
+                    {
+                      [btnClasses['neonBtn--contained']]: isCurrentActive,
+                      [btnClasses['neonBtn--outlined']]: !isCurrentActive,
+                    },
+                  )
+                }
+              >
+                {p.name}
+              </button>
+            )
+          })
         }
       </div>
       <div className={baseClasses.unitInternalWrapper}>
         <div className={baseClasses.stack2}>
-          <div>{firstlyState.loading ? '🟡 loading...' : !!firstlyState.data ? '🟢 ok' : !!firstlyState.error ? `🔴 err | ${firstlyState.error?.message || 'No error msg'}` : '⚪'}</div>
+          <div>{firstlyState.loading ? '🟡 loading...' : !!firstlyState.data ? '🟢 ok' : !!firstlyState.error ? `🔴 err | ${firstlyState.error || 'No error msg'}` : '⚪'}</div>
           <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ firstlyState }, null, 2)}</pre>
         </div>
         <div className={baseClasses.stack2}>
-          <div>{secondaryApiState.loading ? '🟡 loading...' : !!secondaryApiState.data ? '🟢 ok' : !!secondaryApiState.error ? `🔴 err | ${secondaryApiState.error?.message || 'No error msg'}` : '⚪'}</div>
+          <div>{secondaryApiState.loading ? '🟡 loading...' : !!secondaryApiState.data ? '🟢 ok' : !!secondaryApiState.error ? `🔴 err | ${secondaryApiState.error || 'No error msg'}` : '⚪'}</div>
           <pre className={baseClasses.preNormalizedMin}>{JSON.stringify({ secondaryApiState }, null, 2)}</pre>
         </div>
       </div>

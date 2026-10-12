@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import baseClasses from '~/ui.common.module.scss'
 import { ReactiveEngine, useReactiveValue } from '@pravosleva/reactive-engine/react'
-import { MapLogic, Station } from './service.MapLogic'
+import { MapLogic } from './service.MapLogic'
 import clsx from 'clsx'
 import { Select } from '~/shared/Select'
 
@@ -10,7 +10,7 @@ const engine = new ReactiveEngine()
 export const MapExample = () => {
   const logic = engine.inject(MapLogic)
 
-  const { loading, data: stations, error } = useReactiveValue<{ data: Station[] | null; error: null | Error; loading: boolean }>(logic.stationsResource)
+  const { loading, data: stations, error } = useReactiveValue(logic.stationsResource)
   const selectedStation = engine.use(logic.selectedStation)
   // Подписываемся на текущий выбранный город для селекта
   const currentCityId = engine.use(logic.currentCityId)
@@ -76,7 +76,7 @@ export const MapExample = () => {
                 ? '🔴 Ошибка запроса'
                 : '⚪'}
         </code>
-        {error?.message && <em style={{ color: 'red' }}>{error.message}</em>}
+        {error && <em style={{ color: 'red' }}>{error}</em>}
       </div>
 
       {/* Выводим инфо о выбранной АЗС из реактивного стейта под картой */}

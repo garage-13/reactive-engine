@@ -71,7 +71,7 @@ const secondaryError = computed(() => secondaryApiState.value?.error)
       <!-- Блок Первого Ресурса (User Info) -->
       <div :class="baseClasses.stack2">
         <div>
-          {{ userLoading ? '🟡 loading...' : userData ? '🟢 ok' : userError ? `🔴 err | ${userError?.message || 'No error msg'}` : '⚪' }}
+          {{ userLoading ? '🟡 loading...' : userData ? '🟢 ok' : userError ? `🔴 err | ${userError || 'No error msg'}` : '⚪' }}
         </div>
         <pre :class="baseClasses.preNormalizedMin">{{ JSON.stringify({ data: userData }, null, 2) }}</pre>
       </div>
@@ -79,7 +79,7 @@ const secondaryError = computed(() => secondaryApiState.value?.error)
       <!-- Блок Второго Ресурса (Secondary Service, зависящего от первого) -->
       <div :class="baseClasses.stack2">
         <div>
-          {{ secondaryLoading ? '🟡 loading...' : secondaryData ? '🟢 ok' : secondaryError ? `🔴 err | ${secondaryError?.message || 'No error msg'}` : '⚪' }}
+          {{ secondaryLoading ? '🟡 loading...' : secondaryData ? '🟢 ok' : secondaryError ? `🔴 err | ${secondaryError || 'No error msg'}` : '⚪' }}
         </div>
         <pre :class="baseClasses.preNormalizedMin">{{ JSON.stringify({ data: secondaryData }, null, 2) }}</pre>
       </div>
