@@ -580,13 +580,13 @@ export class ReactiveEngineCore {
     const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true
     const responseValidate = options.responseValidate
     const validateBeforeFetch = options.validateBeforeFetch
-
-    // const retryCount = 0
+    // -- NOTE: Hardcoded yet
+    const retryCount = 1
     const baseDelay = 1000
-    const useExponential = false
-    const maxRetryDelay = 30000
+    const useExponential = true
+    const maxRetryDelay = 1000 * 60 * 5
     const timeoutMs = 1000
-
+    // --
     // Оставляем префикс метаданных для внутренней подсистемы логгера
     const state = this.signal<ResourceState<T>>(
       { data: null, loading: true, error: null, isRetrying: false },
@@ -595,21 +595,8 @@ export class ReactiveEngineCore {
 
     // Внутренний метод для безопасного обновления стейта и отправки лога
     const updateResourceState = (nextState: ResourceState<T>) => {
-      const _oldValue = JSON.stringify(state.value)
+      this.log({ type: 'resource', label: resourceSignalName, details: { to: nextState, from: state.value } })
       state.value = nextState
-
-      this.log({ type: 'resource', label: resourceSignalName, details: { to: state.value, from: _oldValue } })
-
-      // Logger Trigger for Resource: Передаем чистое signalName, чтобы заголовок в консоли оставался аккуратным
-      // if (typeof this.queueLog === 'function') {
-      //   this.queueLog('resource', resourceSignalName, {
-      //     loading: nextState.loading,
-      //     data: nextState.data,
-      //     error: nextState.error,
-      //     isRetrying: nextState.isRetrying,
-      //     to: state.value
-      //   })
-      // }
     }
 
     const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
@@ -665,7 +652,6 @@ export class ReactiveEngineCore {
       const shouldClear = isSourceChange && resetDataOnSourceChange
       const currentData = shouldClear ? null : this.untrack(() => state.value.data)
       updateResourceState({ data: currentData, loading: true, error: null, isRetrying: false })
-      const retryCount = 0
       for (let attempt = 0; attempt <= retryCount; attempt++) {
         if (effectSignal.aborted) return
         let combinedSignal = effectSignal
@@ -715,8 +701,7 @@ export class ReactiveEngineCore {
 
             // Фиксация финальной ошибки
             updateResourceState({
-              data: null,
-              loading: false,
+              data: null, loading: false,
               error: finalError instanceof Error ? finalError.message : typeof finalError === 'string' ? finalError : `typeof finalError is ${typeof finalError}`,
               isRetrying: false,
             })
