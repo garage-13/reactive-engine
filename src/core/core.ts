@@ -12,7 +12,7 @@ let currentTransaction: TransactionContext | null = null
 function safeValueToString(value: unknown): string {
   if (value === null) return 'null'
   if (value === undefined) return 'undefined'
-  if (typeof value === 'object') return '{...}'
+  if (typeof value === 'object') return JSON.stringify(value) // '{...}'
   return String(value)
 }
 export function queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
@@ -35,7 +35,13 @@ export function flushLogs(): void {
     const colorStyle = badgeColors[record.type]
     const hasTransition = record.from !== undefined || record.to !== undefined
     let logMessage = `%c${record.type.toUpperCase()}%c ${record.label}`
-    if (hasTransition) logMessage += ` (${safeValueToString(record.from)} → ${safeValueToString(record.to)})`
+
+    if (hasTransition) {
+      if (!!record.from)
+        logMessage += `(${safeValueToString(record.from)} → ${safeValueToString(record.to)})`
+      else logMessage += `(${safeValueToString(record.to)})`
+    }
+
     if (record.payload !== undefined) {
       console.groupCollapsed(logMessage, colorStyle, 'color: inherit;')
       console.log('Payload:', record.payload)
@@ -65,12 +71,6 @@ export class ReactiveEngineCore {
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
   }
-  public shouldLog(type: LogEventType): boolean {
-    if (!this.logger.isEnabled) return false
-    // const filter = this.logger.filter
-    // return typeof filter === 'string' ? (filter === '' || type.toLowerCase() === filter.toLowerCase()) : filter instanceof RegExp ? filter.test(type) : true
-    return true
-  }
   public queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
     queueLog(type, label, details)
   }
@@ -92,7 +92,18 @@ export class ReactiveEngineCore {
       if (this.batchDepth === 0) this.flushEffects()
     }
   }
-
+  private log ({ type, label, details }: { type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown } }) {
+    const isEnabled = this.logger.isEnabled
+    const isCoreOptimizationDebugEnabled = this.logger.isCoreOptimizationDebugEnabled
+    const isInternalCoreSignal = getExtractedValues({
+      tested: [label], expectedKey: 'CORE_INTERNAL_SIGNAL', valueType: 'number',
+    })?.[0] === '1' || false
+    if (isEnabled) {
+      if (isInternalCoreSignal) {
+        if (isCoreOptimizationDebugEnabled) queueLog(type, label, details)
+      } else queueLog(type, label, details)
+    }
+  }
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
     const engine = this
     let value = initialValue
@@ -128,7 +139,7 @@ export class ReactiveEngineCore {
         value = newValue
         version++
         engine.epoch++
-        if (engine.shouldLog('signal')) queueLog('signal', name || 'signal', { from: oldValue, to: newValue })
+        engine.log({ type: 'signal', label: name || 'signal', details: { from: oldValue, to: newValue } })
         const markDirtyNode = (node: any) => {
           node.subscribers.forEach((sub: any) => {
             if (sub === engine.activeConsumer) return
@@ -163,7 +174,6 @@ export class ReactiveEngineCore {
     ;(sigInstance as any)._node = signalNode
     return sigInstance as any
   }
-
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
     const engine = this
     const cachedRef = engine.computedCache.get(fn)
@@ -193,11 +203,16 @@ export class ReactiveEngineCore {
         try {
           const newValue = fn()
           const isObj = value && typeof value === 'object'
-          const changed = isDirty || value !== newValue || isObj
+          // -- TODO: Review
+          const changed = isDirty || (!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))
           if (changed) {
+            if ((!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))) {
+              engine.log({ type: 'computed', label: signalName || 'unnamed_computed', details: { from: value, to: newValue } })
+            }
             value = newValue
             version++
           }
+          // --
           isDirty = false
           let maxDepDepth = 0
           dependencies.forEach(dep => {
@@ -206,7 +221,7 @@ export class ReactiveEngineCore {
             if (dep.depth !== undefined && dep.depth > maxDepDepth) maxDepDepth = dep.depth
           })
           computedNode.depth = maxDepDepth + 1
-          if (engine.shouldLog('computed')) queueLog('computed', signalName || 'computed')
+          // engine.log({ type: 'computed', label: signalName || 'computed', details: { to: newValue } })
           return changed
         } finally {
           engine.activeConsumer = prevConsumer
@@ -338,7 +353,7 @@ export class ReactiveEngineCore {
           prevDeps.forEach(dep => {
             if (!dependencies.has(dep)) dep.subscribers.delete(effectNode)
           })
-          if (engine.shouldLog('effect')) queueLog('effect', effectName || 'effect')
+          engine.log({ type: 'effect', label: effectName || 'unnamed_effect' })
         } finally {
           engine.activeConsumer = prevConsumer
         }
@@ -390,7 +405,7 @@ export class ReactiveEngineCore {
           signalsMap.set(prop, sig)
         }
         const val = sig.value
-        if (engine.activeConsumer && engine.shouldLog('reactive')) queueLog('reactive', `Read ${name || ''}.${String(prop)}`, { payload: val })
+        if (engine.activeConsumer) engine.log({ type: 'reactive', label: `Read ${name || ''}.${String(prop)}`, details: { to: val } })
         if (val !== null && typeof val === 'object') return engine.reactive(val, name ? `${name}.${String(prop)}` : String(prop))
         return val
       },
@@ -404,7 +419,7 @@ export class ReactiveEngineCore {
           sig = engine.signal(oldValue)
           signalsMap.set(prop, sig)
         }
-        if (engine.shouldLog('reactive')) queueLog('reactive', `Update ${name || ''}.${String(prop)}`, { from: oldValue, to: rawValue })
+        // engine.log({ type: 'reactive', label: `Update ${name || ''}.${String(prop)}`, details: { from: oldValue, to: rawValue } })
         sig.value = rawValue
         if (Array.isArray(t) && prop !== 'length') {
           let lengthSig = signalsMap.get('length')
@@ -462,114 +477,6 @@ export class ReactiveEngineCore {
       this.cycleDetectionStack.delete(token)
     }
   }
-
-  // -- TODO: New way (v2.x.x-alpha)
-  // public resource<T, S = void>(
-  //   fetcher: (source: S, abortSignal: AbortSignal) => Promise<T>,
-  //   sourceSignal: Signal<S>,
-  //   optionsOrName?: string | ResourceOptions<T, S>
-  // ): any // { data: T | null; loading: boolean; error: Error | null }
-  //   {
-  //   const isOptionsObjectReceived = typeof optionsOrName === 'object' && !!optionsOrName
-  //   const signalName = isOptionsObjectReceived ? optionsOrName.name : optionsOrName as string || 'unnamed_resource'
-  //   let currentController: AbortController | null = null
-  //   const resourceState = this.reactive({
-  //     data: null as T | null,
-  //     loading: true,
-  //     error: null as Error | null
-  //   }, `resource:${signalName}`)
-  //   const engine = this
-  //   const subscribe = engine.effect(() => {
-  //     const sourceValue = sourceSignal.value
-  //     if (currentController) currentController.abort()
-  //     currentController = new AbortController()
-  //     resourceState.loading = true
-  //     fetcher(sourceValue, currentController.signal)
-  //       .then(data => {
-  //         resourceState.data = data
-  //         resourceState.loading = false
-  //         resourceState.error = null
-  //       })
-  //       .catch(err => {
-  //         if (err.name === 'AbortError' || err.message === 'aborted') return
-  //         resourceState.error = err instanceof Error ? err : new Error(String(err))
-  //         resourceState.loading = false
-  //       })
-  //   })
-  //   return resourceState
-  // }
-  // --
-  // -- v1.6
-  // public resource<T, S = void>(
-  //   fetcher: (source: S, signal: AbortSignal) => Promise<T>,
-  //   source?: { value: S },
-  //   optionsOrName?: string | ResourceOptions<T, S>
-  // ): any {
-  //   const isOptionsObject = optionsOrName && typeof optionsOrName === 'object'
-  //   const signalName = isOptionsObject ? optionsOrName.name : (optionsOrName as string) || 'unnamed_resource'
-
-  //   const state = this.signal<ResourceState<T>>(
-  //     { data: null, loading: true, error: null, isRetrying: false },
-  //     `resource:${signalName}`
-  //   )
-
-  //   const engine = this // Фиксируем инстанс ядра в замыкании
-  //   let activeController: AbortController | null = null
-
-  //   const load = async (sValue: S, signal: AbortSignal) => {
-  //     if (signal.aborted) return
-
-  //     // Заворачиваем запись в untrack, чтобы разорвать бесконечную петлю
-  //     // самовызова эффекта при обновлении стейта загрузки!
-  //     engine.untrack(() => {
-  //       state.value = { data: state.value?.data, loading: true, error: null, isRetrying: false }
-  //     })
-
-  //     try {
-  //       const data = await fetcher(sValue, signal)
-  //       if (!signal.aborted) {
-  //         // Заворачиваем запись успешного ответа в untrack
-  //         engine.untrack(() => {
-  //           state.value = { data, loading: false, error: null, isRetrying: false }
-  //         })
-  //       }
-  //     } catch (e: unknown) {
-  //       if (!signal.aborted) {
-  //         // Заворачиваем запись ошибки в untrack
-  //         engine.untrack(() => {
-  //           state.value = { data: null, loading: false, error: (e as Error)?.message, isRetrying: false }
-  //         })
-  //       }
-  //     }
-  //   }
-  //   // Навешиваем синхронный эффект отслеживания источника (source)
-  //   this.effect(() => {
-  //     const sValue = source ? source.value : (undefined as any)
-
-  //     if (activeController) activeController.abort()
-  //     activeController = new AbortController()
-
-  //     load(sValue, activeController.signal)
-
-  //     return () => {
-  //       if (activeController) activeController.abort()
-  //     }
-  //   })
-
-  //   return {
-  //     get data() { return state.value.data },
-  //     get loading() { return state.value.loading },
-  //     get error() { return state.value.error },
-  //     get value() { return state.value },
-  //     refetch: () => {
-  //       if (activeController) activeController.abort()
-  //       activeController = new AbortController()
-  //       load(source ? source.value : (undefined as any), activeController.signal)
-  //     },
-  //     subscribe: (cb: (val: ResourceState<T>) => void) => state.subscribe(cb)
-  //   }
-  // }
-  // --
   // -- v1.5.x-short (legacy - скоро перепишем) Taken from here: https://github.com/garage-13/reactive-engine/blob/84508b8dfe280a385eb6be284faa03e9fea43099/src/core/core.ts
   /**
    * Вспомогательная функция для задержки (sleep), чувствительная к AbortSignal
@@ -662,7 +569,7 @@ export class ReactiveEngineCore {
     optionsOrName?: string | ResourceOptions<T, S>,
   ): Resource<T> {
     const isOptionsObject = optionsOrName && typeof optionsOrName === 'object'
-    const signalName = isOptionsObject
+    const resourceSignalName = isOptionsObject
       ? ((optionsOrName as ResourceOptions<T, S>).name || 'unnamed_resource')
       : (optionsOrName as string) || 'unnamed_resource'
 
@@ -683,23 +590,26 @@ export class ReactiveEngineCore {
     // Оставляем префикс метаданных для внутренней подсистемы логгера
     const state = this.signal<ResourceState<T>>(
       { data: null, loading: true, error: null, isRetrying: false },
-      `[CORE_INTERNAL_SIGNAL=1]:resource:state:${signalName}`
+      `[CORE_INTERNAL_SIGNAL=1]:resource:state:${resourceSignalName}`
     )
 
     // Внутренний метод для безопасного обновления стейта и отправки лога
     const updateResourceState = (nextState: ResourceState<T>) => {
-      (state as any).value = nextState
+      const _oldValue = JSON.stringify(state.value)
+      state.value = nextState
+
+      this.log({ type: 'resource', label: resourceSignalName, details: { to: state.value, from: _oldValue } })
 
       // Logger Trigger for Resource: Передаем чистое signalName, чтобы заголовок в консоли оставался аккуратным
-      if (typeof this.queueLog === 'function') {
-        this.queueLog('resource', signalName, {
-          // loading: nextState.loading,
-          // data: nextState.data,
-          // error: nextState.error,
-          // isRetrying: nextState.isRetrying
-          to: state.value
-        })
-      }
+      // if (typeof this.queueLog === 'function') {
+      //   this.queueLog('resource', resourceSignalName, {
+      //     loading: nextState.loading,
+      //     data: nextState.data,
+      //     error: nextState.error,
+      //     isRetrying: nextState.isRetrying,
+      //     to: state.value
+      //   })
+      // }
     }
 
     const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
@@ -752,31 +662,23 @@ export class ReactiveEngineCore {
           return
         }
       }
-
       const shouldClear = isSourceChange && resetDataOnSourceChange
       const currentData = shouldClear ? null : this.untrack(() => state.value.data)
-
       updateResourceState({ data: currentData, loading: true, error: null, isRetrying: false })
-
       const retryCount = 0
       for (let attempt = 0; attempt <= retryCount; attempt++) {
         if (effectSignal.aborted) return
         let combinedSignal = effectSignal
-
         try {
           // if (timeoutMs && timeoutMs > 0) {
           //   const timeoutSignal = AbortSignal.timeout(timeoutMs)
           //   combinedSignal = AbortSignal.any([effectSignal, timeoutSignal])
           // }
-
           const data = await fetcher(sValue, combinedSignal)
-
           if (effectSignal.aborted) return
-
           if (combinedSignal.aborted) {
             throw new DOMException('The operation timed out.', 'TimeoutError')
           }
-
           if (responseValidate) {
             const validationResult = responseValidate(data)
             if (validationResult === false || typeof validationResult === 'string') {
@@ -786,33 +688,25 @@ export class ReactiveEngineCore {
               return
             }
           }
-
           if (effectSignal.aborted) return
-
           // Успешное завершение запроса
           updateResourceState({ data, loading: false, error: null, isRetrying: false })
           return
-        } catch (e: any) {
-          if (effectSignal.aborted || (e.name === 'AbortError' && effectSignal.aborted)) return
-
-          const isTimeout = e.name === 'TimeoutError' || e.name === 'AbortError' || e.message?.includes('timeout')
-
+        } catch (e: unknown) {
+          if (effectSignal.aborted || ((e as Error).name === 'AbortError' && effectSignal.aborted)) return
+          const isTimeout = (e as Error).name === 'TimeoutError' || (e as Error).name === 'AbortError' || (e as Error).message?.includes('timeout')
           const isCustomValidationError = getExtractedValues({
-            tested: [e.message], expectedKey: 'THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY', valueType: 'number',
+            tested: [(e as Error).message], expectedKey: 'THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY', valueType: 'number',
           })?.[0] === '1' || false
-
           const __defaultCustomValidationErrorMessage = 'Custom validation error'
           let customValidationErrorMessage: string = isCustomValidationError
             ? (getExtractedValues({
-              tested: [e.message], expectedKey: 'MESSAGE', valueType: 'string',
+              tested: [(e as Error).message], expectedKey: 'MESSAGE', valueType: 'string',
             })?.[0] || __defaultCustomValidationErrorMessage)
             : __defaultCustomValidationErrorMessage
-
-          const isFetchBodyValidationError = isCustomValidationError || e.name === 'ValidationError'
-
+          const isFetchBodyValidationError = isCustomValidationError || (e as Error).name === 'ValidationError'
           if (attempt === retryCount || isFetchBodyValidationError) {
             if (effectSignal.aborted) return
-
             const finalError = isTimeout
               ? new Error(`Request timed out after ${timeoutMs}ms`, { cause: e })
               : isCustomValidationError
@@ -820,21 +714,23 @@ export class ReactiveEngineCore {
                 : e
 
             // Фиксация финальной ошибки
-            updateResourceState({ data: null, loading: false, error: finalError, isRetrying: false })
+            updateResourceState({
+              data: null,
+              loading: false,
+              error: finalError instanceof Error ? finalError.message : typeof finalError === 'string' ? finalError : `typeof finalError is ${typeof finalError}`,
+              isRetrying: false,
+            })
             return
           } else {
             if (effectSignal.aborted) return
-
             let currentDelay = useExponential ? baseDelay * Math.pow(2, attempt) : baseDelay
             currentDelay = Math.min(currentDelay, maxRetryDelay)
             const jitter = Math.random() * 200
             currentDelay = currentDelay + jitter
-
             // Безопасное обновление статуса ретрая с логгированием фазы повтора
             updateResourceState({ data: state.value.data, loading: true, error: null, isRetrying: true })
-
             const logReason = isTimeout ? 'таймауту' : 'ошибке сети'
-            console.warn(`[Resource Retry] "${signalName}" сбой по ${logReason}. Попытка ${attempt + 1}/${retryCount + 1}...`)
+            console.warn(`[Resource Retry] "${resourceSignalName}" сбой по ${logReason}. Попытка ${attempt + 1}/${retryCount > 0 ? retryCount + 1 : attempt + 1}...`)
 
             try {
               await this.delay(currentDelay, effectSignal)
@@ -859,7 +755,7 @@ export class ReactiveEngineCore {
       })
 
       return () => effectController.abort()
-    }, '[dev]')
+    }, '[CORE_INTERNAL_SIGNAL=1]:effect')
 
     return {
       get data() { return state.value.data },

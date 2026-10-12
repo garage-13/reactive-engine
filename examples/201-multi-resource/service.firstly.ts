@@ -21,7 +21,7 @@ export class UserInfoService extends AbstractService {
   // --
 
   public counter = this.engine.signal<number>(0, 'example-201:UserInfoService:signal:counter')
-  public activePersonId = this.engine.signal<string | null>(null)
+  public activePersonId = this.engine.signal<string | null>(null, 'active_person_id')
   public setActivePersonId = (val: string) => this.activePersonId.value = val
   private resetActivePersonId = () => this.activePersonId.value = null
 
@@ -68,6 +68,7 @@ export class UserInfoService extends AbstractService {
   public personList = this.engine.computed(
     () => !this.apiState.loading && Array.isArray(this.apiState.data?.items) && this.apiState.data?.items?.length > 0
       ? this.apiState.data.items
-      : []
+      : [],
+    'person_list'
   )
 }

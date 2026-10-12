@@ -18,7 +18,7 @@ export class SecondaryService extends AbstractService {
   private apiDeps = this.engine.computed<[boolean, string | null]>(() => [
     this.isUserDataReceived.value,
     this.userInfoService.activePersonId.value,
-  ])
+  ], 'secondary_api_deps')
 
   public apiState = this.engine.resource<TResData, [boolean, string | null]>(
     async (deps, abortSignal) => {

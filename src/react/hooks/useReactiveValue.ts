@@ -16,15 +16,15 @@ export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? V
     cachedResult: any
     subCleanups: Set<() => void>
     isPendingUpdate: boolean
-  }>({
-    version: 0,
-    unsubscribe: null,
-    listeners: new Set(),
-    lastLocalVersion: -1,
-    cachedResult: null,
-    subCleanups: new Set(),
-    isPendingUpdate: false
-  })
+      }>({
+        version: 0,
+        unsubscribe: null,
+        listeners: new Set(),
+        lastLocalVersion: -1,
+        cachedResult: null,
+        subCleanups: new Set(),
+        isPendingUpdate: false
+      })
 
   const subscribeStore = (cb: () => void) => {
     storeRef.current.listeners.add(cb)
@@ -34,18 +34,18 @@ export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? V
 
       const triggerUpdate = () => {
         if (isInitializing) return
-        
+
         // Синхронно накапливаем инкремент версий, гарантируя, что useSyncExternalStore
         // зафиксирует изменения, но блокируем повторные вызовы listeners до выхода из батча
         if (storeRef.current.isPendingUpdate) {
           storeRef.current.version++
           return
         }
-        
+
         storeRef.current.isPendingUpdate = true
         storeRef.current.version++
         storeRef.current.listeners.forEach(listener => listener())
-        
+
         // Сбрасываем защёлку строго на следующем микрошаге Event Loop
         Promise.resolve().then(() => {
           storeRef.current.isPendingUpdate = false
@@ -57,12 +57,12 @@ export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? V
       } else {
         const setupDeepSubscriptions = (obj: any) => {
           if (obj === null || typeof obj !== 'object') return
-          
+
           if ('__subscribe' in obj && typeof obj.__subscribe === 'function') {
             const mainUnsub = obj.__subscribe(triggerUpdate)
             storeRef.current.subCleanups.add(mainUnsub)
           }
-          
+
           for (const key in obj) {
             try {
               const val = obj[key]

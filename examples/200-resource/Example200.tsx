@@ -42,7 +42,7 @@ const engine = new ReactiveEngine({
   logger: {
     isEnabled: true, // Включаем логгер
     traceTime: true, // Добавляем вывод таймингов по желанию
-    filter: /^example-200:*/ // Можно фильтровать только нужные логи
+    filter: /^example-200:*/, // Можно фильтровать только нужные логи
   }
 })
 
