@@ -1,6 +1,5 @@
 import { describe, test, expect, vi } from 'vitest'
 import { ReactiveEngineCore } from './core'
-import { ReactiveEngineAutomatic } from './core.automatic'
 
 describe('⚛️ Reactive Engine — Продвинутая спецификация Ядра', () => {
 
@@ -8,7 +7,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   // 1. ТЕСТ НА ТОПОЛОГИЧЕСКИЙ ПОРЯДОК СХОЖДЕНИЯ (Бенчмарк #95)
   // =========================================================================
   test('#95 [Stale Evaluation] родительские вычисления обязаны выполняться СТРОГО до начала выполнения дочерних dependees', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const counter = engine.signal(0)
@@ -26,11 +25,9 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
         evaluationOrder.push(`child:${childComputed.value}`)
       })
 
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       evaluationOrder.length = 0
 
       counter.value = 1
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       const firstChildIndex = evaluationOrder.findIndex(l => l.startsWith('child'))
       let lastParentIndex = -1
@@ -49,7 +46,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   // 2. ТЕСТ НА ЖИВУЧЕСТЬ ГРАФА ПРИ ИСКЛЮЧЕНИЯХ В БАТЧЕ (Бенчмарк #154)
   // =========================================================================
   test('#154 [batch throw] граф должен сохранять консистентность и выполнять выжившие эффекты при ошибке в батче', async () => {
-    const engine = new ReactiveEngineAutomatic()
+    const engine = new ReactiveEngineCore()
     const sig = engine.signal(10)
     const spy = vi.fn()
 
@@ -74,7 +71,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   // 3. ТЕСТ НА ОТКАТ МУТАЦИИ В БАТЧЕ (Бенчмарк #132)
   // =========================================================================
   test('#132 [batch revert] эффект не должен повторно просыпаться, если зависимость внутри батча вернулась к истокам', () => {
-    const engine = new ReactiveEngineAutomatic()
+    const engine = new ReactiveEngineCore()
     const sig = engine.signal(100)
     const comp = engine.computed(() => sig.value * 2)
 

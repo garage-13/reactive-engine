@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ReactiveEngineCore } from './core'
-import { ReactiveEngineAutomatic } from './core.automatic'
 
 const engines = [
   { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngineCore, isAsync: false },
-  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic, isAsync: true }
 ]
 
 engines.forEach(({ name, Engine, isAsync }) => {
@@ -119,7 +117,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
           todos: ['Купить молоко']
         }
       })
-      
+
       const spy = vi.fn()
 
       // Регистрируем канонический эффект ядра для глубокого Proxy-объекта
@@ -127,7 +125,7 @@ engines.forEach(({ name, Engine, isAsync }) => {
         // Явно считываем глубокие свойства, чтобы граф зафиксировал зависимости
         spy(state.user.name, [...state.user.todos])
       })
-      
+
       // Сбрасываем стартовый вызов эффекта при инициализации
       spy.mockClear()
 

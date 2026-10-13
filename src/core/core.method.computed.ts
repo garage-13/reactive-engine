@@ -13,17 +13,10 @@ export function createComputed<T>(
   let isDirty = true
   let version = 0
   let versionCheckRequired = false
-<<<<<<< Updated upstream
-  
-  const dependencies = new Set<any>()
-  const depVersions = new Map<any, number>()
-  
-=======
 
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
 
->>>>>>> Stashed changes
   const releaseNode = (node: any): void => {
     if (!node) return
     const actNode = node._node || node
@@ -132,14 +125,10 @@ export function createComputed<T>(
       engine.cycleDetectionStack.add(computedNode)
       const prevConsumer = engine.activeConsumer
       engine.activeConsumer = computedNode
-<<<<<<< Updated upstream
-      
-=======
 
       const oldDeps = Array.from(dependencies)
       const oldVersions = new Map(depVersions)
 
->>>>>>> Stashed changes
       dependencies.forEach(dep => {
         const rawDepNode = dep._node || dep
         if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
@@ -150,24 +139,14 @@ export function createComputed<T>(
       try {
         const newValue = fn()
         const isObj = (value && typeof value === 'object') || (newValue && typeof newValue === 'object')
-<<<<<<< Updated upstream
-        
-        // КРИСТАЛЬНО ЧИСТОЕ СРАВНЕНИЕ ИЗМЕНЕНИЙ ПО ЗНАЧЕНИЮ (Value Equality)
-        const changed = isDirty || isObj || value !== newValue
-        
-=======
 
         // КРИСТАЛЬНО ЧИСТОЕ СРАВНЕНИЕ ИЗМЕНЕНИЙ ПО ЗНАЧЕНИЮ (Value Equality)
         const changed = isDirty || isObj || value !== newValue
 
->>>>>>> Stashed changes
         if (changed) {
           const previousValueSnapshot = isDirty ? undefined : (typeof value === 'object' && value !== null ? JSON.parse(JSON.stringify(value)) : value)
           value = newValue
           version++ // Растет строго при фактическом изменении значения!
-<<<<<<< Updated upstream
-          
-=======
 
           if (engine.log) {
             engine.log({
@@ -177,7 +156,6 @@ export function createComputed<T>(
             })
           }
 
->>>>>>> Stashed changes
           subscribers.forEach(sub => {
             const rawSub = sub._node || sub
             rawSub.isDirty = true
@@ -188,10 +166,6 @@ export function createComputed<T>(
           })
         } else {
           // VALUE EQUALITY CUT: Значение примитива не изменилось!
-<<<<<<< Updated upstream
-          // Синхронизируем мапы версий у подписчиков, сообщая им о стабильности ребра графа
-=======
->>>>>>> Stashed changes
           subscribers.forEach(sub => {
             const rawSub = sub._node || sub
             if (rawSub.depVersions) {
@@ -203,17 +177,10 @@ export function createComputed<T>(
             }
           })
         }
-<<<<<<< Updated upstream
-        
-        isDirty = false
-        versionCheckRequired = false
-        
-=======
 
         isDirty = false
         versionCheckRequired = false
 
->>>>>>> Stashed changes
         let maxDepDepth = 0
         let hasSameDeps = dependencies.size === oldDeps.length
 
@@ -271,23 +238,6 @@ export function createComputed<T>(
         computedNode.subscribers.add(engine.activeConsumer)
         engine.activeConsumer.dependencies.add(computedNode)
       }
-<<<<<<< Updated upstream
-      
-      // 1. ФАЗА СВЕРХУ ВНИЗ: Рекурсивно будим родителей, заставляя их обновиться (Pull)
-      if (versionCheckRequired && dependencies.size > 0) {
-        for (const dep of Array.from(dependencies)) {
-          const rawNode = (dep as any)._node || dep
-          if (rawNode.type === 'computed' && rawNode._node?.versionCheckRequired) {
-            const _forcedParentPull = dep.value // Чтение геттера сохраняет Dynamic Deps контексты!
-          }
-        }
-      }
-      
-      // 2. ВТОРАЯ ФАЗА: Строгая атомарная сверка версий ребер графа строго после Pull каскада
-      let needsUpdate = isDirty
-      let parentChanged = false
-      
-=======
 
       // 1. ФАЗА СВЕРХУ ВНИЗ: Рекурсивно опрашиваем родителей, выявляя сквозные мутации версий
       const upstreamChanged = checkUpstreamModifications(computedNode)
@@ -295,41 +245,16 @@ export function createComputed<T>(
       // 2. ВТОРАЯ ФАЗА: Строгая атомарная сверка версий ребер графа строго после Pull каскада
       let needsUpdate = isDirty || upstreamChanged
 
->>>>>>> Stashed changes
       if (!needsUpdate && dependencies.size > 0) {
         for (const dep of Array.from(dependencies)) {
           const rawNode = (dep as any)._node || dep
           const currentVer = rawNode.version !== undefined ? rawNode.version : (dep.version !== undefined ? dep.version : engine.epoch)
           if (currentVer !== depVersions.get(dep)) {
             needsUpdate = true
-            parentChanged = true
             break
           }
         }
       }
-<<<<<<< Updated upstream
-      
-      // Исполняем вычисление функции, только если зафиксировано реальное изменение предков
-      // или если у текущего узла взведен флаг проверки, но его родители пересчитались
-      if (needsUpdate || versionCheckRequired) {
-        const computedChanged = computedNode.run()
-        
-        // 🟢 КАСКАДНОЕ СКВОЗНОЕ ТУШЕНИЕ (Bi-Directional Pruning):
-        // Если наша функция выполнилась, но значение примитива осталось ПРЕЖНИМ,
-        // мы обязаны принудительно обновить слепок нашей версии в мапах depVersions детей.
-        // Это предотвратит рассинхронизацию кэша на нисходящих итерациях цикла!
-        if (!computedChanged) {
-          subscribers.forEach(sub => {
-            const rawSub = sub._node || sub
-            if (rawSub.depVersions) {
-              rawSub.depVersions.set(computedInstance, version)
-            }
-          })
-        }
-      } else {
-        versionCheckRequired = false
-        // Если мы проверили родителей и они стабильны, мы также транслируем свою стабильность детям
-=======
 
       if (needsUpdate) {
         computedNode.run()
@@ -343,7 +268,6 @@ export function createComputed<T>(
           })
         }
         versionCheckRequired = false
->>>>>>> Stashed changes
         subscribers.forEach(sub => {
           const rawSub = sub._node || sub
           if (rawSub.depVersions) {
@@ -351,13 +275,9 @@ export function createComputed<T>(
           }
         })
       }
-      
       return value
     },
-<<<<<<< Updated upstream
-=======
     get valueWithoutTracking() { return value },
->>>>>>> Stashed changes
     get version() { return version },
     subscribe(cb: (val: T) => void): CleanupFn {
       const fakeEffect: any = {
@@ -403,10 +323,6 @@ export function createComputed<T>(
 ;(computedInstance as any)._node = computedNode
   ;(computedInstance as any).subscribers = subscribers
   ;(computedInstance as any).dependencies = dependencies
-<<<<<<< Updated upstream
-  
-=======
->>>>>>> Stashed changes
   computedInstance._isDirty = () => isDirty || versionCheckRequired
   computedInstance.type = 'computed'
   computedInstance.run = () => computedNode.run()

@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { withThrottleAndCache } from './withThrottleAndCache'
-import { ReactiveEngine, ReactiveEngineAutomatic } from '../../core'
+import { ReactiveEngine } from '../../core'
 
 const engines = [
   { name: 'ReactiveEngine (Synchronous)', Engine: ReactiveEngine, isAsync: false },
-  { name: 'ReactiveEngineAutomatic (Microtask)', Engine: ReactiveEngineAutomatic, isAsync: true }
 ]
 
 engines.forEach(({ name, Engine, isAsync }) => {

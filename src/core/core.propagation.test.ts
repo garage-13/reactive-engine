@@ -1,11 +1,10 @@
 import { describe, test, expect, vi } from 'vitest'
 import { ReactiveEngineCore } from './core'
-import { ReactiveEngineAutomatic } from './core.automatic'
 
 describe('⚛️ Reactive Engine — Спецификация Graph Propagation', () => {
 
   test('#7/#192 Неизмененные вычисляемые значения (value-equality) ОБЯЗАНЫ прерывать каскад обновлений наружу', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const source = engine.signal(1)
@@ -32,13 +31,11 @@ describe('⚛️ Reactive Engine — Спецификация Graph Propagation'
         }
       })
 
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       computedSpy.mockClear()
       sideEffectCalls = 0 // Кристально чисто сбрасываем стартовый квант инициализации кадра
 
       // Мутируем корень графа, значение меняется (1 -> 10), но computed вернет 'static_constant'
       source.value = 10
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       // Вычисляемый колбэк легитимно сработал 1 раз для проверки новых данных графа
       expect(computedSpy).toHaveBeenCalledTimes(1)

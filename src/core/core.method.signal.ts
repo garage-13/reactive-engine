@@ -10,7 +10,7 @@ export function createSignal<T>(
   let version = 0
   const subscribers = new Set<any>()
   const name = typeof optionsOrName === 'string' ? optionsOrName : optionsOrName?.name || ''
-  
+
   const isInternalCoreSignal = getExtractedValues({
     tested: [name],
     expectedKey: 'CORE_INTERNAL_SIGNAL',
@@ -36,7 +36,7 @@ export function createSignal<T>(
     set value(newValue: T) {
       const isObj = value && typeof value === 'object'
       if (value === newValue && !isObj) return
-      
+
       if (optionsOrName && typeof optionsOrName === 'object' && optionsOrName.validate) {
         const validation = optionsOrName.validate(newValue)
         if (validation !== true) {
@@ -44,27 +44,24 @@ export function createSignal<T>(
           return
         }
       }
-      
+
       const oldValue = value
       value = newValue
-      
+
       version++
       engine.epoch++
-      
-      engine.log({ 
-        type: 'signal', 
-        label: name || 'signal', 
-        details: { from: oldValue, to: newValue }, 
-        isInternalCoreSignal 
+
+      engine.log({
+        type: 'signal',
+        label: name || 'signal',
+        details: { from: oldValue, to: newValue },
+        isInternalCoreSignal
       })
-      
-<<<<<<< Updated upstream
-=======
+
       // ⚛️ Синхронное каскадное уведомление подписчиков
->>>>>>> Stashed changes
       subscribers.forEach((sub: any) => {
         const rawSub = sub._node || sub
-        
+
         rawSub.isDirty = true
         if (rawSub.type === 'effect') {
           engine.pendingEffects.add(sub)
@@ -73,7 +70,7 @@ export function createSignal<T>(
           rawSub.markDirty()
         }
       })
-      
+
       if (engine.batchDepth === 0) engine.flushEffects()
     },
     get version() { return version },

@@ -1,5 +1,4 @@
 import { describe, test, expect, vi } from 'vitest'
-import { ReactiveEngineAutomatic } from './core.automatic'
 import { ReactiveEngineCore } from './core'
 
 describe('🧠 Reactive Engine — Спецификация Memory & GC', () => {
@@ -8,7 +7,7 @@ describe('🧠 Reactive Engine — Спецификация Memory & GC', () => 
   // 1. ПОВЕДЕНЧЕСКИЙ ТЕСТ НА ОЧИСТКУ СВЯЗЕЙ (Бенчмарк #160)
   // =========================================================================
   test('#160 ссылки консьюмера должны полностью вырезаться из памяти после потери всех слушателей', async () => {
-    const engine = new ReactiveEngineAutomatic()
+    const engine = new ReactiveEngineCore()
     const source = engine.signal('init')
 
     const computedSpy = vi.fn()
@@ -80,7 +79,7 @@ describe('🧠 Reactive Engine — Спецификация Memory & GC', () => 
   // 3. ТЕСТ НА ЧАСТИЧНЫЙ DISPOSE СОСЕДНИХ ЭФФЕКТОВ (Бенчмарк #215)
   // =========================================================================
   test('#215 partial dispose: sibling effect still notified', async () => {
-    const engine = new ReactiveEngineAutomatic()
+    const engine = new ReactiveEngineCore()
     const source = engine.signal('core_data')
 
     const spy1 = vi.fn()

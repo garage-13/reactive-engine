@@ -1,7 +1,7 @@
-import { ReactiveEngineAutomatic } from './core.automatic'
+import { ReactiveEngineCore } from './core'
 
 export abstract class BaseREServiceEnhanced {
-  constructor(protected engine: ReactiveEngineAutomatic) {
+  constructor(protected engine: ReactiveEngineCore) {
     setTimeout(() => this.onInit(), 0)
   }
 

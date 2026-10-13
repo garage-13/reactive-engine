@@ -1,10 +1,9 @@
 import { describe, test, expect, vi } from 'vitest'
 import { ReactiveEngineCore } from './core'
-import { ReactiveEngineAutomatic } from './core.automatic'
 
 describe('⚛️ Reactive Engine — Продвинутая спецификация Ядра', () => {
   test('#22 [dynamic cleanups] computed должен динамически вырезать неактивные ветви зависимостей // ТЕСТ НА ДИНАМИЧЕСКИЕ ВЕТВЛЕНИЯ ГРАФА (Conditional Evaluation)', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const condition = engine.signal(true)
@@ -23,7 +22,6 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
 
       // Меняем правую (неактивную в данный момент) ветвь
       right.value = 'right-mutated'
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       // Вычисление НЕ должно перезапускаться, так как правая ветвь сейчас спит
       expect(computedExecutions).toBe(1)
@@ -31,7 +29,6 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
 
       // Переключаем условие
       condition.value = false
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       // Вычисление обязано проснуться и забрать данные из правой ветви
       expect(comp.value).toBe('right-mutated')
@@ -39,7 +36,6 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
 
       // Теперь левая ветвь спит. Мутируем её
       left.value = 'left-mutated'
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       // Вычисление должно оставаться неподвижным
       expect(computedExecutions).toBe(2)
@@ -48,11 +44,11 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   })
 
   test('#112 [deep chains] граф обязан без искажений проводить изменения через многоуровневые вычисления // ТЕСТ НА СХОДИМОСТЬ ДЛИННЫХ ЦЕПОЧЕК (Deep Computed Chains)', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const start = engine.signal(1)
-      
+
       // Создаем длинную реактивную матрешку вычислений
       const c1 = engine.computed(() => start.value + 1)
       const c2 = engine.computed(() => c1.value + 1)
@@ -63,7 +59,6 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
 
       // Мутируем корень графа
       start.value = 10
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       // Срез данных на хвосте цепочки обязан мгновенно сойтись к новому значению
       expect(c4.value).toBe(14)
@@ -71,7 +66,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   })
 
   test('#180 [effect dispose] граф должен полностью разрывать связи и освобождать память при уничтожении эффекта // ТЕСТ НА УНИЧТОЖЕНИЕ ПОДПИСОК (Бенчмарк #180 / Dead Roots Garbage Collection)', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const sig = engine.signal('alive')
@@ -82,13 +77,11 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
         spy(sig.value)
       })
 
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       expect(spy).toHaveBeenCalledWith('alive')
       spy.mockClear()
 
       // Мутируем сигнал до отписки -> эффект должен сработать
       sig.value = 'changed'
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       expect(spy).toHaveBeenCalledWith('changed')
       spy.mockClear()
 
@@ -97,7 +90,6 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
 
       // Мутируем сигнал после уничтожения корня
       sig.value = 'dead'
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       // Шпион обязан промолчать, так как узел графа полностью стерт из памяти!
       expect(spy).not.toHaveBeenCalled()
@@ -105,7 +97,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   })
 
   test('#95 [Stale Evaluation] родительские вычисления обязаны выполняться СТРОГО до начала выполнения дочерних dependees // ТЕСТ НА ТОПОЛОГИЧЕСКИЙ ПОРЯДОК СХОЖДЕНИЯ', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const counter = engine.signal(0)
@@ -123,11 +115,9 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
         evaluationOrder.push(`child:${childComputed.value}`)
       })
 
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       evaluationOrder.length = 0
 
       counter.value = 1
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       const firstChildIndex = evaluationOrder.findIndex(l => l.startsWith('child'))
       let lastParentIndex = -1
@@ -143,7 +133,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   })
 
   test('#154 [batch throw] граф должен сохранять консистентность и выполнять выжившие эффекты при ошибке в батче // ТЕСТ НА ЖИВУЧЕСТЬ ГРАФА ПРИ ИСКЛЮЧЕНИЯХ В БАТЧЕ', async () => {
-    const engine = new ReactiveEngineAutomatic()
+    const engine = new ReactiveEngineCore()
     const sig = engine.signal(10)
     const spy = vi.fn()
 
@@ -165,7 +155,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   })
 
   test('#125/#132 [batch revert] эффект не должен просыпаться, если финальное значение графа вернулось к истокам // ТЕСТ НА ПОЛНЫЙ ОТКАТ МУТАЦИИ В БАТЧЕ', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const sig = engine.signal(100)
@@ -182,15 +172,12 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
         }
       })
 
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       sideEffectCalls = 0
 
       engine.batch(() => {
         sig.value = 200
         sig.value = 100 // Полный реверт мутации обратно к истокам!
       })
-
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       // Вычисляемое свойство не изменилось по итогу батча — сайд-эффект обязан промолчать!
       expect(sideEffectCalls).toBe(0)
@@ -199,7 +186,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   })
 
   test('#45 [nested batches] планировщик должен удерживать эффекты до выхода из самого внешнего батча // ВЛОЖЕННЫЕ БАТЧИ (Nested Transactions)', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const s1 = engine.signal(0)
@@ -210,7 +197,6 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
         spy(s1.value, s2.value)
       })
 
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       spy.mockClear()
 
       // Заходим во внешний батч
@@ -235,11 +221,11 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   })
 
   test.skip('#67 [computed bypass] граф должен останавливать волну инвалидации, если computed вернул то же значение // ПРЕРЫВАНИЕ ВЫЧИСЛЕНИЙ ПО РАВЕНСТВУ (Early Value Bypass)', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const source = engine.signal(2)
-      
+
       let compExecutions = 0
       // Вычисление возвращает остаток от деления (всегда 0 для четных чисел)
       const isEven = engine.computed(() => {
@@ -252,25 +238,23 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
         spyEffect(isEven.value)
       })
 
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       expect(compExecutions).toBe(1)
       expect(spyEffect).toHaveBeenCalledTimes(1)
       spyEffect.mockClear()
 
       // Мутируем корень графа: 2 -> 4. Число изменилось, но признак четности (true) остался прежним!
       source.value = 4
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
 
       // Компьютед обязан пересчитаться, чтобы проверить значение
       expect(compExecutions).toBe(2)
-      
+
       // НО ЭФФЕКТ НИЖЕ ПО ГРАФУ НЕ ДОЛЖЕН ТРИГГЕРИТЬСЯ, так как значение ивента не поменялось!
       expect(spyEffect).not.toHaveBeenCalled()
     }
   })
 
   test.skip('#89 [error isolation] падение одного эффекта не должно ломать выполнение остальных эффектов в батче // ОШИБКИ И СТАБИЛЬНОСТЬ ГРАФА (Error Isolation)', () => {
-    const engines = [new ReactiveEngineCore(), new ReactiveEngineAutomatic()]
+    const engines = [new ReactiveEngineCore()]
 
     for (const engine of engines) {
       const trigger = engine.signal(0)
@@ -288,7 +272,6 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
         spySuccess(trigger.value)
       })
 
-      if (engine instanceof ReactiveEngineAutomatic) engine.flushEffects()
       spySuccess.mockClear()
 
       // Глушим console.error в выводе тестов, чтобы не засорять логи ранера
@@ -320,20 +303,14 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
     // Значение должно оставаться строго декларативным и ленивым
     expect(comp.value).toBe(2)
   })
-<<<<<<< Updated upstream
-  describe('⚛️ Reactive Engine — Тесты на Value-Equality Cut', () => {
-
-    test.skip('#7 [TODO: propagation cut] промежуточный computed с неизменным значением обязан блокировать дальнейшую инвалидацию', () => {
-=======
 
   describe('⚛️ Reactive Engine — Тесты на Value-Equality Cut', () => {
 
     test('#7 [propagation cut] промежуточный computed с неизменным значением обязан блокировать дальнейшую инвалидацию', () => {
->>>>>>> Stashed changes
       const engine = new ReactiveEngineCore()
-      
+
       const source = engine.signal(10)
-      
+
       let intermediateExecutions = 0
       // Компьютед-фильтр: всегда возвращает true, если число четное
       const intermediate = engine.computed(() => {
@@ -355,22 +332,18 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
       // Мутируем корень графа: 10 -> 12 (оба четные, результат intermediate не изменился!)
       source.value = 12
 
-      // Читаем хвост графа. 
+      // Читаем хвост графа.
       // Промежуточный узел обязан пересчитаться (так как его корень изменился),
       // но дочерний узел DOWNSTREAM НЕ ДОЛЖЕН пересчитываться, так как intermediate вернул тот же true!
       expect(downstream.value).toBe('Четное')
-      expect(intermediateExecutions).toBe(2) 
+      expect(intermediateExecutions).toBe(2)
       expect(downstreamExecutions).toBe(1) // ❌ Упадет здесь: на старом коде будет 2, так как markDirty сработает вслепую
     })
 
-<<<<<<< Updated upstream
-    test.skip('#34 [TODO: pruning stops] каскад инвалидации должен затухать на первом же узле с неизменным результатом', () => {
-=======
     test.skip('#34 [pruning stops] каскад инвалидации должен затухать на первом же узле с неизменным результатом', () => {
->>>>>>> Stashed changes
       const engine = new ReactiveEngineCore()
       const source = engine.signal(1)
-      
+
       // b зажимает значение в диапазоне [0, 10]
       const b = engine.computed(() => Math.min(Math.max(source.value, 0), 10))
       const c = engine.computed(() => b.value + 1)

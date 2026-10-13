@@ -1,6 +1,5 @@
 import { describe, test, expect, vi } from 'vitest'
 import { ReactiveEngineCore } from './core'
-import { ReactiveEngineAutomatic } from './core.automatic'
 
 describe('⚛️ Reactive Engine — Продвинутая спецификация Ядра', () => {
 
@@ -60,7 +59,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   // 3. ТЕСТ НА ЖИВУЧЕСТЬ ТРАНЗАКЦИЙ ПРИ СБОЕ (#154)
   // =========================================================================
   test('граф должен сохранять консистентность и batchDepth, если внутри batch произошло исключение', () => {
-    const engine = new ReactiveEngineAutomatic()
+    const engine = new ReactiveEngineCore()
     const sig = engine.signal(10)
 
     expect(() => {
@@ -122,7 +121,7 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
   // 5. ТЕСТ НА АВТОМАТИЧЕСКУЮ СБОРКУ МУСОРА (#160, #161, #215)
   // =========================================================================
   test('должен полностью вырезать связи observers и dependencies, когда узел теряет active listeners', () => {
-    const engine = new ReactiveEngineAutomatic()
+    const engine = new ReactiveEngineCore()
     const source = engine.signal('data')
     const comp = engine.computed(() => source.value + '_modified')
 

@@ -102,12 +102,6 @@ export class ReactiveEngineCore {
     if (this.batchDepth > 0) return
     const effects = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
-<<<<<<< Updated upstream
-    
-    // Сортируем эффекты по глубине (depth), чтобы соблюдать топологический порядок кадров
-=======
-
->>>>>>> Stashed changes
     effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
 
     const prevConsumer = this.activeConsumer
@@ -115,8 +109,6 @@ export class ReactiveEngineCore {
     try {
       for (const effect of effects) {
         if (effect.isDisposed) continue
-<<<<<<< Updated upstream
-=======
 
         if (effect.dependencies && effect.dependencies.size > 0) {
           for (const dep of effect.dependencies) {
@@ -133,7 +125,6 @@ export class ReactiveEngineCore {
           }
         }
 
->>>>>>> Stashed changes
         if (!effect.isDirty) continue
 
         try {
