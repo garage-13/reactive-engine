@@ -37,8 +37,8 @@ export function createSignal<T>(
       return value
     },
     set value(newValue: T) {
-      const isObj = value && typeof value === 'object'
-      if (value === newValue && !isObj) return
+      const isObjectKick = value === newValue && value !== null && typeof value === 'object'
+      if (Object.is(value, newValue) && !isObjectKick) return
 
       if (optionsOrName && typeof optionsOrName === 'object' && optionsOrName.validate) {
         const validation = optionsOrName.validate(newValue)
@@ -61,19 +61,20 @@ export function createSignal<T>(
         isInternalCoreSignal
       })
 
-      // ⚛️ Синхронное каскадное уведомление подписчиков
       subscribers.forEach((sub: any) => {
         const rawSub = sub._node || sub
 
-        rawSub.isDirty = true
         if (rawSub.type === 'effect') {
+          rawSub.isDirty = true
           engine.pendingEffects.add(sub)
-        }
-        if (rawSub.markDirty) {
-          rawSub.markDirty()
+        } else if (rawSub.type === 'computed') {
+          if (rawSub.markDirty) rawSub.markDirty(2) // Сигналы пушат DIRTY (2)
+        } else {
+          rawSub.isDirty = true
         }
       })
 
+      // СИНХРOННЫЙ ВЫЗОВ: Если глубина батча равна 0, немедленно выполняем флуш
       if (engine.batchDepth === 0) engine.flushEffects()
     },
     get version() { return version },

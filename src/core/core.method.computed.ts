@@ -12,7 +12,9 @@ export function createComputed<T>(
   let value: T
   let isDirty = true
   let version = 0
-  let versionCheckRequired = false
+
+  // 0 = STABLE, 1 = CHECK, 2 = DIRTY
+  let state = 2
 
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
@@ -43,8 +45,8 @@ export function createComputed<T>(
     override delete(val: any): boolean {
       const res = super.delete(val)
       if (this.size === 0) {
+        state = 2
         isDirty = true
-        versionCheckRequired = true
         releaseNode(computedNode)
         engine.computedCache.delete(fn)
       }
@@ -52,61 +54,38 @@ export function createComputed<T>(
     }
   }()
 
-  // 🟢 КАНОНИЧЕСКИЙ ТОПОЛОГИЧЕСКИЙ ВАЛИДАТОР ГРАФА (Сверху Вниз)
-  // Рекурсивно проверяет родителей и возвращает true, если выше по цепочке была хоть одна мутация.
-  const checkUpstreamModifications = (node: any): boolean => {
-    if (!node) return false
-    const actNode = node._node || node
-
-    // Чисто ленивые цепочки без эффектов (subscribers.size === 0) обязаны всегда рекурсивно
-    // опрашивать предков, так как до них ленивое клеймение markDirty физически не долетает!
-    const hasActiveSubscribers = actNode.subscribers && actNode.subscribers.size > 0
-    if (hasActiveSubscribers && !actNode.versionCheckRequired) {
-      return false
+  // РЕКУРСИВНЫЙ ОБНОВИТЕЛЬ ГРАФА СВЕРХУ ВНИЗ (Pull)
+  const updateIfNecessary = (node: any): boolean => {
+    if (node.state === 2 || isDirty) {
+      return node.run()
     }
 
-    let hasChangedParent = false
-    const depsArray = Array.from(actNode.dependencies || [])
+    if (node.state === 1) {
+      let hasChangedParent = false
 
-    // 1. ФАЗА 1: Рекурсивно погружаемся в дедушек до самых корней графа
-    for (const dep of depsArray) {
-      const rawDep = (dep as any)._node || dep
-      if (rawDep.type === 'computed' && (rawDep.versionCheckRequired || !hasActiveSubscribers)) {
-        checkUpstreamModifications(rawDep)
-      }
-    }
+      for (const dep of Array.from(node.dependencies || [])) {
+        const rawDep = (dep as any)._node || dep
 
-    // 2. ФАЗА 2: Атомарно сверяем версии рёбер графа строго после схождения верхних каскадов.
-    // Временная подмена activeConsumer гарантирует кристальную чистоту Dynamic Deps!
-    const savedConsumer = engine.activeConsumer
-    for (const dep of depsArray) {
-      const rawDep = (dep as any)._node || dep
+        if (rawDep.type === 'computed' && rawDep.state > 0) {
+          if (updateIfNecessary(rawDep)) {
+            hasChangedParent = true
+          }
+        }
 
-      if (rawDep.type === 'computed' && (rawDep.isDirty || rawDep.versionCheckRequired || !hasActiveSubscribers)) {
-        engine.activeConsumer = rawDep
-        try {
-          rawDep.run()
-        } finally {
-          engine.activeConsumer = savedConsumer
+        if (node.depVersions.get(dep) !== rawDep.version) {
+          hasChangedParent = true
         }
       }
 
-      const currentVer = rawDep.version !== undefined ? rawDep.version : ((dep as any).version !== undefined ? (dep as any).version : engine.epoch)
-
-      // СИНХРОНИЗАЦИЯ РЕБРА СВЯЗИ ВРЕМЕНИ ГРАФА:
-      // Сверяем актуальную версию родителя со старым слепком в депо-версиях ребенка.
-      if (!actNode.depVersions.has(dep) || currentVer !== actNode.depVersions.get(dep)) {
-        hasChangedParent = true
+      if (hasChangedParent) {
+        return node.run()
+      } else {
+        node.state = 0
+        return false // Value Equality Cut
       }
-
-      // Атомарно перезаписываем свежую актуальную версию родителя в локальный слепок ребенка,
-      // намертво защищая глубокие ленивые матрешки от протухания кэша!
-      actNode.depVersions.set(dep, currentVer)
     }
-    engine.activeConsumer = savedConsumer
 
-    actNode.versionCheckRequired = false
-    return hasChangedParent
+    return false
   }
 
   const computedNode: any = {
@@ -117,36 +96,35 @@ export function createComputed<T>(
     type: 'computed',
     fn,
     get version() { return version },
-    get versionCheckRequired() { return versionCheckRequired },
-    set versionCheckRequired(val: boolean) { versionCheckRequired = val },
+    get state() { return state },
+    set state(val: number) { state = val },
     get depVersions() { return depVersions },
+    update: () => {
+      return updateIfNecessary(computedNode)
+    },
     run: () => {
       if (engine.cycleDetectionStack.has(computedNode)) throw new Error('[Graph Error] Cyclic dependency detected')
       engine.cycleDetectionStack.add(computedNode)
+
       const prevConsumer = engine.activeConsumer
       engine.activeConsumer = computedNode
-
-      const oldDeps = Array.from(dependencies)
-      const oldVersions = new Map(depVersions)
 
       dependencies.forEach(dep => {
         const rawDepNode = dep._node || dep
         if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
       })
       dependencies.clear()
-      depVersions.clear()
 
       try {
         const newValue = fn()
-        const isObj = (value && typeof value === 'object') || (newValue && typeof newValue === 'object')
 
-        // КРИСТАЛЬНО ЧИСТОЕ СРАВНЕНИЕ ИЗМЕНЕНИЙ ПО ЗНАЧЕНИЮ (Value Equality)
-        const changed = isDirty || isObj || value !== newValue
+        // Сравнение по ссылке для объектов и примитивов
+        const changed = isDirty || !Object.is(value, newValue)
 
         if (changed) {
           const previousValueSnapshot = isDirty ? undefined : (typeof value === 'object' && value !== null ? JSON.parse(JSON.stringify(value)) : value)
           value = newValue
-          version++ // Растет строго при фактическом изменении значения!
+          version++
 
           if (engine.log) {
             engine.log({
@@ -158,57 +136,24 @@ export function createComputed<T>(
 
           subscribers.forEach(sub => {
             const rawSub = sub._node || sub
+            rawSub.state = 2
             rawSub.isDirty = true
             if (rawSub.type === 'effect') {
               engine.pendingEffects.add(sub)
             }
-            if (rawSub.markDirty) rawSub.markDirty()
-          })
-        } else {
-          // VALUE EQUALITY CUT: Значение примитива не изменилось!
-          subscribers.forEach(sub => {
-            const rawSub = sub._node || sub
-            if (rawSub.depVersions) {
-              rawSub.depVersions.set(computedInstance, version)
-            }
-            if (rawSub.type === 'effect') {
-              rawSub.isDirty = false
-              engine.pendingEffects.delete(sub)
-            }
+            if (rawSub.markDirty) rawSub.markDirty(2)
           })
         }
 
         isDirty = false
-        versionCheckRequired = false
+        state = 0
 
         let maxDepDepth = 0
-        let hasSameDeps = dependencies.size === oldDeps.length
-
         dependencies.forEach(dep => {
           const rawNode = dep._node || dep
-          const currentVer = rawNode.version !== undefined ? rawNode.version : (dep.version !== undefined ? dep.version : engine.epoch)
-          depVersions.set(dep, currentVer)
+          depVersions.set(dep, rawNode.version)
           if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) maxDepDepth = rawNode.depth
-          if (hasSameDeps && !oldDeps.includes(dep)) hasSameDeps = false
         })
-
-        // ПАТТЕРН МЕЖКАДРОВОЙ СИНХРОНИЗАЦИИ: Если состав родителей стабилен, мы восстанавливаем
-        // точные числовые тайминги версий из старого кадра, спасая длинные ленивые цепочки!
-        if (hasSameDeps && oldVersions.size > 0) {
-          oldVersions.forEach((ver, dep) => {
-            if (depVersions.has(dep)) {
-              const rawNode = dep._node || dep
-              depVersions.set(dep, rawNode.version !== undefined ? rawNode.version : ver)
-            }
-          })
-        } else if (!hasSameDeps && oldVersions.size > 0) {
-          oldVersions.forEach((ver, dep) => {
-            if (depVersions.has(dep)) {
-              const rawNode = dep._node || dep
-              depVersions.set(dep, rawNode.version !== undefined ? rawNode.version : ver)
-            }
-          })
-        }
 
         computedNode.depth = maxDepDepth + 1
         return changed
@@ -217,16 +162,22 @@ export function createComputed<T>(
         engine.cycleDetectionStack.delete(computedNode)
       }
     },
-    markDirty: () => {
-      if (!versionCheckRequired) {
-        versionCheckRequired = true
+    markDirty: (parentState: number) => {
+      if (state >= parentState) return
+
+      const oldState = state
+      state = parentState
+
+      if (oldState === 0) {
         subscribers.forEach(sub => {
           const rawSub = sub._node || sub
-          rawSub.isDirty = true
           if (rawSub.type === 'effect') {
+            rawSub.isDirty = true
             engine.pendingEffects.add(sub)
           }
-          if (rawSub.markDirty) rawSub.markDirty()
+          if (rawSub.markDirty) {
+            rawSub.markDirty(1) // Переводим дочерние computed в CHECK (1)
+          }
         })
       }
     }
@@ -239,42 +190,12 @@ export function createComputed<T>(
         engine.activeConsumer.dependencies.add(computedNode)
       }
 
-      // 1. ФАЗА СВЕРХУ ВНИЗ: Рекурсивно опрашиваем родителей, выявляя сквозные мутации версий
-      const upstreamChanged = checkUpstreamModifications(computedNode)
+      updateIfNecessary(computedNode)
 
-      // 2. ВТОРАЯ ФАЗА: Строгая атомарная сверка версий ребер графа строго после Pull каскада
-      let needsUpdate = isDirty || upstreamChanged
-
-      if (!needsUpdate && dependencies.size > 0) {
-        for (const dep of Array.from(dependencies)) {
-          const rawNode = (dep as any)._node || dep
-          const currentVer = rawNode.version !== undefined ? rawNode.version : (dep.version !== undefined ? dep.version : engine.epoch)
-          if (currentVer !== depVersions.get(dep)) {
-            needsUpdate = true
-            break
-          }
-        }
+      if (engine.activeConsumer && engine.activeConsumer.depVersions) {
+        engine.activeConsumer.depVersions.set(computedInstance, version)
       }
 
-      if (needsUpdate) {
-        computedNode.run()
-      } else {
-        // Логируем холостой проход строго на уровне геттера для полной прозрачной отладки кэша
-        if (versionCheckRequired && engine.log) {
-          engine.log({
-            type: 'computed',
-            label: signalName || `computed:[${fn.name || computedNode.id}]`,
-            details: { from: value, to: value }
-          })
-        }
-        versionCheckRequired = false
-        subscribers.forEach(sub => {
-          const rawSub = sub._node || sub
-          if (rawSub.depVersions) {
-            rawSub.depVersions.set(computedInstance, version)
-          }
-        })
-      }
       return value
     },
     get valueWithoutTracking() { return value },
@@ -306,6 +227,7 @@ export function createComputed<T>(
       releaseNode(computedNode)
       engine.computedCache.delete(fn)
       isDirty = true
+      state = 2
     },
     __subscribe(cb: () => void): CleanupFn {
       const hookEffect: any = {
@@ -320,15 +242,14 @@ export function createComputed<T>(
       }
     }
   } as any
-;(computedInstance as any)._node = computedNode
+
+  ;(computedInstance as any)._node = computedNode
   ;(computedInstance as any).subscribers = subscribers
   ;(computedInstance as any).dependencies = dependencies
-  computedInstance._isDirty = () => isDirty || versionCheckRequired
+  computedInstance._isDirty = () => state > 0
   computedInstance.type = 'computed'
   computedInstance.run = () => computedNode.run()
-  computedNode.destroy = () => {
-    engine.computedCache.delete(fn)
-  }
+
   engine.computedCache.set(fn, new WeakRef(computedInstance as any))
   return computedInstance
 }
