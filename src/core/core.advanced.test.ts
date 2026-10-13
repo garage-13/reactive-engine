@@ -320,4 +320,73 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
     // Значение должно оставаться строго декларативным и ленивым
     expect(comp.value).toBe(2)
   })
+  describe('⚛️ Reactive Engine — Тесты на Value-Equality Cut', () => {
+
+    test.skip('#7 [TODO: propagation cut] промежуточный computed с неизменным значением обязан блокировать дальнейшую инвалидацию', () => {
+      const engine = new ReactiveEngineCore()
+      
+      const source = engine.signal(10)
+      
+      let intermediateExecutions = 0
+      // Компьютед-фильтр: всегда возвращает true, если число четное
+      const intermediate = engine.computed(() => {
+        intermediateExecutions++
+        return source.value % 2 === 0
+      })
+
+      let downstreamExecutions = 0
+      const downstream = engine.computed(() => {
+        downstreamExecutions++
+        return intermediate.value ? 'Четное' : 'Нечетное'
+      })
+
+      // Триггерим первоначальный сбор графа
+      expect(downstream.value).toBe('Четное')
+      expect(intermediateExecutions).toBe(1)
+      expect(downstreamExecutions).toBe(1)
+
+      // Мутируем корень графа: 10 -> 12 (оба четные, результат intermediate не изменился!)
+      source.value = 12
+
+      // Читаем хвост графа. 
+      // Промежуточный узел обязан пересчитаться (так как его корень изменился),
+      // но дочерний узел DOWNSTREAM НЕ ДОЛЖЕН пересчитываться, так как intermediate вернул тот же true!
+      expect(downstream.value).toBe('Четное')
+      expect(intermediateExecutions).toBe(2) 
+      expect(downstreamExecutions).toBe(1) // ❌ Упадет здесь: на старом коде будет 2, так как markDirty сработает вслепую
+    })
+
+    test.skip('#34 [TODO: pruning stops] каскад инвалидации должен затухать на первом же узле с неизменным результатом', () => {
+      const engine = new ReactiveEngineCore()
+      const source = engine.signal(1)
+      
+      // b зажимает значение в диапазоне [0, 10]
+      const b = engine.computed(() => Math.min(Math.max(source.value, 0), 10))
+      const c = engine.computed(() => b.value + 1)
+      const d = engine.computed(() => c.value * 2)
+
+      expect(d.value).toBe(4) // initial: source(1) -> b(1) -> c(2) -> d(4)
+
+      // Изменение внутри диапазона: b меняется, c меняется, d меняется
+      source.value = 2
+      expect(d.value).toBe(6)
+
+      // Мутируем source далеко за предел: 20. b станет равно 10.
+      source.value = 20
+      expect(d.value).toBe(22) // b(10) -> c(11) -> d(22)
+
+      // А теперь мутируем source еще дальше: 20 -> 30.
+      // Значение b остается равным 10. Каскад обязан затухнуть на b!
+      let spy = vi.fn()
+      engine.effect(() => {
+        spy(d.value)
+      })
+      spy.mockClear()
+
+      source.value = 30
+
+      // Так как b не изменился (остался 10), эффекты и вычисления ниже по графу не должны дергаться
+      expect(spy).not.toHaveBeenCalled() // ❌ Упадет здесь на текущей реализации
+    })
+  })
 })

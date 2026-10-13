@@ -1,10 +1,6 @@
 import { getExtractedValues } from '../utils/getExtractedValues'
 import { Signal, CleanupFn, SignalOptions } from './types'
 
-/**
- * Изолированная фабрика сигналов реактивного графа.
- * Полностью отвязана от лексического контекста класса для абсолютной чистоты V8.
- */
 export function createSignal<T>(
   engine: any,
   initialValue: T,
@@ -51,32 +47,29 @@ export function createSignal<T>(
       
       const oldValue = value
       value = newValue
+      
       version++
       engine.epoch++
-      engine.log({ type: 'signal', label: name || 'signal', details: { from: oldValue, to: newValue }, isInternalCoreSignal })
       
-      const markDirtyNode = (node: any) => {
-        node.subscribers.forEach((sub: any) => {
-          if (sub === engine.activeConsumer) return
-          
-          const wasDirty = sub.isDirty
-          sub.isDirty = true
-          
-          if (sub.type === 'effect') {
-            engine.pendingEffects.add(sub)
-          } else {
-            engine.pendingEffects.add(sub)
-            // 🟢 ИСПРАВЛЕНО: Если подписчик — это компьютед, делегируем каскад инвалидации его нативному методу markDirty
-            if (sub.markDirty) {
-              sub.markDirty()
-            } else if (!wasDirty && sub.subscribers) {
-              markDirtyNode(sub)
-            }
-          }
-        })
-      }
+      engine.log({ 
+        type: 'signal', 
+        label: name || 'signal', 
+        details: { from: oldValue, to: newValue }, 
+        isInternalCoreSignal 
+      })
       
-      markDirtyNode(signalNode)
+      subscribers.forEach((sub: any) => {
+        const rawSub = sub._node || sub
+        
+        rawSub.isDirty = true
+        if (rawSub.type === 'effect') {
+          engine.pendingEffects.add(sub)
+        }
+        if (rawSub.markDirty) {
+          rawSub.markDirty()
+        }
+      })
+      
       if (engine.batchDepth === 0) engine.flushEffects()
     },
     get version() { return version },
@@ -86,6 +79,7 @@ export function createSignal<T>(
         isDirty: true,
         depth: 9999,
         dependencies: new Set(),
+        type: 'effect',
         run: () => {
           if (fakeEffect.isDisposed) return
           try { cb(value) } catch (err) { console.error(err) }

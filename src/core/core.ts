@@ -101,6 +101,8 @@ export class ReactiveEngineCore {
     if (this.batchDepth > 0) return
     const effects = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
+    
+    // Сортируем эффекты по глубине (depth), чтобы соблюдать топологический порядок кадров
     effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
     
     const prevConsumer = this.activeConsumer
@@ -108,27 +110,11 @@ export class ReactiveEngineCore {
     try {
       for (const effect of effects) {
         if (effect.isDisposed) continue
-
-        if (effect.dependencies && effect.dependencies.size > 0) {
-          for (const dep of effect.dependencies) {
-            const rawNode = dep._node || dep
-            if (rawNode.type === 'computed' && rawNode._isDirty && rawNode._isDirty()) {
-              try {
-                rawNode.run() 
-              } catch (err) {
-                if (this.batchDepth === 0) throw err
-              }
-            }
-          }
-        }
-
         if (!effect.isDirty) continue
 
         try {
           effect.run()
         } catch (err) {
-          // 🟢 ИСПРАВЛЕНО (core.test.ts): Убираем console.error, чтобы не спамить в stderr Vitest.
-          // Если мы вне батча, мгновенно пробрасываем ошибку для корректных toThrow ассертов
           if (this.batchDepth === 0) throw err
         }
       }

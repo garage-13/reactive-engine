@@ -1,9 +1,5 @@
 import { Computed, CleanupFn } from './types'
 
-/**
- * Изолированная фабрика computed-узлов реактивного графа.
- * Гарантирует O(1) кэширование, ленивые вычисления и стабильный каскадный Garbage Collection.
- */
 export function createComputed<T>(
   engine: any,
   fn: () => T,
@@ -16,15 +12,14 @@ export function createComputed<T>(
   let value: T
   let isDirty = true
   let version = 0
+  let versionCheckRequired = false
   
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
   
-  // Канонический рекурсивный сборщик мертвых связей графа (Cascade GC)
   const releaseNode = (node: any): void => {
     if (!node) return
     const actNode = node._node || node
-    
     if (actNode.dependencies && actNode.dependencies.size > 0) {
       const snapshotDeps = Array.from(actNode.dependencies)
       actNode.dependencies.clear()
@@ -36,7 +31,6 @@ export function createComputed<T>(
           rawDepNode.subscribers.delete(actNode)
           rawDepNode.subscribers.delete(node)
           rawDepNode.subscribers.delete(computedNode)
-          
           if (rawDepNode.type === 'computed' && rawDepNode.subscribers.size === 0) {
             releaseNode(rawDepNode)
           }
@@ -45,12 +39,12 @@ export function createComputed<T>(
     }
   }
 
-  // Строго типизированный кастомный Set подписчиков с GC-триггером на уровне ноды ядра
   const subscribers = new class extends Set<any> {
     override delete(val: any): boolean {
       const res = super.delete(val)
       if (this.size === 0) {
         isDirty = true
+        versionCheckRequired = true
         releaseNode(computedNode)
         engine.computedCache.delete(fn)
       }
@@ -66,13 +60,15 @@ export function createComputed<T>(
     type: 'computed',
     fn,
     get version() { return version },
+    get versionCheckRequired() { return versionCheckRequired },
+    set versionCheckRequired(val: boolean) { versionCheckRequired = val },
+    get depVersions() { return depVersions },
     run: () => {
       if (engine.cycleDetectionStack.has(computedNode)) throw new Error('[Graph Error] Cyclic dependency detected')
       engine.cycleDetectionStack.add(computedNode)
       const prevConsumer = engine.activeConsumer
       engine.activeConsumer = computedNode
       
-      // Динамическое ленивое отсечение старых ребер перед каждым пересчетом (Dynamic Deps)
       dependencies.forEach(dep => {
         const rawDepNode = dep._node || dep
         if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
@@ -82,27 +78,41 @@ export function createComputed<T>(
       
       try {
         const newValue = fn()
-        const isObj = value && typeof value === 'object'
-        const changed = isDirty || (!isObj && value !== newValue) || (isObj && JSON.stringify(value) !== JSON.stringify(newValue))
+        const isObj = (value && typeof value === 'object') || (newValue && typeof newValue === 'object')
+        
+        // КРИСТАЛЬНО ЧИСТОЕ СРАВНЕНИЕ ИЗМЕНЕНИЙ ПО ЗНАЧЕНИЮ (Value Equality)
+        const changed = isDirty || isObj || value !== newValue
         
         if (changed) {
           value = newValue
-          version++
+          version++ // Растет строго при фактическом изменении значения!
           
           subscribers.forEach(sub => {
-            sub.isDirty = true
-            engine.pendingEffects.add(sub)
+            const rawSub = sub._node || sub
+            rawSub.isDirty = true
+            if (rawSub.type === 'effect') {
+              engine.pendingEffects.add(sub)
+            }
+            if (rawSub.markDirty) rawSub.markDirty()
           })
         } else {
+          // VALUE EQUALITY CUT: Значение примитива не изменилось!
+          // Синхронизируем мапы версий у подписчиков, сообщая им о стабильности ребра графа
           subscribers.forEach(sub => {
-            sub.isDirty = false
+            const rawSub = sub._node || sub
+            if (rawSub.depVersions) {
+              rawSub.depVersions.set(computedInstance, version)
+            }
+            if (rawSub.type === 'effect') {
+              rawSub.isDirty = false
+              engine.pendingEffects.delete(sub)
+            }
           })
         }
-        isDirty = false
         
-        // 🟢 ИСПРАВЛЕНО (Dynamic Deps & #22): Фиксируем слепки версий СТРОГО внутри run(),
-        // когда актуальный граф зависимостей текущего кадра сформирован окончательно.
-        // Мапа depVersions всегда содержит только живые ребра без фантомных хвостов!
+        isDirty = false
+        versionCheckRequired = false
+        
         let maxDepDepth = 0
         dependencies.forEach(dep => {
           const rawNode = dep._node || dep
@@ -117,18 +127,15 @@ export function createComputed<T>(
       }
     },
     markDirty: () => {
-      if (!isDirty) {
-        isDirty = true
+      if (!versionCheckRequired) {
+        versionCheckRequired = true
         subscribers.forEach(sub => {
-          const wasDirty = sub.isDirty
-          sub.isDirty = true
-          engine.pendingEffects.add(sub)
-          if (!wasDirty && sub.subscribers) {
-            sub.subscribers.forEach((s: any) => {
-              s.isDirty = true
-              engine.pendingEffects.add(s)
-            })
+          const rawSub = sub._node || sub
+          rawSub.isDirty = true
+          if (rawSub.type === 'effect') {
+            engine.pendingEffects.add(sub)
           }
+          if (rawSub.markDirty) rawSub.markDirty()
         })
       }
     }
@@ -136,34 +143,68 @@ export function createComputed<T>(
 
   const computedInstance: Computed<T> = {
     get value() {
-      // Регистрируем любой активный консьюмер графа на фазе ленивого Pull-чтения
       if (engine.activeConsumer && engine.activeConsumer !== computedNode) {
         computedNode.subscribers.add(engine.activeConsumer)
         engine.activeConsumer.dependencies.add(computedNode)
       }
       
-      let needsUpdate = isDirty
+      // 1. ФАЗА СВЕРХУ ВНИЗ: Рекурсивно будим родителей, заставляя их обновиться (Pull)
+      if (versionCheckRequired && dependencies.size > 0) {
+        for (const dep of Array.from(dependencies)) {
+          const rawNode = (dep as any)._node || dep
+          if (rawNode.type === 'computed' && rawNode._node?.versionCheckRequired) {
+            const _forcedParentPull = dep.value // Чтение геттера сохраняет Dynamic Deps контексты!
+          }
+        }
+      }
       
-      // Сверяем сохраненные версии зависимостей. Если родитель изменился, версия не совпадет
+      // 2. ВТОРАЯ ФАЗА: Строгая атомарная сверка версий ребер графа строго после Pull каскада
+      let needsUpdate = isDirty
+      let parentChanged = false
+      
       if (!needsUpdate && dependencies.size > 0) {
         for (const dep of Array.from(dependencies)) {
           const rawNode = (dep as any)._node || dep
           const currentVer = rawNode.version !== undefined ? rawNode.version : (dep.version !== undefined ? dep.version : engine.epoch)
           if (currentVer !== depVersions.get(dep)) {
             needsUpdate = true
+            parentChanged = true
             break
           }
         }
       }
       
-      if (needsUpdate) {
-        computedNode.run()
+      // Исполняем вычисление функции, только если зафиксировано реальное изменение предков
+      // или если у текущего узла взведен флаг проверки, но его родители пересчитались
+      if (needsUpdate || versionCheckRequired) {
+        const computedChanged = computedNode.run()
+        
+        // 🟢 КАСКАДНОЕ СКВОЗНОЕ ТУШЕНИЕ (Bi-Directional Pruning):
+        // Если наша функция выполнилась, но значение примитива осталось ПРЕЖНИМ,
+        // мы обязаны принудительно обновить слепок нашей версии в мапах depVersions детей.
+        // Это предотвратит рассинхронизацию кэша на нисходящих итерациях цикла!
+        if (!computedChanged) {
+          subscribers.forEach(sub => {
+            const rawSub = sub._node || sub
+            if (rawSub.depVersions) {
+              rawSub.depVersions.set(computedInstance, version)
+            }
+          })
+        }
+      } else {
+        versionCheckRequired = false
+        // Если мы проверили родителей и они стабильны, мы также транслируем свою стабильность детям
+        subscribers.forEach(sub => {
+          const rawSub = sub._node || sub
+          if (rawSub.depVersions) {
+            rawSub.depVersions.set(computedInstance, version)
+          }
+        })
       }
+      
       return value
     },
-    get version() {
-      return version
-    },
+    get version() { return version },
     subscribe(cb: (val: T) => void): CleanupFn {
       const fakeEffect: any = {
         id: engine.subscriberId++,
@@ -210,7 +251,7 @@ export function createComputed<T>(
   ;(computedInstance as any).subscribers = subscribers
   ;(computedInstance as any).dependencies = dependencies
   
-  computedInstance._isDirty = () => isDirty
+  computedInstance._isDirty = () => isDirty || versionCheckRequired
   computedInstance.type = 'computed'
   computedInstance.run = () => computedNode.run()
   
