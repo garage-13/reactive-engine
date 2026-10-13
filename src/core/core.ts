@@ -90,6 +90,8 @@ export class ReactiveEngineCore {
   private reactiveSignals = new WeakMap<object, Map<string | symbol, any>>()
   private cycleDetectionStack = new Set<unknown>()
 
+  public batchedSignals = new Set<any>()
+
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
   }
@@ -98,12 +100,35 @@ export class ReactiveEngineCore {
     queueLog(type, label, details)
   }
 
+  public batch<T>(fn: () => T): T {
+    this.batchDepth++
+    try {
+      return fn()
+    } finally {
+      this.batchDepth--
+      if (this.batchDepth === 0) {
+        // 🚀 АТOМАРНЫЙ КOММИТ ТРАНЗАКЦИИ
+        const signalsToFlush = Array.from(this.batchedSignals)
+        this.batchedSignals.clear()
+
+        // Сначала фиксируем финальные версии всех изменившихся сигналов
+        signalsToFlush.forEach(sig => {
+          if (sig._flushBatch) sig._flushBatch()
+        })
+
+        // Затем одной топологической волной запускаем эффекты
+        this.flushEffects()
+      }
+    }
+  }
+
   public flushEffects(): void {
     if (this.batchDepth > 0) return
 
     const effects = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
 
+    // Гарантируем строгий топологический порядок выполнения эффектов
     effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
 
     const prevConsumer = this.activeConsumer
@@ -112,14 +137,11 @@ export class ReactiveEngineCore {
       for (const effect of effects) {
         if (effect.isDisposed) continue
 
-        // Валидация зависимостей эффекта перед запуском
+        // Рекурсивный pull-анализ версий родителей перед запуском эффекта
         if (effect.dependencies && effect.dependencies.size > 0) {
           let parentChanged = false
           for (const dep of effect.dependencies) {
             const rawNode = dep._node || dep
-
-            // КРИТИЧЕСКИЙ ШАГ: Вызываем метод .update(), позволяя computed
-            // произвести рекурсивный pull-анализ изменений
             if (rawNode.type === 'computed' && rawNode.state > 0) {
               if (rawNode.update) rawNode.update()
             }
@@ -127,7 +149,7 @@ export class ReactiveEngineCore {
               parentChanged = true
             }
           }
-
+          // Value Equality Cut: Если предки стабильны, гасим эффект
           if (!parentChanged && effect.dependencies.size > 0) {
             effect.isDirty = false
             continue
@@ -147,9 +169,9 @@ export class ReactiveEngineCore {
     }
   }
 
-  public batch<T>(fn: () => T): T {
-    return executeBatch<T>(this, fn)
-  }
+  // public batch<T>(fn: () => T): T {
+  //   return executeBatch<T>(this, fn)
+  // }
 
   private log ({ type, label, details, isInternalCoreSignal = false }: { type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }, isInternalCoreSignal?: boolean }) {
     ReactiveDebounceLogger.processLog(this.logger, queueLog, {

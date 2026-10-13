@@ -58,12 +58,20 @@ export function createComputed<T>(
 
   // ⚡ ЭТАЛОННЫЙ АПДЕЙТЕР ГРАФА ПО ВЕРСИЯМ РОДИТЕЛЕЙ (Pull)
   const updateIfNecessary = (node: any): boolean => {
+    // 1. Холодный старт
     if (!isInitialized) {
       return node.run()
     }
 
-    if (node.state > 0) {
-      // Рекурсивно заставляем всех computed-предков актуализировать свои состояния
+    // 🌟 ДОБАВИТЬ ЭТОТ БЛOК: Если прилетела прямая грязь от сигнала — вычисляем сразу
+    if (node.state === 2) {
+      return node.run()
+    }
+
+    // 2. Проверка каскада CHECK
+    if (node.state === 1) {
+      let hasChangedParent = false
+
       for (const dep of Array.from(node.dependencies)) {
         const rawDep = (dep as any)._node || dep
         if (rawDep.type === 'computed' && rawDep.state > 0) {
@@ -71,8 +79,6 @@ export function createComputed<T>(
         }
       }
 
-      // Атомарно проверяем, изменилась ли числовая версия хоть одной из наших сохраненных зависимостей
-      let hasChangedParent = false
       for (const dep of Array.from(node.dependencies)) {
         const rawDep = (dep as any)._node || dep
         if (node.depVersions.get(dep) !== rawDep.version) {
@@ -83,12 +89,11 @@ export function createComputed<T>(
 
       node.state = 0
 
-      // Пересчитываем узел исключительно если зафиксировано реальное изменение родителей
       if (hasChangedParent || isDirty) {
         return node.run()
       }
 
-      return false // Value Equality Cut
+      return false
     }
 
     return false
