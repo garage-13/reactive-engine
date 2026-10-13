@@ -4,7 +4,20 @@ import { useReactiveValue } from './hooks/useReactiveValue'
 import { ISignalLike } from '../core/types'
 
 class ExtendedReactiveEngine extends ReactiveEngineCore {
-  public use<T>(item: T): T extends ISignalLike<infer V> ? V : T {
+  /**
+   * Сценарий 1: На вход подан легитимный реактивный примитив (Signal или Computed)
+   */
+  public use<V>(item: ISignalLike<V>): V;
+
+  /**
+   * Сценарий 2: На вход подан Proxy-объект, массив или обычный примитив
+   */
+  public use<T>(item: T): T;
+
+  /**
+   * Исполняемая сигнатура метода
+   */
+  public use(item: any): any {
     return useReactiveValue(item)
   }
 }

@@ -33,6 +33,9 @@ export function createSignal<T>(
       }
       return value
     },
+    get valueWithoutTracking() {
+      return value
+    },
     set value(newValue: T) {
       const isObj = value && typeof value === 'object'
       if (value === newValue && !isObj) return

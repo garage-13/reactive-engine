@@ -1,63 +1,53 @@
-import { useSyncExternalStore, useRef } from 'react'
+import { useState, useEffect, useDebugValue } from 'react'
 import { ISignalLike } from '../../core/types'
 
-export function useReactiveValue<T>(item: T): T extends ISignalLike<infer V> ? V : T {
-  if (item === null || item === undefined || typeof item !== 'object') {
-    return item as any
+export function useReactiveValue<V>(signal: ISignalLike<V> | any): V {
+  const isProxy = signal && typeof signal === 'object' && '__subscribe' in signal
+  const isSignal = signal && typeof signal === 'object' && 'subscribe' in signal
+
+  if (!isSignal && !isProxy) {
+    return signal
   }
 
-  const isSignal = 'subscribe' in item && typeof (item as Record<string, unknown>).subscribe === 'function'
+  // Находим корневой инстанс ядра реактивности фреймворка
+  const rawNode = (signal as any)._node || signal
+  const engine = rawNode.engine || (signal as any).engine
 
-  const storeRef = useRef<{
-    version: number
-    unsubscribe: (() => void) | null
-    listeners: Set<() => void>
-  }>({
-    version: 0,
-    unsubscribe: null,
-    listeners: new Set()
+  // РЕАКТИВНЫЙ БУФЕР ДЛЯ REACT 18 CONCURRENT MODE
+  // Инициализируем локальный стейт React строго актуальным значением из кэша.
+  // Использование engine.untrack() защищает стартовый рендер в StrictMode от утечки контекста!
+  const [localState, setLocalState] = useState(() => {
+    if (engine && 'untrack' in engine) {
+      return engine.untrack(() => (signal.value !== undefined ? signal.value : signal))
+    }
+    return signal.value !== undefined ? signal.value : signal
   })
 
-  const subscribeStore = (cb: () => void) => {
-    storeRef.current.listeners.add(cb)
+  useEffect(() => {
+    // Выбираем пассивный системный хук __subscribe для computed и proxy,
+    // чтобы просыпаться строго один раз в конце транзакции, убирая дубли из консоли
+    const hasHook = '__subscribe' in signal && typeof (signal as any).__subscribe === 'function'
 
-    if (!storeRef.current.unsubscribe) {
-      let isInitializing = true
+    const triggerStoreUpdate = () => {
+      // Актуализируем ленивое значение кэша строго на этапе закрытия транзакции ядра
+      const freshValue = signal.value !== undefined ? signal.value : signal
 
-      const triggerUpdate = () => {
-        if (isInitializing) return
-        storeRef.current.version++
-        storeRef.current.listeners.forEach(listener => listener())
-      }
-
-      if (isSignal) {
-        storeRef.current.unsubscribe = (item as any).subscribe(triggerUpdate)
-      } else if ('__subscribe' in item && typeof (item as any).__subscribe === 'function') {
-        // Нативно подписываемся на сквозной эмиттер Proxy-коллекции ядра
-        storeRef.current.unsubscribe = (item as any).__subscribe(triggerUpdate)
-      }
-
-      isInitializing = false
+      // Проталкиваем изменения в локальный стейт React.
+      // Если это массив, React зафиксирует новую ссылку и сделает ровно 1 ререндер!
+      setLocalState(freshValue)
     }
 
-    return () => {
-      storeRef.current.listeners.delete(cb)
-      if (storeRef.current.listeners.size === 0 && storeRef.current.unsubscribe) {
-        storeRef.current.unsubscribe()
-        storeRef.current.unsubscribe = null
-      }
-    }
-  }
+    const unsubscribe = hasHook
+      ? (signal as any).__subscribe(triggerStoreUpdate)
+      : signal.subscribe((newValue: any) => setLocalState(newValue))
 
-  // useSyncExternalStore реагирует строго на инкремент версии, перезапуская ререндер
-  useSyncExternalStore(
-    subscribeStore,
-    () => storeRef.current.version,
-    () => storeRef.current.version
-  )
+    return () => unsubscribe()
+  }, [signal])
 
-  const rawValue = isSignal ? (item as any).value : item
+  useDebugValue(localState)
 
-  // Возвращаем оригинальный Proxy-объект напрямую! Ссылочная идентичность инпутов в React сохраняется на 100%
-  return rawValue as any
+  // Возвращаем локальный изолированный стейт. Во время фазы рендера React
+  // хук больше не дергает внутренние геттеры ядра, полностью блокируя Render Loop
+  // и гарантируя 100% стабильность ссылочных типов данных в renderHook!
+  return localState
 }
