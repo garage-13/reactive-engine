@@ -254,4 +254,164 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(dRuns).toBe(0) // d по-прежнему недостижим и НЕ должен вычисляться!
   })
 
+  // =========================================================================
+  // 💀 ГРУППА: ЖИЗНЕННЫЙ ЦИКЛ ЭФФЕКТOВ И ДИНАМИЧЕСКOЕ УНИЧТOЖЕНИЕ
+  // =========================================================================
+  test('#201: computed-triggered disposal — effect skipped and no subscription leak', () => {
+    const engine = new ReactiveEngineCore()
+    const s = engine.signal(0)
+
+    let e1Runs = 0
+    let e2Runs = 0
+
+    // Объявляем ссылки на dispose-функции заранее
+    let disposeE1: () => void = () => {}
+
+    // Вычисляемое свойство, которое на значении s === 1 уничтожает e1
+    const a = engine.computed(() => {
+      if (s.value === 1) {
+        disposeE1() // Уничтожаем эффект e1 ПРЯМO из тела computed во время его вычисления!
+      }
+      return s.value * 10
+    })
+
+    // Создаем два эффекта-слушателя
+    disposeE1 = engine.effect(() => {
+      const _ = a.value
+      e1Runs++
+    })
+
+    const disposeE2 = engine.effect(() => {
+      const _ = a.value
+      e2Runs++
+    })
+
+    // Прогрев графа
+    expect(e1Runs).toBe(1)
+    expect(e2Runs).toBe(1)
+
+    // Триггерим мутацию, запускающую disposal
+    s.value = 1
+
+    // КРИТИЧЕСКИЕ УТВЕРЖДЕНИЯ СЛЕДСТВИЯ:
+    // 1. Эффект e2 обязан выполниться и получить новое значение (10)
+    expect(e2Runs).toBe(2)
+    // 2. Эффект e1 был уничтожен ПРЕДВАРИТЕЛЬНO посреди флуша, поэтому он НЕ должен нарастить счетчик!
+    expect(e1Runs).toBe(1)
+
+    // Проверяем на утечку подписок (Subscription Leak)
+    s.value = 2
+    expect(e1Runs).toBe(1) // e1 мертв, счетчик стоит
+    expect(e2Runs).toBe(3) // e2 живет и реагирует
+  })
+
+  test('#202: computed-triggered disposal — sibling effects still notified correctly', () => {
+    const engine = new ReactiveEngineCore()
+    const s = engine.signal(0)
+
+    let disposeE1: () => void = () => {}
+
+    const a = engine.computed(() => {
+      if (s.value === 1) {
+        disposeE1()
+      }
+      return s.value + 100
+    })
+
+    // Инициализируем e1, который будет уничтожен
+    disposeE1 = engine.effect(() => {
+      const _ = a.value
+    })
+
+    // Сиблинг (соседний эффект), который должен выжить несмотря на мутацию итератора в Set
+    const spySibling = vi.fn()
+    engine.effect(() => {
+      spySibling(a.value)
+    })
+
+    expect(spySibling).toHaveBeenLastCalledWith(100)
+    spySibling.mockClear()
+
+    // Запускаем триггер
+    s.value = 1
+
+    // Соседний эффект обязан стабильно проснуться и получить свежее значение,
+    // мутация Set.prototype.delete не должна сбить итератор планировщика!
+    expect(spySibling).toHaveBeenCalledTimes(1)
+    expect(spySibling).toHaveBeenLastCalledWith(101)
+  })
+
+  test('#40: effect cleanup runs completely outside reactive evaluation context', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+    const b = engine.signal(0)
+
+    let cleanupSpy = vi.fn()
+    let effectSpy = vi.fn()
+
+    const dispose = engine.effect(() => {
+      effectSpy(a.value)
+
+      return () => {
+        // Функция очистки (cleanup) СЧИТЫВАЕТ сигнал b.
+        // Это НЕ должно создавать реактивную подписку эффекта на сигнал b!
+        cleanupSpy(b.value)
+      }
+    })
+
+    expect(effectSpy).toHaveBeenCalledTimes(1)
+    expect(effectSpy).toHaveBeenLastCalledWith(0)
+
+    // Первый перезапуск эффекта, чтобы сработал первый cleanup
+    effectSpy.mockClear()
+    cleanupSpy.mockClear()
+    a.value = 1
+
+    expect(effectSpy).toHaveBeenCalledTimes(1)
+    expect(cleanupSpy).toHaveBeenCalledTimes(1)
+    expect(cleanupSpy).toHaveBeenLastCalledWith(0)
+
+    // КРИТИЧЕСКАЯ ПРОВЕРКА: Изменяем сигнал b.
+    // Поскольку cleanup обязан выполняться в режиме untracked, эффект НЕ должен реагировать!
+    effectSpy.mockClear()
+    cleanupSpy.mockClear()
+    b.value = 10
+
+    expect(effectSpy).not.toHaveBeenCalled()
+    expect(cleanupSpy).not.not.toHaveBeenCalled() // Тишина, утечки контекста нет
+
+    dispose()
+  })
+
+  test('#111: cleanup-triggered dispose prevents subsequent scheduled re-runs', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+
+    let effectRuns = 0
+    let dispose: () => void
+
+    dispose = engine.effect(() => {
+      effectRuns++
+      const _ = a.value
+
+      return () => {
+        // Эффект уничтожает сам себя прямо внутри своей функции очистки!
+        if (a.value === 1) {
+          dispose()
+        }
+      }
+    })
+
+    expect(effectRuns).toBe(1)
+
+    // Триггерим изменение, которое вызовет cleanup с условием a === 1
+    a.value = 1
+    expect(effectRuns).toBe(2) // Эффект перезапустился во второй раз и вызвал dispose()
+
+    // КРИТИЧЕСКАЯ ПРОВЕРКА: Теперь эффект полностью мёртв и отписан.
+    // Последующие мутации сигнала 'a' не должны приводить к его вызову!
+    a.value = 2
+    expect(effectRuns).toBe(2) // Счетчик замер на двух, эффект успешно уничтожен
+  })
+
 })
