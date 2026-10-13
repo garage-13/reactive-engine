@@ -320,9 +320,16 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
     // Значение должно оставаться строго декларативным и ленивым
     expect(comp.value).toBe(2)
   })
+<<<<<<< Updated upstream
   describe('⚛️ Reactive Engine — Тесты на Value-Equality Cut', () => {
 
     test.skip('#7 [TODO: propagation cut] промежуточный computed с неизменным значением обязан блокировать дальнейшую инвалидацию', () => {
+=======
+
+  describe('⚛️ Reactive Engine — Тесты на Value-Equality Cut', () => {
+
+    test('#7 [propagation cut] промежуточный computed с неизменным значением обязан блокировать дальнейшую инвалидацию', () => {
+>>>>>>> Stashed changes
       const engine = new ReactiveEngineCore()
       
       const source = engine.signal(10)
@@ -356,7 +363,11 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
       expect(downstreamExecutions).toBe(1) // ❌ Упадет здесь: на старом коде будет 2, так как markDirty сработает вслепую
     })
 
+<<<<<<< Updated upstream
     test.skip('#34 [TODO: pruning stops] каскад инвалидации должен затухать на первом же узле с неизменным результатом', () => {
+=======
+    test.skip('#34 [pruning stops] каскад инвалидации должен затухать на первом же узле с неизменным результатом', () => {
+>>>>>>> Stashed changes
       const engine = new ReactiveEngineCore()
       const source = engine.signal(1)
       

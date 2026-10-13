@@ -6,6 +6,7 @@ import { executeBatch } from './core.method.batch'
 import { executeUntrack } from './core.method.untrack'
 import { createReactive } from './core.method.reactive'
 import { createEffect } from './core.method.effect'
+import { ReactiveDebounceLogger } from './core.logger'
 
 // Тип для конструктора класса
 type Constructor<T> = new (...args: any[]) => T
@@ -58,8 +59,8 @@ export function flushLogs(): void {
 
     if (hasTransition) {
       if (!!record.from)
-        logMessage += `(${safeValueToString(record.from)} → ${safeValueToString(record.to)})`
-      else logMessage += `(${safeValueToString(record.to)})`
+        logMessage += ` ${safeValueToString(record.from)} → ${safeValueToString(record.to)}`
+      else logMessage += ` (${safeValueToString(record.to)})`
     }
 
     if (record.payload !== undefined) {
@@ -101,15 +102,38 @@ export class ReactiveEngineCore {
     if (this.batchDepth > 0) return
     const effects = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
+<<<<<<< Updated upstream
     
     // Сортируем эффекты по глубине (depth), чтобы соблюдать топологический порядок кадров
+=======
+
+>>>>>>> Stashed changes
     effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
-    
+
     const prevConsumer = this.activeConsumer
 
     try {
       for (const effect of effects) {
         if (effect.isDisposed) continue
+<<<<<<< Updated upstream
+=======
+
+        if (effect.dependencies && effect.dependencies.size > 0) {
+          for (const dep of effect.dependencies) {
+            const rawNode = dep._node || dep
+            if (rawNode.type === 'computed' && rawNode._isDirty && rawNode._isDirty()) {
+              try {
+                this.untrack(() => {
+                  const _actualizeLazyCache = dep.value
+                })
+              } catch (err) {
+                if (this.batchDepth === 0) throw err
+              }
+            }
+          }
+        }
+
+>>>>>>> Stashed changes
         if (!effect.isDirty) continue
 
         try {
@@ -128,13 +152,12 @@ export class ReactiveEngineCore {
   }
 
   private log ({ type, label, details, isInternalCoreSignal = false }: { type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }, isInternalCoreSignal?: boolean }) {
-    const isEnabled = this.logger.isEnabled
-    const isCoreOptimizationDebugEnabled = this.logger.isCoreOptimizationDebugEnabled
-    if (isEnabled) {
-      if (isInternalCoreSignal) {
-        if (isCoreOptimizationDebugEnabled) queueLog(type, label, details)
-      } else queueLog(type, label, details)
-    }
+    ReactiveDebounceLogger.processLog(this.logger, queueLog, {
+      type,
+      label,
+      details,
+      isInternalCoreSignal
+    })
   }
 
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
@@ -265,29 +288,29 @@ export class ReactiveEngineCore {
        * - НЕАКТИВНО: Более очевидное логирование процессов пре-валидации (выставление ошибок и мониторинг разработчиком)
       */
       // --
-      if (isValid === false) {
-        // Если валидатор вернул строго false — мы тихо блокируем старт фетчера,
-        // переводя ресурс в состояние ПОКОЯ (loading: false, error: null).
-        // Это полностью ликвидирует генерацию ложных ошибок при монтировании!
-        state.value = {
-          loading: false,
-          data: null,
-          error: null, // Ошибки нет! Стейт стабилен.
-          isRetrying: false
-        }
-        return
-      }
-      if (typeof isValid === 'string') {
-        // Если валидатор вернул строку — это боевая декларативная ошибка валидации формы.
-        // Здесь мы честно переводим ресурс в стейт ошибки, как и требовалось ранее.
-        state.value = {
-          loading: false,
-          data: null,
-          error: 'Core internal stopper',
-          isRetrying: false
-        }
-        return
-      }
+      // if (isValid === false) {
+      //   // Если валидатор вернул строго false — мы тихо блокируем старт фетчера,
+      //   // переводя ресурс в состояние ПОКОЯ (loading: false, error: null).
+      //   // Это полностью ликвидирует генерацию ложных ошибок при монтировании!
+      //   state.value = {
+      //     loading: false,
+      //     data: null,
+      //     error: null, // Ошибки нет! Стейт стабилен.
+      //     isRetrying: false
+      //   }
+      //   return
+      // }
+      // if (typeof isValid === 'string') {
+      //   // Если валидатор вернул строку — это боевая декларативная ошибка валидации формы.
+      //   // Здесь мы честно переводим ресурс в стейт ошибки, как и требовалось ранее.
+      //   state.value = {
+      //     loading: false,
+      //     data: null,
+      //     error: 'Core internal stopper',
+      //     isRetrying: false
+      //   }
+      //   return
+      // }
       // --
       if (validateBeforeFetch) {
         const preValidationResult = validateBeforeFetch(sValue)

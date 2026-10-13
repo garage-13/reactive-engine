@@ -15,7 +15,7 @@ export function createSignal<T>(
     tested: [name],
     expectedKey: 'CORE_INTERNAL_SIGNAL',
     valueType: 'number',
-  })?.toString() === '1' || false
+  })?.[0] === '1' || false
 
   const signalNode = {
     subscribers,
@@ -58,6 +58,10 @@ export function createSignal<T>(
         isInternalCoreSignal 
       })
       
+<<<<<<< Updated upstream
+=======
+      // ⚛️ Синхронное каскадное уведомление подписчиков
+>>>>>>> Stashed changes
       subscribers.forEach((sub: any) => {
         const rawSub = sub._node || sub
         
