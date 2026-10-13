@@ -12,6 +12,7 @@ export function createComputed<T>(
   let value: T
   let isDirty = true
   let version = 0
+  let isInitialized = false
 
   // 0 = STABLE, 1 = CHECK, 2 = DIRTY
   let state = 2
@@ -47,6 +48,7 @@ export function createComputed<T>(
       if (this.size === 0) {
         state = 2
         isDirty = true
+        isInitialized = false
         releaseNode(computedNode)
         engine.computedCache.delete(fn)
       }
@@ -54,35 +56,39 @@ export function createComputed<T>(
     }
   }()
 
-  // РЕКУРСИВНЫЙ ОБНОВИТЕЛЬ ГРАФА СВЕРХУ ВНИЗ (Pull)
+  // ⚡ ЭТАЛОННЫЙ АПДЕЙТЕР ГРАФА ПО ВЕРСИЯМ РОДИТЕЛЕЙ (Pull)
   const updateIfNecessary = (node: any): boolean => {
-    if (node.state === 2 || isDirty) {
+    if (!isInitialized) {
       return node.run()
     }
 
-    if (node.state === 1) {
-      let hasChangedParent = false
-
-      for (const dep of Array.from(node.dependencies || [])) {
+    if (node.state > 0) {
+      // Рекурсивно заставляем всех computed-предков актуализировать свои состояния
+      for (const dep of Array.from(node.dependencies)) {
         const rawDep = (dep as any)._node || dep
-
         if (rawDep.type === 'computed' && rawDep.state > 0) {
-          if (updateIfNecessary(rawDep)) {
-            hasChangedParent = true
-          }
+          updateIfNecessary(rawDep)
         }
+      }
 
+      // Атомарно проверяем, изменилась ли числовая версия хоть одной из наших сохраненных зависимостей
+      let hasChangedParent = false
+      for (const dep of Array.from(node.dependencies)) {
+        const rawDep = (dep as any)._node || dep
         if (node.depVersions.get(dep) !== rawDep.version) {
           hasChangedParent = true
+          break
         }
       }
 
-      if (hasChangedParent) {
+      node.state = 0
+
+      // Пересчитываем узел исключительно если зафиксировано реальное изменение родителей
+      if (hasChangedParent || isDirty) {
         return node.run()
-      } else {
-        node.state = 0
-        return false // Value Equality Cut
       }
+
+      return false // Value Equality Cut
     }
 
     return false
@@ -109,22 +115,30 @@ export function createComputed<T>(
       const prevConsumer = engine.activeConsumer
       engine.activeConsumer = computedNode
 
-      dependencies.forEach(dep => {
-        const rawDepNode = dep._node || dep
-        if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
-      })
+      // 🎯 ЧЕСТНЫЙ DIFF ЗАВИСИМОСТЕЙ БЕЗ ВСЛЕПУЮ ОЧИСТКИ (Канонический Паттерн)
+      // Сохраняем слепок старых зависимостей, не удаляя их из подписчиков родителей раньше времени!
+      const oldDeps = new Set(dependencies)
       dependencies.clear()
 
       try {
         const newValue = fn()
 
-        // Сравнение по ссылке для объектов и примитивов
+        // Отписываемся ТОЛЬКО от тех старых зависимостей, которые не нарисовались в новом запуске fn()
+        oldDeps.forEach(dep => {
+          if (!dependencies.has(dep)) {
+            const rawDepNode = dep._node || dep
+            if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
+            depVersions.delete(dep)
+          }
+        })
+
+        // Строгое эталонное сравнение по ссылке
         const changed = isDirty || !Object.is(value, newValue)
 
         if (changed) {
           const previousValueSnapshot = isDirty ? undefined : (typeof value === 'object' && value !== null ? JSON.parse(JSON.stringify(value)) : value)
           value = newValue
-          version++
+          version++ // Растет строго при фактическом изменении значения!
 
           if (engine.log) {
             engine.log({
@@ -136,23 +150,33 @@ export function createComputed<T>(
 
           subscribers.forEach(sub => {
             const rawSub = sub._node || sub
-            rawSub.state = 2
-            rawSub.isDirty = true
             if (rawSub.type === 'effect') {
+              rawSub.state = 2 // Эффекты переводим в DIRTY
+              rawSub.isDirty = true
               engine.pendingEffects.add(sub)
+            } else {
+              if (rawSub.markDirty) rawSub.markDirty(1) // computed переводят потомков в CHECK (1)
             }
-            if (rawSub.markDirty) rawSub.markDirty(2)
           })
         }
 
         isDirty = false
         state = 0
+        isInitialized = true
 
         let maxDepDepth = 0
         dependencies.forEach(dep => {
           const rawNode = dep._node || dep
           depVersions.set(dep, rawNode.version)
           if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) maxDepDepth = rawNode.depth
+        })
+
+        // Синхронизация слепков версий подписчиков
+        subscribers.forEach(sub => {
+          const rawSub = sub._node || sub
+          if (rawSub.depVersions) {
+            rawSub.depVersions.set(computedInstance, version)
+          }
         })
 
         computedNode.depth = maxDepDepth + 1
@@ -165,37 +189,38 @@ export function createComputed<T>(
     markDirty: (parentState: number) => {
       if (state >= parentState) return
 
-      const oldState = state
       state = parentState
 
-      if (oldState === 0) {
-        subscribers.forEach(sub => {
-          const rawSub = sub._node || sub
-          if (rawSub.type === 'effect') {
-            rawSub.isDirty = true
-            engine.pendingEffects.add(sub)
-          }
-          if (rawSub.markDirty) {
-            rawSub.markDirty(1) // Переводим дочерние computed в CHECK (1)
-          }
-        })
-      }
+      subscribers.forEach(sub => {
+        const rawSub = sub._node || sub
+        if (rawSub.type === 'effect') {
+          rawSub.isDirty = true
+          engine.pendingEffects.add(sub)
+        }
+        if (rawSub.markDirty) {
+          rawSub.markDirty(1)
+        }
+      })
     }
   }
 
   const computedInstance: Computed<T> = {
     get value() {
+      // Регистрируем зависимость, если этот computed считывается внутри другого computed или эффекта
       if (engine.activeConsumer && engine.activeConsumer !== computedNode) {
         computedNode.subscribers.add(engine.activeConsumer)
         engine.activeConsumer.dependencies.add(computedNode)
       }
 
+      // Атомарно запускаем pull-алгоритм ленивой проверки версий родителей
       updateIfNecessary(computedNode)
 
+      // Синхронизируем числовой слепок версии для активного консьюмера
       if (engine.activeConsumer && engine.activeConsumer.depVersions) {
         engine.activeConsumer.depVersions.set(computedInstance, version)
       }
 
+      // Железобетонно отдаем закэшированное значение без фантомных перезапусков!
       return value
     },
     get valueWithoutTracking() { return value },
@@ -228,6 +253,7 @@ export function createComputed<T>(
       engine.computedCache.delete(fn)
       isDirty = true
       state = 2
+      isInitialized = false
     },
     __subscribe(cb: () => void): CleanupFn {
       const hookEffect: any = {

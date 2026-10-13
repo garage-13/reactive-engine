@@ -373,4 +373,124 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
       expect(spy).not.toHaveBeenCalled() // ❌ Упадет здесь на текущей реализации
     })
   })
+
+  // =========================================================================
+  // КОНТРОЛЬ МУТАЦИЙ МАССИВОВ И КОЛЛЕКЦИЙ (UI-ИМИТАЦИЯ БЕЗ ПРИВЯЗКИ К ФРЕЙМВОРКАМ)
+  // =========================================================================
+  test('#M-1: деструктивная мутация массива через пинок сеттера самому себе', () => {
+    const engine = new ReactiveEngineCore()
+    const listSignal = engine.signal(['apple', 'banana'])
+
+    // Эмулируем computed-селектор компонента
+    const upperList = engine.computed(() => listSignal.value.map(word => word.toUpperCase()))
+
+    const spy = vi.fn()
+    engine.effect(() => {
+      spy(upperList.value)
+    })
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenLastCalledWith(['APPLE', 'BANANA'])
+
+    // Симулируем классический паттерн из UI: мутируем нативно и пинаем ссылку саму в себя
+    spy.mockClear()
+    listSignal.value.push('orange')
+    listSignal.value = listSignal.value // Инициирует Object.is(obj, obj) в сеттере
+
+    // Граф обязан зафиксировать пинок, прокинуть версию и синхронно обновить эффект
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenLastCalledWith(['APPLE', 'BANANA', 'ORANGE'])
+  })
+
+  test('#M-2: нативные деструктивные мутации Proxy-массивов (.push / .reverse) внутри reactive', () => {
+    const engine = new ReactiveEngineCore()
+
+    // Создаем глубокий реактивный стейт
+    const state = engine.reactive({
+      todos: ['Task 1']
+    })
+
+    // Имитируем тяжелый computed-счетчик или фильтр
+    let computedRuns = 0
+    const todoCountMessage = engine.computed(() => {
+      computedRuns++
+      return `Total: ${state.todos.length} items`
+    })
+
+    const spy = vi.fn()
+    engine.effect(() => {
+      spy(todoCountMessage.value)
+    })
+
+    expect(spy).toHaveBeenLastCalledWith('Total: 1 items')
+    expect(computedRuns).toBe(1)
+
+    // 1. Делаем нативный push в прокси-массив — ловушка обязана перехватить изменение length
+    spy.mockClear()
+    state.todos.push('Task 2')
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenLastCalledWith('Total: 2 items')
+    expect(computedRuns).toBe(2)
+
+    // 2. Делаем деструктивный разворот массива на месте (.reverse)
+    // Длина массива не изменилась, но элементы поменяли индексы
+    const contentCollector = engine.computed(() => state.todos.join(', '))
+
+    const contentSpy = vi.fn()
+    engine.effect(() => {
+      contentSpy(contentCollector.value)
+    })
+
+    contentSpy.mockClear()
+    state.todos.reverse() // Поменяет порядок элементов на месте
+
+    // Ловушка прокси обязана зафиксировать мутацию индексов и обновить граф
+    expect(contentSpy).toHaveBeenCalledTimes(1)
+    expect(contentSpy).toHaveBeenLastCalledWith('Task 2, Task 1')
+  })
+
+  test('#M-3: каскадная фильтрация массивов и Value Equality Cut при "холостых" мутациях', () => {
+    const engine = new ReactiveEngineCore()
+    const itemsSignal = engine.signal(['js', 'ts', 'rust'])
+
+    // Фильтруем только те слова, длина которых равна 2 символам ('js', 'ts')
+    let filterRuns = 0
+    const shortWords = engine.computed(() => {
+      filterRuns++
+      return itemsSignal.value.filter(item => item.length === 2)
+    })
+
+    // Дочерний computed считает общее количество отфильтрованных элементов
+    let countRuns = 0
+    const totalShort = engine.computed(() => {
+      countRuns++
+      return shortWords.value.length
+    })
+
+    const spy = vi.fn()
+    engine.effect(() => {
+      spy(totalShort.value)
+    })
+
+    expect(spy).toHaveBeenLastCalledWith(2) // 'js' и 'ts'
+    expect(filterRuns).toBe(1)
+    expect(countRuns).toBe(1)
+
+    // БОЕВАЯ МУТАЦИЯ: Добавляем элемент 'python', который НЕ проходит фильтр shortWords
+    spy.mockClear()
+    itemsSignal.value.push('python')
+    itemsSignal.value = itemsSignal.value
+
+    // shortWords ОБЯЗАН пересчитаться (так как источник изменился по ссылке)
+    expect(filterRuns).toBe(2)
+
+    // КРИТИЧЕСКАЯ ПРОВЕРКА: Поскольку отфильтрованный массив по итогу выполнения функции
+    // поменял ссылку, узел totalShort ОБЯЗАН перезапуститься во второй раз, чтобы проверить длину.
+    // Но так как его длина осталась прежней (2), он совершает VALUE EQUALITY CUT —
+    // каскад затухает, и эффект-шпион обязан промолчать!
+    expect(spy).not.toHaveBeenCalled()
+    expect(countRuns).toBe(2) // Дочерний count пересчитался ровно 2 раза (1 при старте + 1 при смене ссылки)
+  })
+
 })
