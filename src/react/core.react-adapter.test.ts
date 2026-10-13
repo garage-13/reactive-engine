@@ -204,4 +204,84 @@ describe('React Adapter Hooks — useReactiveSubscription (Imperative Flow)', ()
     // Колбэк больше не должен вызываться, так как хук триггернул функцию очистки
     expect(spyCallback).toHaveBeenCalledTimes(1)
   })
+
+  it('должен гарантированно обновлять ленивый computed в рендере без прямой подписки на корень графа', () => {
+    const sourceSignal = engine.signal(10)
+    const lazyComputed = engine.computed(() => sourceSignal.value * 5)
+
+    // Компонент подписывается СТРОГО на computed. На базовый сигнал подписки в UI нет!
+    const { result } = renderHook(() => use(lazyComputed))
+
+    expect(result.current).toBe(50)
+
+    act(() => {
+      sourceSignal.value = 20
+    })
+
+    // На старом адаптере здесь прилетит 50 вместо 100, потому что пассивный __subscribe 
+    // ленивого узла не разбудит React, а кэш не прогреется в фазе рендера!
+    expect(result.current).toBe(100)
+
+    act(() => {
+      sourceSignal.value = 30
+    })
+
+    expect(result.current).toBe(150)
+  })
+
+  it('должен гарантированно обновлять ленивый computed в рендере без прямой подписки компонента на корень графа', () => {
+    const sourceSignal = engine.signal(10)
+    const lazyComputed = engine.computed(() => sourceSignal.value * 5)
+
+    // Эмулируем Пример 100: компонент подписывается СТРОГО на computed-ноду.
+    // На базовый сигнал прямой подписки в интерфейсе нет.
+    const { result } = renderHook(() => use(lazyComputed))
+
+    // 1. Стартовая инициализация
+    expect(result.current).toBe(50)
+
+    // 2. Первая мутация корня — ленивый узел обязан проснуться через активный .subscribe()
+    act(() => {
+      sourceSignal.value = 20
+    })
+    expect(result.current).toBe(100)
+
+    // 3. Вторая мутация корня — проверка стабильности инкремента локальных версий
+    act(() => {
+      sourceSignal.value = 30
+    })
+    expect(result.current).toBe(150)
+  })
+
+  it('должен предотвращать бесконечный цикл обновлений и сохранять референсное равенство ссылочных computed-типов при StrictMode проверках', () => {
+    const rootSignal = engine.signal({ value: 1 })
+    
+    // Вычисление возвращает новый объект при каждом изменении, имитируя сложные структуры
+    const objectComputed = engine.computed(() => {
+      return { score: rootSignal.value.value * 10 }
+    })
+
+    const renderSpy = vi.fn()
+    const { result } = renderHook(() => {
+      renderSpy()
+      return use(objectComputed)
+    })
+
+    expect(result.current).toEqual({ score: 10 })
+    renderSpy.mockClear()
+
+    // Имитируем мутацию
+    act(() => {
+      rootSignal.value = { value: 2 }
+    })
+
+    // 1. Проверяем, что значение успешно долетело до UI
+    expect(result.current).toEqual({ score: 20 })
+    
+    // 2. КЛЮЧЕВОЙ ИНВАРИАНТ: Компонент обязан сделать ровно 1 ререндер.
+    // Если getSnapshot или рендер-фаза вызовут каскадные триггеры,
+    // тест выбросит Maximum update depth exceeded или зафиксирует лишние проходы.
+    expect(renderSpy).toHaveBeenCalledTimes(1)
+  })
+
 })

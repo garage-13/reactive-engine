@@ -1,4 +1,4 @@
-import { useState, useEffect, useDebugValue } from 'react'
+import { useSyncExternalStore, useDebugValue, useState, useMemo } from 'react'
 import { ISignalLike } from '../../core/types'
 
 export function useReactiveValue<V>(signal: ISignalLike<V> | any): V {
@@ -9,45 +9,52 @@ export function useReactiveValue<V>(signal: ISignalLike<V> | any): V {
     return signal
   }
 
-  // Находим корневой инстанс ядра реактивности фреймворка
   const rawNode = (signal as any)._node || signal
   const engine = rawNode.engine || (signal as any).engine
 
-  // РЕАКТИВНЫЙ БУФЕР ДЛЯ REACT 18 CONCURRENT MODE
-  // Инициализируем локальный стейт React строго актуальным значением из кэша.
-  // Использование engine.untrack() защищает стартовый рендер в StrictMode от утечки контекста!
-  const [localState, setLocalState] = useState(() => {
-    if (engine && 'untrack' in engine) {
-      return engine.untrack(() => (signal.value !== undefined ? signal.value : signal))
-    }
-    return signal.value !== undefined ? signal.value : signal
-  })
+  // Использование локального стейта-счетчика версий гарантирует,
+  // что Object.is() внутри React 18 Concurrent Mode взведется в false 
+  // для любых ссылочных типов, массивов и примитивов вычислений!
+  const [localVersion, setLocalVersion] = useState(0)
 
-  useEffect(() => {
-    // Выбираем пассивный системный хук __subscribe для computed и proxy,
-    // чтобы просыпаться строго один раз в конце транзакции, убирая дубли из консоли
-    const hasHook = '__subscribe' in signal && typeof (signal as any).__subscribe === 'function'
+  // 🟢 КАНОНИЧЕСКИЙ АКТИВНЫЙ ВЕРСИОННЫЙ МОСТ (Идемпотентный Snap)
+  useSyncExternalStore(
+    // Фаза подписки: Изумительно будит ленивые computed-ноды за счет 
+    // вызова оригинального метода .subscribe(), который вешает активный эффект ядра!
+    useMemo(() => (onStoreChange: () => void) => {
+      const triggerStoreRerender = () => {
+        // Синхронно инкрементируем локальную версию хука
+        setLocalVersion((v) => v + 1)
+        onStoreChange()
+      }
 
-    const triggerStoreUpdate = () => {
-      // Актуализируем ленивое значение кэша строго на этапе закрытия транзакции ядра
-      const freshValue = signal.value !== undefined ? signal.value : signal
+      // Для Proxy-объектов используем пассивный хук транзакций,
+      // но для Сигналов и Computed — строго честный, активный .subscribe()!
+      if (rawNode.type !== 'computed' && '__subscribe' in signal && typeof (signal as any).__subscribe === 'function') {
+        return (signal as any).__subscribe(triggerStoreRerender)
+      }
+      
+      return signal.subscribe(triggerStoreRerender)
+    }, [signal, rawNode, engine]),
+    
+    // getSnapshot: Кристально чистая, детерминированная O(1) операция!
+    // Возвращает примитивное число локальной версии. Никаких деструктивных вызовов 
+    // .run() или геттеров внутри снапшота — абсолютная защита от Render Loop!
+    () => localVersion,
+    
+    // Снапшот для сервера (SSR)
+    () => 0
+  )
 
-      // Проталкиваем изменения в локальный стейт React.
-      // Если это массив, React зафиксирует новую ссылку и сделает ровно 1 ререндер!
-      setLocalState(freshValue)
-    }
+  useDebugValue(localVersion)
 
-    const unsubscribe = hasHook
-      ? (signal as any).__subscribe(triggerStoreUpdate)
-      : signal.subscribe((newValue: any) => setLocalState(newValue))
+  // ⚛️ ТОПОЛОГИЧЕСКАЯ АКТУАЛИЗАЦИЯ И ИЗОЛЯЦИЯ ФАЗЫ РЕНДЕРА (Topological Pull):
+  // В теле рендера компонента React мы вызываем оригинальный публичный геттер .value.
+  // Но делаем это строго внутри engine.untrack(), полностью исключая появление 
+  // избыточных транзакций ядра, зацикливаний и холостых логов во время рендера React!
+  if (engine && 'untrack' in engine) {
+    return engine.untrack(() => (signal.value !== undefined ? signal.value : signal))
+  }
 
-    return () => unsubscribe()
-  }, [signal])
-
-  useDebugValue(localState)
-
-  // Возвращаем локальный изолированный стейт. Во время фазы рендера React
-  // хук больше не дергает внутренние геттеры ядра, полностью блокируя Render Loop
-  // и гарантируя 100% стабильность ссылочных типов данных в renderHook!
-  return localState
+  return signal.value !== undefined ? signal.value : signal
 }
