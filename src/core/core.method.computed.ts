@@ -114,13 +114,13 @@ export function createComputed<T>(
     get depVersions() { return depVersions },
     update: () => updateIfNecessary(computedNode),
     run: () => {
-      // 1. Быстрый выход, если узел уже актуализирован в рамках текущего кадра эпохи
+      // 1. Быстрый выход, если узел уже актуализирован в рамках текущей эпохи кадра
       if (evaluatedInEpoch === engine.epoch && isInitialized) {
         return false
       }
       evaluatedInEpoch = engine.epoch
 
-      // 2. Пуленепробиваемая защита от циклических зависимостей
+      // 2. Пуленепробиваемая защита от циклических зависимостей графа
       if (engine.cycleDetectionStack.has(computedNode)) {
         throw new Error('[Graph Error] Cyclic dependency detected')
       }
@@ -133,21 +133,24 @@ export function createComputed<T>(
       engine.activeConsumer = computedNode
       engine.activeOwner = computedNode
 
-      // 4. Снимаем слепок старых зависимостей перед оценкой
+      // 4. Снимаем слепок старых зависимостей перед оценкой кадра
       const oldDeps = new Set(dependencies)
       dependencies.clear()
 
       try {
         // 🌳 ФИКС КЕЙСА #242: Очищаем вложенные эффекты предыдущего кадра строго ДО оценки fn()
         if (ownedEffects) {
-          ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
+          ownedEffects.forEach(child => {
+            if (child && typeof child.dispose === 'function') {
+              child.dispose()
+            }
+          })
           ownedEffects.clear()
         }
 
-        // 5. Вычисляем новое значение строго ВНУТРИ изолированного контекста try
         const newValue = fn()
 
-        // 6. Дифференцируем внешние связи графа строго ПОСЛЕ вычисления fn()
+        // 5. Дифференцируем внешние связи графа строго ПОСЛЕ вычисления fn()
         oldDeps.forEach(dep => {
           if (!dependencies.has(dep)) {
             const rawDepNode = dep._node || dep
@@ -187,7 +190,7 @@ export function createComputed<T>(
         state = 0
         isInitialized = true
 
-        // 7. Актуализируем числовые версии ребер и пересчитываем depth
+        // 6. Актуализируем числовые версии ребер и пересчитываем depth
         let maxDepDepth = 0
         dependencies.forEach(dep => {
           const rawNode = dep._node || dep
@@ -208,7 +211,7 @@ export function createComputed<T>(
         computedNode.depth = maxDepDepth + 1
         return changed
       } finally {
-        // 8. Всегда гарантированно восстанавливаем контексты Ядра в блоке finally
+        // 7. Всегда гарантированно восстанавливаем контексты Ядра в блоке finally
         engine.activeConsumer = prevConsumer
         engine.activeOwner = prevOwner
         engine.cycleDetectionStack.delete(computedNode)

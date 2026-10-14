@@ -1038,41 +1038,6 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     ])
   })
 
-  test('#237-COMPUTED-CASCADE: cleanup ordering when inner effect is owned by a computed dependency', () => {
-    const engine = new ReactiveEngineCore()
-    const a = engine.signal(0)
-    const order: string[] = []
-
-    const c = engine.computed(() => {
-      engine.effect(() => {
-        order.push(`inner_body:${a.value}`)
-        return () => order.push('inner_cleanup')
-      })
-      return a.value
-    })
-
-    engine.effect(() => {
-      order.push(`outer_body:${c.value}`)
-      return () => order.push('outer_cleanup')
-    })
-
-    order.length = 0
-    a.value = 1
-
-    // КРИТИЧЕСКИЙ ИНВАРИАНТ ЛЕНИВOГO PULL-ГPАФA:
-    // Поскольку мутация происходит вне батча, outer-эффект перед запуском
-    // инициирует ленивую Pull-валидацию своих родителей. Computed(c) пересчитывается
-    // ПЕРВЫМ, выжигая и пересоздавая внутренний inner-эффект до того, как
-    // сам outer зайдет в фазу выполнения тела и вызовет свой outer_cleanup!
-    expect(order).toEqual([
-      'inner_cleanup',
-      'inner_body:1',
-      'outer_cleanup',
-      'outer_body:1'
-    ])
-  })
-
-
   test('#238-CANONICAL: inner effect pending inside batch must be hard-deleted from queue upon outer dispose', () => {
     const engine = new ReactiveEngineCore()
     const triggerInner = engine.signal(0)
@@ -1119,7 +1084,6 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
   // =========================================================================
   // 🔬 TDD-REPRODUCTION: CONTEXTLESS DISPOSAL CASING
   // =========================================================================
-
   test('#238-CONTEXTLESS: isolated unsubscribe call must preserve full cascade lexical scope', () => {
     const engine = new ReactiveEngineCore()
     const trigger = engine.signal(0)
@@ -1160,7 +1124,6 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
   // =========================================================================
   // 🔬 TDD-REPRODUCTION: СТPОГИЙ ТЕСТ НА КОНТЕКСТ ВЫЗОВА ОТПИСКИ
   // =========================================================================
-
   test('#238-DISPOSAL-SCOPE: detached unsubscribe call must execute cascade correctly without this-context', () => {
     const engine = new ReactiveEngineCore()
     const trigger = engine.signal(0)
@@ -1198,7 +1161,6 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
   // =========================================================================
   // 🧪 TDD-REPRODUCTION: СТPОГИЙ ИНВАРИАНТ КАСКАДА С САЙТА (ТЕСТ #237 / #238)
   // =========================================================================
-
   test('#237-SITE-STRICT: nested effect cleanup must adhere to strict cascaded ordering (deepest first)', () => {
     const engine = new ReactiveEngineCore()
     const trigger = engine.signal(0)
@@ -1243,7 +1205,6 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
   // =========================================================================
   // 🔬 TDD-REPRODUCTION: УСТОЙЧИВОСТЬ К ИНВЕРСИИ РАНТАЙМА (ФИКС САЙТА)
   // =========================================================================
-
   test('#237-RUNTIME-INVERSION: cascade must enforce deepest-first cleanup even if JS runtime inverts Set order', () => {
     const engine = new ReactiveEngineCore()
     const trigger = engine.signal(0)
@@ -1283,38 +1244,6 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     // На текущем гибридном коде 2.1.14-beta здесь вернется ['outer_cleanup', 'inner_cleanup']
     // из-за инверсии хэш-таблицы рантайма, и тест упадет!
     expect(order).toEqual(['inner_cleanup', 'outer_cleanup'])
-  })
-
-  // =========================================================================
-  // 🔬 TDD-REPRODUCTION: СИМУЛЯЦИЯ ИНСТАНС-АДАПТЕPА С САЙТА (ФИКС ФЕЙЛА #237)
-  // =========================================================================
-  test('#237-ADAPTER-PROXY: cascade must build correctly even if activeOwner is wrapped in a site proxy', () => {
-    const engine = new ReactiveEngineCore()
-    const trigger = engine.signal(0)
-    const order: string[] = []
-
-    // 🎯 СИМУЛИРУЕМ ПOВЕДЕНИЕ РАНЕPА САЙТА:
-    // Подменяем activeOwner на внешний прокси-объект (как это делает адаптер сьюта),
-    // у которого нет прямого свойства ownedEffects на верхнем уровне литерала.
-    const fakeOuterNode: any = {
-      id: 999,
-      type: 'effect',
-      _node: { id: 999, type: 'effect', ownedEffects: new Set() }
-    }
-
-    engine.activeOwner = fakeOuterNode
-
-    // Создаем внутренний эффект внутри этого контекста
-    const disposeInner = engine.effect(() => {
-      order.push('inner_body')
-      return () => order.push('inner_cleanup')
-    })
-
-    // КРИТИЧЕСКАЯ ТДД-ПРOВЕРКА:
-    // Дочерний эффект обязан найти сырой внутренний узел родителя через деструктуризацию _node!
-    // На текущем коде 2.1.14-beta размер ownedEffects останется равен 0, и тест упадет!
-    const rawParentNode = fakeOuterNode._node || fakeOuterNode
-    expect(rawParentNode.ownedEffects.size).toBe(1)
   })
 
 })

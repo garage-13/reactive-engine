@@ -8,7 +8,6 @@ interface ICoreEffectNode extends IEffect {
   depth: number;
   state: number;
   _node: any;
-  isComputedOwned?: boolean;
   dispose: () => void;
 }
 
@@ -21,11 +20,8 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
   const depVersions = new Map<any, number>()
   const ownedEffects = new Set<ICoreEffectNode>()
 
-  // Строго фиксируем контекст владения в момент инициализации фабрики
-  const parentOwner = engine.activeOwner
-  const isComputedOwned = parentOwner && parentOwner.type === 'computed'
-
   const runCleanupPhase = () => {
+    // Каскадное уничтожение вложенных детей
     if (ownedEffects.size > 0) {
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
@@ -37,9 +33,11 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
       engine.activeOwner = prevOwner
     }
 
+    // Изоляция ошибок в деструкторах пользователя
     if (effectNode.cleanups.size > 0) {
       const prevConsumer = engine.activeConsumer
       engine.activeConsumer = null
+
       effectNode.cleanups.forEach(cleanup => {
         try {
           cleanup()
@@ -47,6 +45,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
           console.error(err)
         }
       })
+
       effectNode.cleanups.clear()
       engine.activeConsumer = prevConsumer
     }
@@ -60,7 +59,6 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     type: 'effect',
     depth: 0,
     label: effectName,
-    isComputedOwned,
 
     get isDirty(): boolean { return state > 0 },
     set isDirty(val: boolean) { if (val) state = 2 },
@@ -76,12 +74,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     markDirty: () => {
       if (state >= 1) return
       state = 1
-
-      // 🎯 ИЗОЛЯЦИЯ ОТ ПУШ-ОЧЕРЕДИ:
-      // Вложенный эффект никогда не должен флушиться плоским планировщиком Ядра напрямую!
-      if (!isComputedOwned) {
-        engine.pendingEffects.add(effectNode)
-      }
+      engine.pendingEffects.add(effectNode)
     },
 
     run: () => {
@@ -93,10 +86,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
 
-      // 🎯 КАНOНИЧЕСКОЕ Dependency-Проксирование:
-      // Перенаправляем контекст считывания зависимостей на родительский computed-узел.
-      // Это предотвращает создание прямой паразитной пуш-связи между сигналом и inner-эффектом!
-      engine.activeConsumer = isComputedOwned ? parentOwner : effectNode
+      engine.activeConsumer = effectNode
       engine.activeOwner = effectNode
 
       const oldDeps = new Set(dependencies)
@@ -152,21 +142,15 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     }
   }
 
-  if (engine.activeOwner && engine.activeOwner.ownedEffects) {
-    engine.activeOwner.ownedEffects.add(effectNode)
-  }
-
-  effectNode.run()
-
-  // 🎯 АППАРАТНЫЙ ПОИСК СЫРOГO УЗЛА РОДИТЕЛЯ:
-  // Извлекаем чистый внутренний узел, если activeOwner обернут адаптером сайта
+  // Распаковываем прокси инстанса адаптера сайта для безопасной иерархической регистрации
   const actualOwnerNode = engine.activeOwner ? (engine.activeOwner._node || engine.activeOwner) : null
 
   if (actualOwnerNode && actualOwnerNode.ownedEffects) {
     actualOwnerNode.ownedEffects.add(effectNode)
   }
 
-  // Возвращаем context-safe изолированную стрелку для внешних вызовов ранера сайта
+  effectNode.run()
+
   return () => {
     effectNode.dispose()
   }
