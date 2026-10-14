@@ -835,4 +835,107 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(gRuns).toBe(2)
   })
 
+  // =========================================================================
+  // 🧪 TDD-REPRODUCTION: СИМУЛЯЦИЯ ГЛOБАЛЬНOГO КЭША МАТРИЦЫ С САЙТА
+  // =========================================================================
+
+  test('#3-TDD: jagged diamond with global computedCache pollution from site environment', () => {
+    const engine = new ReactiveEngineCore()
+
+    // СИМУЛИРУЕМ ТЕСТ #1: Создаем сигналы и computed, которые осядут в глобальном кэше ядра
+    const initialSignal = engine.signal(0)
+    const anonymousFn1 = () => initialSignal.value
+    const cachedComputed = engine.computed(anonymousFn1)
+
+    // Прогреваем кэш, чтобы у ноды зафиксировался старый depVersions стейт
+    expect(cachedComputed.value).toBe(0)
+
+    // ───────────────────────────────────────────────────────────────────────
+    // СИМУЛИРУЕМ СТАРТ ТЕСТА #3: Он повторно использует ту же функцию из кэша!
+    const a = initialSignal
+
+    // Левое крыло алмаза (глубина +2)
+    const b = cachedComputed // <-- Нода переиспользована из кэша матрицы!
+    const d = engine.computed(() => b.value)
+
+    // Правое крыло алмаза (глубина +1)
+    const c = engine.computed(() => a.value)
+
+    // Точка схождения асимметричного алмаза
+    let eRuns = 0
+    const e = engine.computed(() => {
+      eRuns++
+      return d.value + c.value
+    })
+
+    // Хвост на выходе
+    let fRuns = 0
+    const f = engine.computed(() => {
+      fRuns++
+      return e.value * 10
+    })
+
+    // Удерживаем граф в живом состоянии через эффект
+    engine.effect(() => {
+      const _ = f.value
+    })
+
+    expect(f.value).toBe(0)
+    expect(eRuns).toBe(1)
+    expect(fRuns).toBe(1)
+
+    // ТРИГГЕР МУТАЦИИ: Изменяем корень
+    a.value = 1
+
+    // Стягиваем финальное значение
+    expect(f.value).toBe(20)
+
+    // КРИТИЧЕСКИЙ ТДД-ИНВАРИАНТ:
+    // Из-за того, что в 2.1.10-beta очистка oldDeps шла ДО оценки fn(),
+    // переиспользованная нода 'b' принудительно выжигала рёбра, сбивая маркер версий.
+    // На текущем коде ядра Vitest выдаст AssertionError: expected 3 to be 2!
+    expect(eRuns).toBe(2)
+    expect(fRuns).toBe(2)
+  })
+
+  // =========================================================================
+  // 🔬 TDD-REPRODUCTION КЕЙСА #193 — ИЗОЛЯЦИЯ МЕРТВОЙ ВЕТКИ
+  // =========================================================================
+
+  test('#193-TDD: branch switch must completely drop and skip evaluation of orphan computed', () => {
+    const engine = new ReactiveEngineCore()
+
+    const sourceA = engine.signal<number | null>(1)
+    const b = engine.computed(() => sourceA.value)
+
+    // c зависит от b. Если b становится null, c не должен пересчитываться!
+    let cRuns = 0
+    const c = engine.computed(() => {
+      cRuns++
+      return b.value ? (b.value as number) * 10 : 0
+    })
+
+    // d динамически переключает ветку: если b равен null, он скрывает ветку c!
+    const d = engine.computed(() => {
+      return b.value !== null ? c.value : 999
+    })
+
+    engine.effect(() => {
+      const _ = d.value
+    })
+
+    expect(cRuns).toBe(1)
+
+    // ТРИГГЕР МУТАЦИИ: Переводим ветку в null
+    sourceA.value = null
+
+    // Принудительно стягиваем значение хвоста графа
+    expect(d.value).toBe(999)
+
+    // КАНOНИЧЕСКИЙ ИНВАРИАНТ СИРOТСТВА:
+    // Когда b стал null, узел d ушел в ветку 999 и отписался от c.
+    // Количество подписчиков у c упало до 0. Функция c.fn() НЕ ДОЛЖНА запускаться во второй раз!
+    expect(cRuns).toBe(1) // На текущем коде 2.1.11-beta здесь вернется Received: 2!
+  })
+
 })
