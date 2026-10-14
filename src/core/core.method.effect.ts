@@ -89,10 +89,11 @@ export function createEffect(
     }
   }
 
-  // Автоматическая регистрация в родительском контексте владения
+  // Автоматическая регистрация в родительском контексте владения (Effect или Computed)
   if (engine.activeOwner && engine.activeOwner.ownedEffects) {
     engine.activeOwner.ownedEffects.add(effectNode)
   }
+
 
   effectNode.run()
 

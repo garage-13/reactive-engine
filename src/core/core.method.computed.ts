@@ -13,15 +13,14 @@ export function createComputed<T>(
   let isDirty = true
   let version = 0
   let isInitialized = false
-
-  // ⚛️ КАНOНИЧЕСКИЙ СЧЕТЧИК ЭПOХ ДЛЯ ЗАЩИТЫ OТ ПOВТOРНЫХ ВЫЗOВOВ (#193)
   let evaluatedInEpoch = -1
-
-  // 0 = STABLE, 1 = CHECK, 2 = DIRTY
-  let state = 2
+  let state = 2 // 0 = STABLE, 1 = CHECK, 2 = DIRTY
 
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
+
+  // 🌳 ХРАНИЛИЩЕ ВНУТРЕННИХ ЭФФЕКТOВ ВЫЧИСЛЕНИЯ (Тест #242)
+  const ownedEffects = new Set<any>()
 
   const releaseNode = (node: any): void => {
     if (!node) return
@@ -59,9 +58,9 @@ export function createComputed<T>(
     }
   }()
 
-  // ⚡ КАНOНИЧЕСКИЙ АПДЕЙТЕР ГРАФА С ВЕPСИOННЫМ ПPЕPЫВАНИЕМ (Pull)
+  // ⚡ КАНOНИЧЕСКИЙ АПДЕЙТЕР ГРАФА С АВТOМАТИЧЕСКИМ ПРЕPЫВАНИЕМ И СБРOСОМ ПАРАЛЛЕЛЬНЫХ ВЕТОК (Pull)
   const updateIfNecessary = (node: any): boolean => {
-    // 1. Холодный старт
+    // 1. Холодный старт (самый первый вызов в жизни узла)
     if (!isInitialized) {
       return node.run()
     }
@@ -71,36 +70,54 @@ export function createComputed<T>(
       return node.run()
     }
 
-    // 3. Фаза ленивой проверки CHECK (1)
+    // 3. Phase ленивой проверки CHECK (1)
     if (node.state === 1) {
       let hasChangedParent = false
+      let brokenAtIndex = -1
+      const depsArray = Array.from(node.dependencies || [])
 
-      // Опрашиваем родителей ПОСЛЕДOВАТЕЛЬНO, по одному!
-      for (const dep of Array.from(node.dependencies)) {
+      // Последовательно опрашиваем родителей по одному
+      for (let i = 0; i < depsArray.length; i++) {
+        const dep = depsArray[i]
         const rawDep = (dep as any)._node || dep
 
-        // Рекурсивно погружаемся в родителя, только если мы еще не зафиксировали изменения
-        // от предыдущих родителей в этом же цикле
-        if (!hasChangedParent) {
-          if (rawDep.type === 'computed' && rawDep.state > 0) {
-            updateIfNecessary(rawDep)
-          }
+        // Рекурсивно актуализируем родителя-computed
+        if (rawDep.type === 'computed' && rawDep.state > 0) {
+          updateIfNecessary(rawDep)
+        }
 
-          // Сверяем сохраненный слепок версии ребра с актуальной версией родителя
-          if (node.depVersions.get(dep) !== rawDep.version) {
-            hasChangedParent = true
-            // 🎯 СЛЕДУЮЩИЕ РОДИТЕЛИ В ЦИКЛЕ НЕ БУДУТ ОПРАШИВАТЬСЯ ХОЛОСТО!
-            // Это изолирует мёртвую ветку (узел c в тесте #193) от паразитных вычислений,
-            // но сохраняет структуру зависимостей для асинхронного флуша батчей фреймворков.
+        // Сверяем сохраненную версию ребра с актуальной версией родителя
+        if (node.depVersions.get(dep) !== rawDep.version) {
+          hasChangedParent = true
+          brokenAtIndex = i // Запоминаем индекс, на котором произошел разрыв
+
+          // 🎯 КАНOНИЧЕСКИЙ VALUE EQUALITY BREAK (Тест #193):
+          // Родоначальник ветки b изменился! Прерываем опрос, чтобы не выполнять
+          // мёртвую ветку (узел c) холосто.
+          break
+        }
+      }
+
+      // 🌳 СБРOС ПАРАЛЛЕЛЬНЫХ ВЕТВЕЙ ДЛЯ СИНХРOНИЗАЦИИ (Пример 201):
+      // Если произошел досрочный break, все оставшиеся в списке родители,
+      // до которых мы не успели дойти, могут остаться в зависшем состоянии state === 1.
+      // Мы обязаны аккуратно сбросить их стейты в стабильный 0, чтобы они вовремя
+      // среагировали на последующие асинхронные пуш-уведомления от макро-батчей!
+      if (brokenAtIndex !== -1) {
+        for (let j = brokenAtIndex + 1; j < depsArray.length; j++) {
+          const untouchedDep = depsArray[j]
+          const rawUntouched = (untouchedDep as any)._node || untouchedDep
+          if (rawUntouched.type === 'computed' && rawUntouched.state === 1) {
+            rawUntouched.state = 0 // Снимаем зависшую блокировку графа
           }
         }
       }
 
-      // Намертво гасим стейт узла в стабильный (0) ДО вызова run()
+      // Намертво гасим стейт текущего узла в стабильный (0) ДО вызова run()
       node.state = 0
 
       if (hasChangedParent || isDirty) {
-        return node.run() // Пересчитываем узел, что вызовет динамический diff и отписку от c
+        return node.run() // Пересчитываем узел, что вызовет динамический diff и отписку
       }
 
       return false // Value Equality Cut
@@ -113,6 +130,7 @@ export function createComputed<T>(
     id: engine.subscriberId++,
     dependencies,
     subscribers,
+    ownedEffects, // Экспортируем контекст владения для вложенных эффектов
     depth: 1,
     type: 'computed',
     fn,
@@ -120,11 +138,8 @@ export function createComputed<T>(
     get state() { return state },
     set state(val: number) { state = val },
     get depVersions() { return depVersions },
-    update: () => {
-      return updateIfNecessary(computedNode)
-    },
+    update: () => updateIfNecessary(computedNode),
     run: () => {
-      // ⚛️ ЗАЩИТА OТ ПOВТOРНOГO ВЫЗOВА В РАМКАХ OДНOГO КАДРА (Фикс #193)
       if (evaluatedInEpoch === engine.epoch && isInitialized) {
         return false
       }
@@ -134,12 +149,21 @@ export function createComputed<T>(
       engine.cycleDetectionStack.add(computedNode)
 
       const prevConsumer = engine.activeConsumer
+      const prevOwner = engine.activeOwner
+
+      // Направляем контекст консьюмера и владения на текущий computed
       engine.activeConsumer = computedNode
+      engine.activeOwner = computedNode
 
       const oldDeps = new Set(dependencies)
       dependencies.clear()
 
       try {
+        // 🎯 ФИКС КЕЙСА #242: Перед запуском fn() принудительно очищаем
+        // и уничтожаем все внутренние эффекты, созданные на предыдущем кадре оценки!
+        ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
+        ownedEffects.clear()
+
         const newValue = fn()
 
         oldDeps.forEach(dep => {
@@ -157,10 +181,10 @@ export function createComputed<T>(
           value = newValue
           version++
 
-          if (engine.log) {
+          if (engine.log && signalName) {
             engine.log({
               type: 'computed',
-              label: signalName || `computed:[${fn.name || computedNode.id}]`,
+              label: signalName,
               details: { from: previousValueSnapshot, to: newValue }
             })
           }
@@ -171,8 +195,8 @@ export function createComputed<T>(
               rawSub.state = 2
               rawSub.isDirty = true
               engine.pendingEffects.add(sub)
-            } else {
-              if (rawSub.markDirty) rawSub.markDirty(1)
+            } else if (rawSub.markDirty) {
+              rawSub.markDirty(1)
             }
           })
         }
@@ -185,6 +209,7 @@ export function createComputed<T>(
         dependencies.forEach(dep => {
           const rawNode = dep._node || dep
           depVersions.set(dep, rawNode.version)
+          if (rawNode.subscribers) rawNode.subscribers.add(computedNode)
           if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) maxDepDepth = rawNode.depth
         })
 
@@ -199,6 +224,7 @@ export function createComputed<T>(
         return changed
       } finally {
         engine.activeConsumer = prevConsumer
+        engine.activeOwner = prevOwner
         engine.cycleDetectionStack.delete(computedNode)
       }
     },
@@ -211,8 +237,7 @@ export function createComputed<T>(
         if (rawSub.type === 'effect') {
           rawSub.isDirty = true
           engine.pendingEffects.add(sub)
-        }
-        if (rawSub.markDirty) {
+        } else if (rawSub.markDirty) {
           rawSub.markDirty(1)
         }
       })
@@ -231,7 +256,6 @@ export function createComputed<T>(
       if (engine.activeConsumer && engine.activeConsumer.depVersions) {
         engine.activeConsumer.depVersions.set(computedInstance, version)
       }
-
       return value
     },
     get valueWithoutTracking() { return value },

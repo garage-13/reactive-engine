@@ -529,4 +529,86 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(cRuns).toBe(1) // Если cRuns станет равен 2 — значит, недостижимая ветка проснулась холосто
   })
 
+  // =========================================================================
+  // 🔬 ГРУППА: ФИНАЛЬНЫЕ КРАЕВЫЕ КЕЙСЫ — ПОБОЧНЫЕ ЗАПИСИ И ОЧИСТКИ
+  // =========================================================================
+
+  test('#230: cleanup writes signal inside batch propagates completely after flush', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+    const b = engine.signal(10)
+
+    let e1Runs = 0
+    engine.effect(() => {
+      e1Runs++
+      const _ = a.value // Е1 зависит строго от а
+
+      return () => {
+        // Функция очистки побочно пишет в сигнал b
+        b.value = 20
+      }
+    })
+
+    let e2Runs = 0
+    const spyE2 = vi.fn()
+    engine.effect(() => {
+      e2Runs++
+      spyE2(b.value) // Е2 зависит строго от b
+    })
+
+    // Стартовый прогрев
+    expect(e1Runs).toBe(1)
+    expect(e2Runs).toBe(1)
+    expect(spyE2).toHaveBeenLastCalledWith(10)
+    spyE2.mockClear()
+
+    // Запускаем транзакцию батча
+    engine.batch(() => {
+      a.value = 1 // Это инвалидирует E1 и ставит его в очередь флуша
+    })
+
+    // КРИТИЧЕСКИЙ ИНВАРИАНТ: После закрытия батча, выполнение E1 обязано вызвать cleanup,
+    // cleanup запишет 20 в 'b', и планировщик ОБЯЗАН синхронно в этой же фазе выполнить E2!
+    expect(e1Runs).toBe(2)
+    expect(e2Runs).toBe(2) // Если Е2 промахнулся мимо тика флуша — тест упадет
+    expect(spyE2).toHaveBeenLastCalledWith(20)
+  })
+
+  test('#242: effect in computed — old inner cleanup completely fires before new evaluation', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+
+    let cleanupCalled = false
+    let evalStep = 0
+
+    const c = engine.computed(() => {
+      evalStep++
+
+      // Симулируем условное владение эффектом внутри computed
+      if (a.value === 0) {
+        engine.effect(() => {
+          return () => {
+            cleanupCalled = true // Этот колбэк обязан сработать ДО шага evalStep === 2
+          }
+        })
+      }
+      return a.value
+    })
+
+    // Прогреваем computed
+    expect(c.value).toBe(0)
+    expect(evalStep).toBe(1)
+
+    // Триггерим изменение корня графа
+    a.value = 1
+
+    // Вызываем пулл-актуализацию вычисления
+    const _ = c.value
+
+    // КРИТИЧЕСКИЙ ИНВАРИАНТ: При переходе computed в новое состояние,
+    // старый внутренний cleanup эффекта обязан выполниться СТРОГО ДО начала новой оценки!
+    expect(evalStep).toBe(2)
+    expect(cleanupCalled).toBe(true)
+  })
+
 })
