@@ -938,4 +938,51 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(cRuns).toBe(1) // На текущем коде 2.1.11-beta здесь вернется Received: 2!
   })
 
+  // =========================================================================
+  // 🔬 TDD-REPRODUCTION: УТЕЧКА ВЛОЖЕННЫХ ЭФФЕКТОВ ПРИ ПЕРЕЗАПУСКЕ
+  // =========================================================================
+  test('#237-CONCURRENT: outer effect re-run must completely dispose stale inner effects', () => {
+    const engine = new ReactiveEngineCore()
+    const trigger = engine.signal(0)
+    const innerSignal = engine.signal(100)
+
+    let innerEvaluations = 0
+    let innerCleanups = 0
+
+    // Родительский эффект
+    engine.effect(() => {
+      const _ = trigger.value // Зависимость от корня
+
+      // Вложенный эффект
+      engine.effect(() => {
+        innerEvaluations++
+        const __ = innerSignal.value
+        return () => {
+          innerCleanups++
+        }
+      })
+    })
+
+    // Старт: первый проход
+    expect(innerEvaluations).toBe(1)
+    expect(innerCleanups).toBe(0)
+
+    // ТРИГГЕР: Перезапускаем только РОДИТЕЛЬСКИЙ эффект
+    trigger.value = 1
+
+    // Проверяем, что старый дочерний эффект был честно уничтожен
+    expect(innerCleanups).toBe(1)
+    expect(innerEvaluations).toBe(2) // 1 (старт) + 1 (создание нового при перезапуске родителя)
+
+    // Пинаем внутренний сигнал
+    trigger.value = 1 // Убеждаемся, что эпоха стабильна
+    innerSignal.value = 200
+
+    // ЭТАЛOННЫЙ ИНВАРИАНТ КОНТЕКСТА ВЛАДЕНИЯ:
+    // Старый эффект мёртв. Проснуться должен СТPОГO OДИН новый живой эффект!
+    // Счетчик innerEvaluations должен стать равен строго 3 (2 + 1 запуск на мутацию).
+    // Если бы старый эффект выжил — они бы проснулись вдвоем, и значение стало бы равно 4!
+    expect(innerEvaluations).toBe(3)
+  })
+
 })
