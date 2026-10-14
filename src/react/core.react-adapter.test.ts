@@ -160,13 +160,13 @@ describe('React Adapter Hooks — useReactiveSubscription (Imperative Flow)', ()
         todos: ['Купить молоко']
       }
     })
-    
+
     let callsCount = 0
     let lastTodo = ''
 
     // Тестируем хук напрямую через канонический вызов подписки
     const computedTodos = engine.computed(() => state.user.todos)
-    
+
     computedTodos.subscribe((todos) => {
       callsCount++
       lastTodo = todos[todos.length - 1]
@@ -218,7 +218,7 @@ describe('React Adapter Hooks — useReactiveSubscription (Imperative Flow)', ()
       sourceSignal.value = 20
     })
 
-    // На старом адаптере здесь прилетит 50 вместо 100, потому что пассивный __subscribe 
+    // На старом адаптере здесь прилетит 50 вместо 100, потому что пассивный __subscribe
     // ленивого узла не разбудит React, а кэш не прогреется в фазе рендера!
     expect(result.current).toBe(100)
 
@@ -255,7 +255,7 @@ describe('React Adapter Hooks — useReactiveSubscription (Imperative Flow)', ()
 
   it('должен предотвращать бесконечный цикл обновлений и сохранять референсное равенство ссылочных computed-типов при StrictMode проверках', () => {
     const rootSignal = engine.signal({ value: 1 })
-    
+
     // Вычисление возвращает новый объект при каждом изменении, имитируя сложные структуры
     const objectComputed = engine.computed(() => {
       return { score: rootSignal.value.value * 10 }
@@ -277,11 +277,37 @@ describe('React Adapter Hooks — useReactiveSubscription (Imperative Flow)', ()
 
     // 1. Проверяем, что значение успешно долетело до UI
     expect(result.current).toEqual({ score: 20 })
-    
+
     // 2. КЛЮЧЕВОЙ ИНВАРИАНТ: Компонент обязан сделать ровно 1 ререндер.
     // Если getSnapshot или рендер-фаза вызовут каскадные триггеры,
     // тест выбросит Maximum update depth exceeded или зафиксирует лишние проходы.
     expect(renderSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('должен корректно обновлять интерфейс при каскадной асинхронной загрузке цепочки ресурсов в батче', () => {
+    const apiStateSignal = engine.signal({ loading: true, data: null as string[] | null })
+
+    // computed-нода фильтрует/преобразует данные ресурса (аналог userInfo.personList)
+    const processedData = engine.computed(() => {
+      const state = apiStateSignal.value
+      return state.data ? state.data.map(name => name.toUpperCase()) : []
+    })
+
+    const { result } = renderHook(() => use(processedData))
+
+    // Изначально данных нет, загрузка идет
+    expect(result.current).toEqual([])
+
+    // Симулируем прилет данных по сети внутри макро-батча ядра
+    act(() => {
+      engine.batch(() => {
+        apiStateSignal.value = { loading: false, data: ['ivan', 'alex', 'sergey'] }
+      })
+    })
+
+    // 🎯 КРИТИЧЕСКИЙ ИНВАРИАНТ: useSyncExternalStore обязан зафиксировать
+    // изменение версии computed и перерисовать компонент новыми кнопками/списком!
+    expect(result.current).toEqual(['IVAN', 'ALEX', 'SERGEY'])
   })
 
 })

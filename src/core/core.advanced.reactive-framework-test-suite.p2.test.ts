@@ -486,4 +486,47 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(innerB_Runs).toBe(1) // Должен сработать строго 1 раз (только новый инстанс эффекта)
   })
 
+  test('#193: sequential dirty check — branch switch skips unreachable computed completely', () => {
+    const engine = new ReactiveEngineCore()
+
+    // Явно задаем тип, разрешающий null
+    const sourceA = engine.signal<number | null>(1)
+
+    // b зависит от sourceA
+    const b = engine.computed(() => sourceA.value)
+
+    // c зависит от b. Если b становится null, c не должен пересчитываться холосто!
+    let cRuns = 0
+    const c = engine.computed(() => {
+      cRuns++
+      return b.value ? (b.value as number) * 10 : 0
+    })
+
+    // d динамически переключает ветку: если b равен null, он возвращает 999 и СКРЫВАЕТ ветку c!
+    let dRuns = 0
+    const d = engine.computed(() => {
+      dRuns++
+      return b.value !== null ? c.value : 999
+    })
+
+    const spy = vi.fn()
+    engine.effect(() => {
+      spy(d.value)
+    })
+
+    expect(spy).toHaveBeenLastCalledWith(10) // a=1 -> b=1 -> c=10 -> d=10
+    expect(cRuns).toBe(1)
+    expect(dRuns).toBe(1)
+
+    // ТРИГГЕР МУТАЦИИ: Переводим ветку в null
+    spy.mockClear()
+    sourceA.value = null // Изменение значения через правильную переменную
+
+    // КРИТИЧЕСКИЕ УТВЕРЖДЕНИЯ СЛЕДСТВИЯ:
+    // d обязан переключиться на ветку 999.
+    // А узел c стал НЕДОСТИЖИМЫМ. Его функция fn() НЕ ДОЛЖНА запускаться во второй раз!
+    expect(spy).toHaveBeenLastCalledWith(999)
+    expect(cRuns).toBe(1) // Если cRuns станет равен 2 — значит, недостижимая ветка проснулась холосто
+  })
+
 })

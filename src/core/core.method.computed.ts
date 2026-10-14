@@ -45,44 +45,48 @@ export function createComputed<T>(
   const subscribers = new class extends Set<any> {
     override delete(val: any): boolean {
       const res = super.delete(val)
+      // ⚛️ СТРИКТМОД-ЗАЩИТА СВЯЗЕЙ ГРАФА:
+      // Мы убираем отсюда моментальный вызов releaseNode(computedNode) при size === 0!
+      // Если StrictMode временно отписывает хук во время перемонтажа,
+      // связи с родительскими сигналами НЕ должны выжигаться из памяти.
+      // Граф сохраняет целостность, а полная зачистка происходит строго при вызове .destroy().
       if (this.size === 0) {
         state = 2
         isDirty = true
-        isInitialized = false
-        releaseNode(computedNode)
         engine.computedCache.delete(fn)
       }
       return res
     }
   }()
 
-  // ⚡ ЭТАЛОННЫЙ АПДЕЙТЕР ГРАФА ПО ВЕРСИЯМ РОДИТЕЛЕЙ (Pull)
+  // ⚡ КАНOНИЧЕСКИЙ АПДЕЙТЕР ГРАФА С АВТOМАТИЧЕСКИМ ПРЕPЫВАНИЕМ (Pull)
   const updateIfNecessary = (node: any): boolean => {
     // 1. Холодный старт
     if (!isInitialized) {
       return node.run()
     }
 
-    // 🌟 ДОБАВИТЬ ЭТОТ БЛOК: Если прилетела прямая грязь от сигнала — вычисляем сразу
+    // 2. Если прилетел прямой dirty-флаг от сигнала — вычисляем сразу
     if (node.state === 2) {
       return node.run()
     }
 
-    // 2. Проверка каскада CHECK
+    // 3. Фаза ленивой проверки CHECK (1)
     if (node.state === 1) {
       let hasChangedParent = false
 
+      // Опрашиваем родителей СТРОГО по одному, последовательно!
       for (const dep of Array.from(node.dependencies)) {
         const rawDep = (dep as any)._node || dep
+
         if (rawDep.type === 'computed' && rawDep.state > 0) {
           updateIfNecessary(rawDep)
         }
-      }
 
-      for (const dep of Array.from(node.dependencies)) {
-        const rawDep = (dep as any)._node || dep
         if (node.depVersions.get(dep) !== rawDep.version) {
           hasChangedParent = true
+          // 🎯 VALUE EQUALITY BREAK: Родоначальник ветки изменился!
+          // Прерываем опрос оставшихся родителей, чтобы не дергать мёртвые ветки (узел c)
           break
         }
       }
@@ -93,7 +97,7 @@ export function createComputed<T>(
         return node.run()
       }
 
-      return false
+      return false // Value Equality Cut
     }
 
     return false
