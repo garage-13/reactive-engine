@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "2.1.16-beta",
+  "version": "2.1.16",
   "engines": {
     "node": ">=22.20.0"
   },
