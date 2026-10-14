@@ -611,4 +611,228 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(cleanupCalled).toBe(true)
   })
 
+  // =========================================================================
+  // 💎 ГРУППА: АСИММЕТРИЧНЫЕ АЛМАЗНЫЕ ГРАФЫ И СХОДИМОСТЬ
+  // =========================================================================
+
+  test('#3: jagged diamond + tails — asymmetry depth evaluate only once', () => {
+    const engine = new ReactiveEngineCore()
+
+    const a = engine.signal(0)
+
+    // Левое крыло алмаза (глубина +2)
+    const b = engine.computed(() => a.value)
+    const d = engine.computed(() => b.value)
+
+    // Правое крыло алмаза (прямая связь, глубина +1)
+    const c = engine.computed(() => a.value)
+
+    // Точка схождения алмаза (Fan-In)
+    let eRuns = 0
+    const e = engine.computed(() => {
+      eRuns++
+      return d.value + c.value
+    })
+
+    // Хвосты (Fan-Out) на выходе из точки схождения
+    let fRuns = 0
+    const f = engine.computed(() => {
+      fRuns++
+      return e.value * 10
+    })
+
+    let gRuns = 0
+    const g = engine.computed(() => {
+      gRuns++
+      return e.value + 100
+    })
+
+    // Регистрируем эффекты-слушатели для удержания графа в живом состоянии
+    const spyF = vi.fn()
+    engine.effect(() => spyF(f.value))
+
+    const spyG = vi.fn()
+    engine.effect(() => spyG(g.value))
+
+    // Стартовый прогрев графа
+    expect(e.value).toBe(0)
+    expect(eRuns).toBe(1)
+    expect(fRuns).toBe(1)
+    expect(gRuns).toBe(1)
+    spyF.mockClear()
+    spyG.mockClear()
+
+    // ТРИГГЕР МУТАЦИИ: Изменяем корень графа
+    a.value = 1
+
+    // Принудительно стягиваем значения хвостов
+    expect(f.value).toBe(20) // d(1) + c(1) = e(2) -> f(20)
+    expect(g.value).toBe(102) // e(2) + 100 = 102
+
+    // КРИТИЧЕСКИЙ ИНВАРИАНТ ТОПОЛОГИИ (#3):
+    // Из-за асимметрии пуш-волна долетает до 'e' с разным лагом.
+    // Но канонический pull/push граф обязан пересчитать каждую вершину
+    // строго по ОДНОМУ разу, полностью исключая фантомные промежуточные такты!
+    expect(eRuns).toBe(2)
+    expect(fRuns).toBe(2)
+    expect(gRuns).toBe(2)
+  })
+
+  test('#3: jagged diamond + tails — integration environment with batching', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+
+    // Асимметричный граф (разная топологическая глубина веток)
+    const b = engine.computed(() => a.value)
+    const d = engine.computed(() => b.value)
+    const c = engine.computed(() => a.value)
+
+    let eRuns = 0
+    const e = engine.computed(() => {
+      eRuns++
+      return d.value + c.value
+    })
+
+    let fRuns = 0
+    const f = engine.computed(() => {
+      fRuns++
+      return e.value * 10
+    })
+
+    // Удерживаем граф живым через эффект
+    engine.effect(() => {
+      const _ = f.value
+    })
+
+    expect(e.value).toBe(0)
+    expect(eRuns).toBe(1)
+    expect(fRuns).toBe(1)
+
+    // 🎯 СИМУЛЯЦИЯ СРЕДЫ СЬЮТА: Мутируем корень внутри макро-батча транзакции!
+    // Если в ядре версии 2.1.10-beta очистка oldDeps шла ДО оценки fn(),
+    // этот батч ломал учет эпох на правой ветке 'c', вызывая тройной пересчет fRuns!
+    engine.batch(() => {
+      a.value = 1
+    })
+
+    // Стягиваем финальное значение
+    expect(f.value).toBe(20)
+
+    // КРИТИЧЕСКИЙ МАТЕМАТИЧЕСКИЙ ИНВАРИАНТ:
+    // Каждая вершина обязана выполниться строго по ОДНОМУ разу в рамках кадра флуша!
+    expect(eRuns).toBe(2)
+    expect(fRuns).toBe(2) // Если здесь Received: 3 — значит, регрессия поймана локально!
+  })
+
+  test('#3: jagged diamond + tails — value equality cut inside asymmetric layout', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+
+    // Левое крыло алмаза (глубина +2)
+    const b = engine.computed(() => a.value)
+    const d = engine.computed(() => b.value)
+
+    // Правое крыло алмаза (глубина +1).
+    // ВНИМАНИЕ: ОНО ВСЕГДА ВОЗВРАЩАЕТ 999 (Value Equality Cut)!
+    const c = engine.computed(() => {
+      const _ = a.value
+      return 999
+    })
+
+    // Точка схождения алмаза (Fan-In)
+    let eRuns = 0
+    const e = engine.computed(() => {
+      eRuns++
+      return d.value + c.value
+    })
+
+    // Хвост алмаза (Fan-Out)
+    let fRuns = 0
+    const f = engine.computed(() => {
+      fRuns++
+      return e.value * 10
+    })
+
+    // Удерживаем граф живым через эффект
+    engine.effect(() => {
+      const _ = f.value
+    })
+
+    expect(f.value).toBe(9990) // (0 + 999) * 10
+    expect(eRuns).toBe(1)
+    expect(fRuns).toBe(1)
+
+    // ТРИГГЕР МУТАЦИИ В БАТЧЕ:
+    // Изменяем 'a'. Правая ветка 'c' пересчитается, но вернет тот же самый 999.
+    // Если в 2.1.10-beta очистка oldDeps шла ДО оценки fn(), узел 'e' превентивно
+    // отпишется от 'c', заблокировав легитимное гашение волны, что вызовет лишний пересчет fRuns!
+    engine.batch(() => {
+      a.value = 1
+    })
+
+    // Стягиваем финальное значение хвоста
+    expect(f.value).toBe(10000) // (1 + 999) * 10 = 1000 -> 10000
+
+    // КРИТИЧЕСКИЙ МАТЕМАТИЧЕСКИЙ ИНВАРИАНТ ТЕСТА #3 С САЙТА:
+    // Каждая вершина обязана перезапуститься строго по одному разу!
+    expect(eRuns).toBe(2)
+    expect(fRuns).toBe(2) // 🔴 НА СТАРОМ КОДЕ ЗДЕСЬ БУДЕТ ВЫДАНО 3 ВМЕСТО 2!
+  })
+
+  test('#3: jagged diamond + tails — original canonical framework test', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+
+    // b зависит от a (глубина +1)
+    const b = engine.computed(() => a.value)
+    // d зависит от b (глубина +2)
+    const d = engine.computed(() => b.value)
+
+    // c зависит от a напрямую (глубина +1)
+    const c = engine.computed(() => a.value)
+
+    // Точка схождения асимметричного алмаза
+    let eRuns = 0
+    const e = engine.computed(() => {
+      eRuns++
+      return d.value + c.value
+    })
+
+    // Хвосты на выходе
+    let fRuns = 0
+    const f = engine.computed(() => {
+      fRuns++
+      return e.value * 10
+    })
+
+    let gRuns = 0
+    const g = engine.computed(() => {
+      gRuns++
+      return e.value + 100
+    })
+
+    // В оригинальном тесте #3 эффекты НЕ создаются!
+    // Граф вычисляется лениво "по требованию" (Pull-only)
+    expect(f.value).toBe(0)
+    expect(g.value).toBe(100)
+    expect(eRuns).toBe(1)
+    expect(fRuns).toBe(1)
+    expect(gRuns).toBe(1)
+
+    // МУТАЦИЯ КОРНЯ
+    a.value = 1
+
+    // Стягиваем значения хвостов напрямую
+    expect(f.value).toBe(20) // d(1) + c(1) = e(2) -> f(20)
+    expect(g.value).toBe(102) // e(2) + 100 = 102
+
+    // КРИТИЧЕСКИЙ ИНВАРИАНТ СЬЮТА С САЙТА:
+    // Без удержания эффектами, при превентивном выжигании oldDeps в 2.1.10-beta
+    // узел 'e' отписывался от 'c'. На пулл-фазе правая ветка засыпала,
+    // ломая маркер версий, из-за чего fRuns и gRuns перезапускались ложно по 2 раза подряд!
+    expect(eRuns).toBe(2)
+    expect(fRuns).toBe(2) // 🔴 НА СТАРОМ КОДЕ ЗДЕСЬ БУДЕТ ВЫДАНО 3 ВМЕСТО 2!
+    expect(gRuns).toBe(2)
+  })
+
 })

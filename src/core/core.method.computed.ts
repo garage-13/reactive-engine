@@ -151,7 +151,6 @@ export function createComputed<T>(
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
 
-      // Направляем контекст консьюмера и владения на текущий computed
       engine.activeConsumer = computedNode
       engine.activeOwner = computedNode
 
@@ -159,13 +158,14 @@ export function createComputed<T>(
       dependencies.clear()
 
       try {
-        // 🎯 ФИКС КЕЙСА #242: Перед запуском fn() принудительно очищаем
-        // и уничтожаем все внутренние эффекты, созданные на предыдущем кадре оценки!
+        // 🌳 ФИКС КЕЙСА #242 (Очистка вложенных эффектов строго ДО оценки fn)
         ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
         ownedEffects.clear()
 
+        // Вычисляем новое значение на стабильном графе родителей
         const newValue = fn()
 
+        // Дифференцируем внешние зависимости строго ПОСЛЕ вычисления (Возвращает стабильность тесту #3!)
         oldDeps.forEach(dep => {
           if (!dependencies.has(dep)) {
             const rawDepNode = dep._node || dep

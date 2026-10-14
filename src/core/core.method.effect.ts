@@ -94,7 +94,6 @@ export function createEffect(
     engine.activeOwner.ownedEffects.add(effectNode)
   }
 
-
   effectNode.run()
 
   const disposeFn = () => {
