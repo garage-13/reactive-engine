@@ -414,4 +414,76 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(effectRuns).toBe(2) // Счетчик замер на двух, эффект успешно уничтожен
   })
 
+  // =========================================================================
+  // 🌳 ГРУППА: ВЛOЖЕННЫЕ КОНТЕКСТЫ И КАСКАДНOЕ УНИЧТOЖЕНИЕ
+  // =========================================================================
+
+  test('#209: three-level nested effect — cascading disposal removes grandchild links', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+
+    let outerRuns = 0
+    let middleRuns = 0
+    let innerRuns = 0
+
+    // Создаем трехслойную вложенность эффектов
+    const disposeOuter = engine.effect(() => {
+      outerRuns++
+      const _ = a.value
+
+      engine.effect(() => {
+        middleRuns++
+
+        engine.effect(() => {
+          innerRuns++
+        })
+      })
+    })
+
+    expect(outerRuns).toBe(1)
+    expect(middleRuns).toBe(1)
+    expect(innerRuns).toBe(1)
+
+    // Вызываем dispose самого верхнего уровня
+    disposeOuter()
+
+    // Мутируем сигнал. Ни один из вложенных эффектов не должен проснуться!
+    a.value = 10
+
+    expect(outerRuns).toBe(1)
+    expect(middleRuns).toBe(1)
+    expect(innerRuns).toBe(1) // Если каскад сломан, счетчики вырастут
+  })
+
+  test('#210: multiple inner effects all cleaned when outer re-runs', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+    const b = engine.signal(0)
+
+    let innerB_Runs = 0
+    let innerC_Runs = 0
+
+    engine.effect(() => {
+      const _ = a.value // Зависимость внешнего эффекта
+
+      // Каждый раз при перезапуске внешнего эффекта создаются новые внутренние эффекты
+      engine.effect(() => {
+        const _ = b.value
+        innerB_Runs++
+      })
+    })
+
+    expect(innerB_Runs).toBe(1)
+
+    // Перезапускаем ВНЕШНИЙ эффект.
+    // Старый внутренний эффект ОБЯЗАН автоматически уничтожиться перед созданием нового!
+    a.value = 1
+
+    // Пинаем сигнал b. Если старый эффект не удалился, он сработает как зомби
+    innerB_Runs = 0
+    b.value = 100
+
+    expect(innerB_Runs).toBe(1) // Должен сработать строго 1 раз (только новый инстанс эффекта)
+  })
+
 })

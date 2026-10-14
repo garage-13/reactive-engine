@@ -9,6 +9,9 @@ export function createEffect(
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
 
+  // Список дочерних вложенных эффектов, созданных этим эффектом
+  const ownedEffects = new Set<any>()
+
   const effectNode: any = {
     id: engine.subscriberId++,
     isDirty: true,
@@ -16,41 +19,47 @@ export function createEffect(
     dependencies,
     depVersions,
     cleanups,
+    ownedEffects,
     type: 'effect',
     isDisposed: false,
     run: () => {
-      // Если эффект был принудительно уничтожен извне до старта — выходим сразу
+      // Если эффект был принудительно уничтожен ДО старта фазы — выходим сразу
       if (effectNode.isDisposed) return
       if (effectNode === engine.activeConsumer) return
 
       const prevConsumer = engine.activeConsumer
+      const prevOwner = engine.activeOwner
 
-      // Инициализируем реактивный контекст
+      // Переключаем глобальные контексты ядра на текущий эффект
       engine.activeConsumer = effectNode
+      engine.activeOwner = effectNode
 
       const prevDeps = new Set(dependencies)
       dependencies.clear()
 
       try {
-        // Фаза 1: Запускаем cleanups строго вне реактивного контекста (untracked)
+        // 🌳 Каскадно уничтожаем старых детей перед новым запуском
+        ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
+        ownedEffects.clear()
+
+        // Выполняем функции очистки (cleanups)
         engine.untrack(() => {
           cleanups.forEach(cb => { try { cb() } catch (err) { console.error(err) } })
           cleanups.clear()
         })
 
-        // 🎯 РАЗРЫВ ЦИКЛА РЕКУРСИИ ДЛЯ ТЕСТА #111:
-        // Если во время выполнения cleanups эффект вызвал собственный dispose(),
-        // он перешел в статус isDisposed = true. Мы даем его телу (fn) выполниться
-        // в ПОСЛЕДНИЙ РАЗ, но временно сбрасываем консьюмер в null (режим untracked),
-        // чтобы мёртвый узел не нахватал паразитных подписок на будущее!
+        // 🎯 ФИКС КЕЙСА #111 С УЧЕТОМ КОНТЕКСТА ВЛАДЕНИЯ:
+        // Если во время вызова cleanups эффект уничтожил сам себя —
+        // мы ОБЯЗАНЫ дать его телу выполниться в последний раз (чтобы инкрементировать счетчик),
+        // но переводим сбор зависимостей в режим untracked, обнуляя активного консьюмера.
         if (effectNode.isDisposed) {
           engine.activeConsumer = null
         }
 
-        // Фаза 2: Выполнение тела эффекта
+        // Выполнение тела эффекта
         const cleanup = fn()
 
-        // Если эффект живой — сохраняем новый cleanup и актуализируем граф
+        // Если эффект остался живым — сохраняем новые рёбра графа
         if (!effectNode.isDisposed) {
           if (typeof cleanup === 'function') cleanups.add(cleanup)
           effectNode.isDirty = false
@@ -67,35 +76,51 @@ export function createEffect(
             depVersions.set(dep, rawNode.version)
           })
         } else {
-          // Если эффект умер во время cleanups/выполнения — тотально зачищаем остатки ребер
-          prevDeps.forEach(dep => {
-            dep.subscribers.delete(effectNode)
-          })
+          // Если эффект умер на лету — тотально зачищаем все входящие связи
+          prevDeps.forEach(dep => { dep.subscribers.delete(effectNode) })
           depVersions.clear()
         }
 
         engine.log({ type: 'effect', label: effectName || 'unnamed_effect' })
       } finally {
         engine.activeConsumer = prevConsumer
+        engine.activeOwner = prevOwner
       }
     }
   }
 
+  // Автоматическая регистрация в родительском контексте владения
+  if (engine.activeOwner && engine.activeOwner.ownedEffects) {
+    engine.activeOwner.ownedEffects.add(effectNode)
+  }
+
   effectNode.run()
 
-  return () => {
-    if (effectNode.isDisposed) return
+  const disposeFn = () => {
+    // Позволяем вызывать метод даже если эффект в процессе выполнения,
+    // но защищаем от повторного входа в базовую очистку
+    const alreadyDisposed = effectNode.isDisposed
     effectNode.isDisposed = true
 
-    engine.untrack(() => {
-      cleanups.forEach(cb => { try { cb() } catch (err) { console.error(err) } })
-      cleanups.clear()
-    })
+    // Каскадно уничтожаем всех вложенных детей
+    ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
+    ownedEffects.clear()
 
-    dependencies.forEach(dep => dep.subscribers.delete(effectNode))
-    dependencies.clear()
-    depVersions.clear()
+    // Вызываем колбэки отписки только если это был первичный внешний вызов dispose
+    if (!alreadyDisposed) {
+      engine.untrack(() => {
+        cleanups.forEach(cb => { try { cb() } catch (err) { console.error(err) } })
+        cleanups.clear()
+      })
 
-    engine.pendingEffects.delete(effectNode)
+      dependencies.forEach(dep => dep.subscribers.delete(effectNode))
+      dependencies.clear()
+      depVersions.clear()
+
+      engine.pendingEffects.delete(effectNode)
+    }
   }
+
+  effectNode.dispose = disposeFn
+  return disposeFn
 }

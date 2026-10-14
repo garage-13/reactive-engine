@@ -89,8 +89,8 @@ export class ReactiveEngineCore {
   private proxyTargets = new WeakSet<object>()
   private reactiveSignals = new WeakMap<object, Map<string | symbol, any>>()
   private cycleDetectionStack = new Set<unknown>()
-
   public batchedSignals = new Set<any>()
+  public activeOwner: any = null
 
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
