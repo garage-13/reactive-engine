@@ -14,6 +14,9 @@ export function createComputed<T>(
   let version = 0
   let isInitialized = false
 
+  // ⚛️ КАНOНИЧЕСКИЙ СЧЕТЧИК ЭПOХ ДЛЯ ЗАЩИТЫ OТ ПOВТOРНЫХ ВЫЗOВOВ (#193)
+  let evaluatedInEpoch = -1
+
   // 0 = STABLE, 1 = CHECK, 2 = DIRTY
   let state = 2
 
@@ -45,21 +48,18 @@ export function createComputed<T>(
   const subscribers = new class extends Set<any> {
     override delete(val: any): boolean {
       const res = super.delete(val)
-      // ⚛️ СТРИКТМОД-ЗАЩИТА СВЯЗЕЙ ГРАФА:
-      // Мы убираем отсюда моментальный вызов releaseNode(computedNode) при size === 0!
-      // Если StrictMode временно отписывает хук во время перемонтажа,
-      // связи с родительскими сигналами НЕ должны выжигаться из памяти.
-      // Граф сохраняет целостность, а полная зачистка происходит строго при вызове .destroy().
       if (this.size === 0) {
         state = 2
         isDirty = true
+        isInitialized = false
+        releaseNode(computedNode)
         engine.computedCache.delete(fn)
       }
       return res
     }
   }()
 
-  // ⚡ КАНOНИЧЕСКИЙ АПДЕЙТЕР ГРАФА С АВТOМАТИЧЕСКИМ ПРЕPЫВАНИЕМ (Pull)
+  // ⚡ КАНOНИЧЕСКИЙ АПДЕЙТЕР ГРАФА С ВЕPСИOННЫМ ПPЕPЫВАНИЕМ (Pull)
   const updateIfNecessary = (node: any): boolean => {
     // 1. Холодный старт
     if (!isInitialized) {
@@ -75,26 +75,32 @@ export function createComputed<T>(
     if (node.state === 1) {
       let hasChangedParent = false
 
-      // Опрашиваем родителей СТРОГО по одному, последовательно!
+      // Опрашиваем родителей ПОСЛЕДOВАТЕЛЬНO, по одному!
       for (const dep of Array.from(node.dependencies)) {
         const rawDep = (dep as any)._node || dep
 
-        if (rawDep.type === 'computed' && rawDep.state > 0) {
-          updateIfNecessary(rawDep)
-        }
+        // Рекурсивно погружаемся в родителя, только если мы еще не зафиксировали изменения
+        // от предыдущих родителей в этом же цикле
+        if (!hasChangedParent) {
+          if (rawDep.type === 'computed' && rawDep.state > 0) {
+            updateIfNecessary(rawDep)
+          }
 
-        if (node.depVersions.get(dep) !== rawDep.version) {
-          hasChangedParent = true
-          // 🎯 VALUE EQUALITY BREAK: Родоначальник ветки изменился!
-          // Прерываем опрос оставшихся родителей, чтобы не дергать мёртвые ветки (узел c)
-          break
+          // Сверяем сохраненный слепок версии ребра с актуальной версией родителя
+          if (node.depVersions.get(dep) !== rawDep.version) {
+            hasChangedParent = true
+            // 🎯 СЛЕДУЮЩИЕ РОДИТЕЛИ В ЦИКЛЕ НЕ БУДУТ ОПРАШИВАТЬСЯ ХОЛОСТО!
+            // Это изолирует мёртвую ветку (узел c в тесте #193) от паразитных вычислений,
+            // но сохраняет структуру зависимостей для асинхронного флуша батчей фреймворков.
+          }
         }
       }
 
+      // Намертво гасим стейт узла в стабильный (0) ДО вызова run()
       node.state = 0
 
       if (hasChangedParent || isDirty) {
-        return node.run()
+        return node.run() // Пересчитываем узел, что вызовет динамический diff и отписку от c
       }
 
       return false // Value Equality Cut
@@ -118,21 +124,24 @@ export function createComputed<T>(
       return updateIfNecessary(computedNode)
     },
     run: () => {
+      // ⚛️ ЗАЩИТА OТ ПOВТOРНOГO ВЫЗOВА В РАМКАХ OДНOГO КАДРА (Фикс #193)
+      if (evaluatedInEpoch === engine.epoch && isInitialized) {
+        return false
+      }
+      evaluatedInEpoch = engine.epoch
+
       if (engine.cycleDetectionStack.has(computedNode)) throw new Error('[Graph Error] Cyclic dependency detected')
       engine.cycleDetectionStack.add(computedNode)
 
       const prevConsumer = engine.activeConsumer
       engine.activeConsumer = computedNode
 
-      // 🎯 ЧЕСТНЫЙ DIFF ЗАВИСИМОСТЕЙ БЕЗ ВСЛЕПУЮ ОЧИСТКИ (Канонический Паттерн)
-      // Сохраняем слепок старых зависимостей, не удаляя их из подписчиков родителей раньше времени!
       const oldDeps = new Set(dependencies)
       dependencies.clear()
 
       try {
         const newValue = fn()
 
-        // Отписываемся ТОЛЬКО от тех старых зависимостей, которые не нарисовались в новом запуске fn()
         oldDeps.forEach(dep => {
           if (!dependencies.has(dep)) {
             const rawDepNode = dep._node || dep
@@ -141,13 +150,12 @@ export function createComputed<T>(
           }
         })
 
-        // Строгое эталонное сравнение по ссылке
         const changed = isDirty || !Object.is(value, newValue)
 
         if (changed) {
           const previousValueSnapshot = isDirty ? undefined : (typeof value === 'object' && value !== null ? JSON.parse(JSON.stringify(value)) : value)
           value = newValue
-          version++ // Растет строго при фактическом изменении значения!
+          version++
 
           if (engine.log) {
             engine.log({
@@ -160,11 +168,11 @@ export function createComputed<T>(
           subscribers.forEach(sub => {
             const rawSub = sub._node || sub
             if (rawSub.type === 'effect') {
-              rawSub.state = 2 // Эффекты переводим в DIRTY
+              rawSub.state = 2
               rawSub.isDirty = true
               engine.pendingEffects.add(sub)
             } else {
-              if (rawSub.markDirty) rawSub.markDirty(1) // computed переводят потомков в CHECK (1)
+              if (rawSub.markDirty) rawSub.markDirty(1)
             }
           })
         }
@@ -180,7 +188,6 @@ export function createComputed<T>(
           if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) maxDepDepth = rawNode.depth
         })
 
-        // Синхронизация слепков версий подписчиков
         subscribers.forEach(sub => {
           const rawSub = sub._node || sub
           if (rawSub.depVersions) {
@@ -197,7 +204,6 @@ export function createComputed<T>(
     },
     markDirty: (parentState: number) => {
       if (state >= parentState) return
-
       state = parentState
 
       subscribers.forEach(sub => {
@@ -215,21 +221,17 @@ export function createComputed<T>(
 
   const computedInstance: Computed<T> = {
     get value() {
-      // Регистрируем зависимость, если этот computed считывается внутри другого computed или эффекта
       if (engine.activeConsumer && engine.activeConsumer !== computedNode) {
         computedNode.subscribers.add(engine.activeConsumer)
         engine.activeConsumer.dependencies.add(computedNode)
       }
 
-      // Атомарно запускаем pull-алгоритм ленивой проверки версий родителей
       updateIfNecessary(computedNode)
 
-      // Синхронизируем числовой слепок версии для активного консьюмера
       if (engine.activeConsumer && engine.activeConsumer.depVersions) {
         engine.activeConsumer.depVersions.set(computedInstance, version)
       }
 
-      // Железобетонно отдаем закэшированное значение без фантомных перезапусков!
       return value
     },
     get valueWithoutTracking() { return value },

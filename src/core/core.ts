@@ -107,16 +107,13 @@ export class ReactiveEngineCore {
     } finally {
       this.batchDepth--
       if (this.batchDepth === 0) {
-        // 🚀 АТOМАРНЫЙ КOММИТ ТРАНЗАКЦИИ
         const signalsToFlush = Array.from(this.batchedSignals)
         this.batchedSignals.clear()
 
-        // Сначала фиксируем финальные версии всех изменившихся сигналов
         signalsToFlush.forEach(sig => {
           if (sig._flushBatch) sig._flushBatch()
         })
 
-        // Затем одной топологической волной запускаем эффекты
         this.flushEffects()
       }
     }
@@ -128,7 +125,7 @@ export class ReactiveEngineCore {
     const effects = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
 
-    // Гарантируем строгий топологический порядок выполнения эффектов
+    // Строгая топологическая сортировка
     effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
 
     const prevConsumer = this.activeConsumer
@@ -137,7 +134,7 @@ export class ReactiveEngineCore {
       for (const effect of effects) {
         if (effect.isDisposed) continue
 
-        // Рекурсивный pull-анализ версий родителей перед запуском эффекта
+        // Pull-валидация версий родителей перед запуском эффекта
         if (effect.dependencies && effect.dependencies.size > 0) {
           let parentChanged = false
           for (const dep of effect.dependencies) {
@@ -149,7 +146,6 @@ export class ReactiveEngineCore {
               parentChanged = true
             }
           }
-          // Value Equality Cut: Если предки стабильны, гасим эффект
           if (!parentChanged && effect.dependencies.size > 0) {
             effect.isDirty = false
             continue
@@ -161,7 +157,7 @@ export class ReactiveEngineCore {
         try {
           effect.run()
         } catch (err) {
-          if (this.batchDepth === 0) throw err
+          throw err
         }
       }
     } finally {
