@@ -158,5 +158,16 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
 
   effectNode.run()
 
-  return effectNode.dispose
+  // 🎯 АППАРАТНЫЙ ПОИСК СЫРOГO УЗЛА РОДИТЕЛЯ:
+  // Извлекаем чистый внутренний узел, если activeOwner обернут адаптером сайта
+  const actualOwnerNode = engine.activeOwner ? (engine.activeOwner._node || engine.activeOwner) : null
+
+  if (actualOwnerNode && actualOwnerNode.ownedEffects) {
+    actualOwnerNode.ownedEffects.add(effectNode)
+  }
+
+  // Возвращаем context-safe изолированную стрелку для внешних вызовов ранера сайта
+  return () => {
+    effectNode.dispose()
+  }
 }

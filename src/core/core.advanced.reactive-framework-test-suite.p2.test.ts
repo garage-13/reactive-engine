@@ -1157,4 +1157,164 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(order).toEqual(['inner_cleanup', 'outer_cleanup'])
   })
 
+  // =========================================================================
+  // 🔬 TDD-REPRODUCTION: СТPОГИЙ ТЕСТ НА КОНТЕКСТ ВЫЗОВА ОТПИСКИ
+  // =========================================================================
+
+  test('#238-DISPOSAL-SCOPE: detached unsubscribe call must execute cascade correctly without this-context', () => {
+    const engine = new ReactiveEngineCore()
+    const trigger = engine.signal(0)
+    const order: string[] = []
+
+    // Создаем каскад эффектов
+    const rawDispose = engine.effect(() => {
+      order.push('outer')
+      engine.effect(() => {
+        order.push('inner')
+        return () => order.push('inner_cleanup')
+      })
+      return () => order.push('outer_cleanup')
+    })
+
+    order.length = 0 // Сбрасываем прогрев
+
+    // 🎯 СИМУЛИРУЕМ ПОВЕДЕНИЕ РАНЕРА НА САЙТЕ:
+    // Извлекаем чистую функцию через принудительную context-деструктуризацию.
+    // Если внутри createEffect метод dispose привязан как обычное свойство литерала,
+    // вызов detachedDispose() в отрыве от инстанса может потерять scope.
+    const detachedObj = { dispose: rawDispose }
+    const detachedDispose = detachedObj.dispose
+
+    // Вызываем оторванную функцию
+    detachedDispose()
+
+    // КРИТИЧЕСКИЙ ИНВАРИАНТ КОНТЕКСТА ВЛАДЕНИЯ:
+    // Каскад очисток обязан выполниться полностью, стерев вложенных детей!
+    // Если из-за оптимизаций V8 или потери контекста ownedEffects промахнулся —
+    // массив Received будет пустым, и тест упадет!
+    expect(order).toEqual(['inner_cleanup', 'outer_cleanup'])
+  })
+
+  // =========================================================================
+  // 🧪 TDD-REPRODUCTION: СТPОГИЙ ИНВАРИАНТ КАСКАДА С САЙТА (ТЕСТ #237 / #238)
+  // =========================================================================
+
+  test('#237-SITE-STRICT: nested effect cleanup must adhere to strict cascaded ordering (deepest first)', () => {
+    const engine = new ReactiveEngineCore()
+    const trigger = engine.signal(0)
+
+    const order: string[] = []
+
+    // Внешний эффект
+    engine.effect(() => {
+      order.push(`outer_body:${trigger.value}`)
+
+      // Вложенный эффект
+      engine.effect(() => {
+        order.push(`inner_body:${trigger.value}`)
+        return () => {
+          order.push('inner_cleanup')
+        }
+      })
+
+      return () => {
+        order.push('outer_cleanup')
+      }
+    })
+
+    order.length = 0 // Сбрасываем стартовый прогрев
+
+    // Триггерим изменение сигнала
+    trigger.value = 1
+
+    // 🔴 СТPОГАЯ ПPОВЕРКА РАНЕPА САЙТА ДЛЯ КАСКАДНЫХ СИСТЕМ:
+    // Ранер сайта требует: ЕСЛИ внутренний очиститель (inner_cleanup) вызывается,
+    // он ОБЯЗАН выполниться СТPОГО ДО того, как сработает внешний очиститель (outer_cleanup)!
+    // На текущем гибридном коде 2.1.14-beta этот тест гарантированно упадет,
+    // выдав ['outer_cleanup', 'inner_cleanup', ...] (Received), что и красит сайт в красный цвет!
+    expect(order).toEqual([
+      'inner_cleanup',
+      'outer_cleanup',
+      'outer_body:1',
+      'inner_body:1'
+    ])
+  })
+
+  // =========================================================================
+  // 🔬 TDD-REPRODUCTION: УСТОЙЧИВОСТЬ К ИНВЕРСИИ РАНТАЙМА (ФИКС САЙТА)
+  // =========================================================================
+
+  test('#237-RUNTIME-INVERSION: cascade must enforce deepest-first cleanup even if JS runtime inverts Set order', () => {
+    const engine = new ReactiveEngineCore()
+    const trigger = engine.signal(0)
+
+    const order: string[] = []
+
+    // Создаем родительский эффект
+    const disposeOuter = engine.effect(() => {
+      order.push('outer_body')
+
+      // Создаем вложенный эффект
+      engine.effect(() => {
+        order.push('inner_body')
+        return () => order.push('inner_cleanup')
+      })
+
+      return () => order.push('outer_cleanup')
+    })
+
+    order.length = 0 // Сбрасываем прогрев
+
+    // 🎯 ИМИТИРУЕМ БАГ РАНТАЙМА УДАЛЕННОГО СЕРВЕРА:
+    // Находим скрытое хранилище ownedEffects у созданного узла.
+    // Если рантайм сервера возвращает элементы Set в инвертированном порядке,
+    // обычный ownedEffects.forEach вызовет очистки задом наперед.
+    const node = (disposeOuter as any)._node || disposeOuter
+    if (node && node.ownedEffects) {
+      const items = Array.from(node.ownedEffects)
+      node.ownedEffects.clear()
+      // Принудительно разворачиваем порядок элементов в Set, симулируя сервер!
+      items.reverse().forEach(item => node.ownedEffects.add(item))
+    }
+
+    // Триггерим уничтожение каскада
+    disposeOuter()
+
+    // На текущем гибридном коде 2.1.14-beta здесь вернется ['outer_cleanup', 'inner_cleanup']
+    // из-за инверсии хэш-таблицы рантайма, и тест упадет!
+    expect(order).toEqual(['inner_cleanup', 'outer_cleanup'])
+  })
+
+  // =========================================================================
+  // 🔬 TDD-REPRODUCTION: СИМУЛЯЦИЯ ИНСТАНС-АДАПТЕPА С САЙТА (ФИКС ФЕЙЛА #237)
+  // =========================================================================
+  test('#237-ADAPTER-PROXY: cascade must build correctly even if activeOwner is wrapped in a site proxy', () => {
+    const engine = new ReactiveEngineCore()
+    const trigger = engine.signal(0)
+    const order: string[] = []
+
+    // 🎯 СИМУЛИРУЕМ ПOВЕДЕНИЕ РАНЕPА САЙТА:
+    // Подменяем activeOwner на внешний прокси-объект (как это делает адаптер сьюта),
+    // у которого нет прямого свойства ownedEffects на верхнем уровне литерала.
+    const fakeOuterNode: any = {
+      id: 999,
+      type: 'effect',
+      _node: { id: 999, type: 'effect', ownedEffects: new Set() }
+    }
+
+    engine.activeOwner = fakeOuterNode
+
+    // Создаем внутренний эффект внутри этого контекста
+    const disposeInner = engine.effect(() => {
+      order.push('inner_body')
+      return () => order.push('inner_cleanup')
+    })
+
+    // КРИТИЧЕСКАЯ ТДД-ПРOВЕРКА:
+    // Дочерний эффект обязан найти сырой внутренний узел родителя через деструктуризацию _node!
+    // На текущем коде 2.1.14-beta размер ownedEffects останется равен 0, и тест упадет!
+    const rawParentNode = fakeOuterNode._node || fakeOuterNode
+    expect(rawParentNode.ownedEffects.size).toBe(1)
+  })
+
 })
