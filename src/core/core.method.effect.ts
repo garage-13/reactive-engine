@@ -1,6 +1,5 @@
 import { IEffect, EffectFn, CleanupFn } from './types'
 
-// Расширяем интерфейс IEffect для внутренних нужд иерархического планировщика Ядра
 interface ICoreEffectNode extends IEffect {
   dependencies: Set<any>;
   depVersions: Map<any, number>;
@@ -9,30 +8,59 @@ interface ICoreEffectNode extends IEffect {
   depth: number;
   state: number;
   _node: any;
+  isComputedOwned?: boolean;
   dispose: () => void;
 }
 
-export function createEffect(engine: any, fn: EffectFn): () => void {
+export function createEffect(engine: any, fn: EffectFn, effectName?: string): () => void {
   let isDisposed = false
-  let isRunning = false // Флаг-защита от бесконечных циклов внутри одного эффекта
-
-  // Системный стейт узла: 0 = STABLE, 1 = CHECK, 2 = DIRTY
-  let state = 2
+  let isRunning = false
+  let state = 2 // 0 = STABLE, 1 = CHECK, 2 = DIRTY
 
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
-
-  // Иерархическое хранилище внутренних вложенных эффектов (Контекст Владения)
   const ownedEffects = new Set<ICoreEffectNode>()
 
-  // Явно реализуем расширенный интерфейс на базе системного IEffect
+  // Строго фиксируем контекст владения в момент инициализации фабрики
+  const parentOwner = engine.activeOwner
+  const isComputedOwned = parentOwner && parentOwner.type === 'computed'
+
+  const runCleanupPhase = () => {
+    if (ownedEffects.size > 0) {
+      const prevConsumer = engine.activeConsumer
+      const prevOwner = engine.activeOwner
+      engine.activeConsumer = null
+      engine.activeOwner = null
+      ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
+      ownedEffects.clear()
+      engine.activeConsumer = prevConsumer
+      engine.activeOwner = prevOwner
+    }
+
+    if (effectNode.cleanups.size > 0) {
+      const prevConsumer = engine.activeConsumer
+      engine.activeConsumer = null
+      effectNode.cleanups.forEach(cleanup => {
+        try {
+          cleanup()
+        } catch (err) {
+          console.error(err)
+        }
+      })
+      effectNode.cleanups.clear()
+      engine.activeConsumer = prevConsumer
+    }
+  }
+
   const effectNode: ICoreEffectNode = {
     id: engine.subscriberId++,
     dependencies,
     ownedEffects,
-    cleanups: new Set<CleanupFn>(), // Каноническое поле cleanups из интерфейса IEffect
+    cleanups: new Set<CleanupFn>(),
     type: 'effect',
     depth: 0,
+    label: effectName,
+    isComputedOwned,
 
     get isDirty(): boolean { return state > 0 },
     set isDirty(val: boolean) { if (val) state = 2 },
@@ -43,73 +71,45 @@ export function createEffect(engine: any, fn: EffectFn): () => void {
     get state(): number { return state },
     set state(val: number) { state = val },
     get depVersions(): Map<any, number> { return depVersions },
-
-    // Ссылка на самого себя для совместимости с внешними консьюмерами адаптеров
     get _node(): any { return effectNode },
 
-    // Реализация метода markDirty из интерфейса IEffect
     markDirty: () => {
       if (state >= 1) return
       state = 1
-      engine.pendingEffects.add(effectNode)
+
+      // 🎯 ИЗОЛЯЦИЯ ОТ ПУШ-ОЧЕРЕДИ:
+      // Вложенный эффект никогда не должен флушиться плоским планировщиком Ядра напрямую!
+      if (!isComputedOwned) {
+        engine.pendingEffects.add(effectNode)
+      }
     },
 
-    // Основной метод выполнения фазы эффекта
     run: () => {
       if (isDisposed || isRunning) return
       isRunning = true
 
-      // 🎯 ТОЧЕЧНОЕ УНИЧТОЖЕНИЕ СТАРЫХ ВЛОЖЕННЫХ ЭФФЕКТOВ ДО НАЧАЛА НОВОЙ ОЦЕНКИ (Фикс #237-CONCURRENT):
-      // Мы обязаны полностью уничтожить дочерний контекст предыдущего кадра
-      // ВНЕ активного отслеживания консьюмера, чтобы старые ссылки не застревали в памяти.
-      if (ownedEffects.size > 0) {
-        const prevConsumer = engine.activeConsumer
-        const prevOwner = engine.activeOwner
-        engine.activeConsumer = null
-        engine.activeOwner = null
-        ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
-        ownedEffects.clear()
-        engine.activeConsumer = prevConsumer
-        engine.activeOwner = prevOwner
-      }
-
-      // ИЗОЛЯЦИЯ ОШИБОК В ДЕСТРУКТОРАХ (Синхронный сброс старого кадра):
-      if (effectNode.cleanups.size > 0) {
-        const prevConsumer = engine.activeConsumer
-        engine.activeConsumer = null // Временно выключаем трекинг
-
-        effectNode.cleanups.forEach(cleanup => {
-          try {
-            cleanup()
-          } catch (err) {
-            console.error(err) // Даем consoleSpy легитимно поймать падающий деструктор!
-          }
-        })
-
-        effectNode.cleanups.clear()
-        engine.activeConsumer = prevConsumer
-      }
+      runCleanupPhase()
 
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
 
-      // Выставляем глобальные указатели Ядра на текущий узел перед запуском тела
-      engine.activeConsumer = effectNode
+      // 🎯 КАНOНИЧЕСКОЕ Dependency-Проксирование:
+      // Перенаправляем контекст считывания зависимостей на родительский computed-узел.
+      // Это предотвращает создание прямой паразитной пуш-связи между сигналом и inner-эффектом!
+      engine.activeConsumer = isComputedOwned ? parentOwner : effectNode
       engine.activeOwner = effectNode
 
-      // Делаем слепок старых зависимостей для динамического diff-расхождения
       const oldDeps = new Set(dependencies)
       dependencies.clear()
 
       try {
-        state = 0 // Узел переходит в стабильное состояние до вызова тела
+        state = 0
 
         const result = fn()
         if (typeof result === 'function') {
           effectNode.cleanups.add(result)
         }
 
-        // Дифференцируем внешние рёбра графа строго ПОСЛЕ выполнения тела fn()
         oldDeps.forEach(dep => {
           if (!dependencies.has(dep)) {
             const rawDepNode = dep._node || dep
@@ -118,7 +118,6 @@ export function createEffect(engine: any, fn: EffectFn): () => void {
           }
         })
 
-        // Актуализируем числовые версии ребер и пересчитываем глубину depth
         let maxDepDepth = 0
         dependencies.forEach(dep => {
           const rawNode = dep._node || dep
@@ -137,34 +136,13 @@ export function createEffect(engine: any, fn: EffectFn): () => void {
       }
     },
 
-    // Публичный метод принудительного размонтирования подписки
     dispose: () => {
       if (isDisposed) return
       isDisposed = true
       effectNode.isDisposed = true
 
-      // Каскадно выжигаем вложенных детей при уничтожении родителя
-      ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
-      ownedEffects.clear()
+      runCleanupPhase()
 
-      // Вызываем пользовательские cleanups из интерфейса IEffect с полной изоляцией ошибок
-      if (effectNode.cleanups.size > 0) {
-        const prevConsumer = engine.activeConsumer
-        engine.activeConsumer = null
-
-        effectNode.cleanups.forEach(cleanup => {
-          try {
-            cleanup()
-          } catch (err) {
-            console.error(err)
-          }
-        })
-
-        effectNode.cleanups.clear()
-        engine.activeConsumer = prevConsumer
-      }
-
-      // Чистим внешние ссылки подписок графа
       dependencies.forEach(dep => {
         const rawNode = dep._node || dep
         if (rawNode.subscribers) rawNode.subscribers.delete(effectNode)
@@ -174,13 +152,10 @@ export function createEffect(engine: any, fn: EffectFn): () => void {
     }
   }
 
-  // 🎯 Автоматическая регистрация во внешнем владельце контекста СТРОГО ДО первого запуска.
-  // Это гарантирует, что иерархическое дерево консьюмеров соберется без лагов контекста!
   if (engine.activeOwner && engine.activeOwner.ownedEffects) {
     engine.activeOwner.ownedEffects.add(effectNode)
   }
 
-  // Первичный синхронный старт эффекта при его декларации
   effectNode.run()
 
   return effectNode.dispose

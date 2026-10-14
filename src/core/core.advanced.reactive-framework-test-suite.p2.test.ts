@@ -985,4 +985,176 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     expect(innerEvaluations).toBe(3)
   })
 
+  // =========================================================================
+  // 🔬 TDD-REPRODUCTION КЕЙСА #237 — БАТЧ-КАСКАД ОЧИСТОК (Deepest First)
+  // =========================================================================
+  test('#237-CANONICAL: batched cascade cleanups must fire deepest first during flush', () => {
+    const engine = new ReactiveEngineCore()
+    const triggerOuter = engine.signal(0)
+    const triggerInner = engine.signal(0)
+
+    const order: string[] = []
+
+    // Внешний эффект (зависит от triggerOuter)
+    engine.effect(() => {
+      order.push(`outer_body:${triggerOuter.value}`)
+
+      // Вложенный эффект (зависит от triggerInner)
+      engine.effect(() => {
+        order.push(`inner_body:${triggerInner.value}`)
+        return () => {
+          order.push('inner_cleanup')
+        }
+      })
+
+      return () => {
+        order.push('outer_cleanup')
+      }
+    })
+
+    // Сбрасываем логи стартового прогрева [outer_body:0, inner_body:0]
+    expect(order).toEqual(['outer_body:0', 'inner_body:0'])
+    order.length = 0
+
+    // 🎯 СИМУЛЯЦИЯ СРЕДЫ СЬЮТА С САЙТА:
+    // Инвалидируем ОБА сигнала внутри одного атомарного макро-батча.
+    // Это заставляет и родительский, и дочерний эффекты одновременно встать в pendingEffects.
+    engine.batch(() => {
+      triggerOuter.value = 1
+      triggerInner.value = 1
+    })
+
+    // КРИТИЧЕСКИЙ МАТЕМАТИЧЕСКИЙ ИНВАРИАНТ ТЕСТА #237:
+    // Универсальное правило иерархических очисток требует, чтобы при перезапуске
+    // каскада сначала ПОЛНОСТЬЮ выстрелил очиститель вложенного эффекта (inner_cleanup),
+    // и только затем — очиститель внешнего (outer_cleanup).
+    // На текущем коде плоского планировщика 2.1.13-beta здесь вернется:
+    // ['outer_cleanup', 'inner_cleanup', ...] — что вызовет жесткий фейл!
+    expect(order).toEqual([
+      'inner_cleanup',
+      'outer_cleanup',
+      'outer_body:1',
+      'inner_body:1'
+    ])
+  })
+
+  test('#237-COMPUTED-CASCADE: cleanup ordering when inner effect is owned by a computed dependency', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+    const order: string[] = []
+
+    const c = engine.computed(() => {
+      engine.effect(() => {
+        order.push(`inner_body:${a.value}`)
+        return () => order.push('inner_cleanup')
+      })
+      return a.value
+    })
+
+    engine.effect(() => {
+      order.push(`outer_body:${c.value}`)
+      return () => order.push('outer_cleanup')
+    })
+
+    order.length = 0
+    a.value = 1
+
+    // КРИТИЧЕСКИЙ ИНВАРИАНТ ЛЕНИВOГO PULL-ГPАФA:
+    // Поскольку мутация происходит вне батча, outer-эффект перед запуском
+    // инициирует ленивую Pull-валидацию своих родителей. Computed(c) пересчитывается
+    // ПЕРВЫМ, выжигая и пересоздавая внутренний inner-эффект до того, как
+    // сам outer зайдет в фазу выполнения тела и вызовет свой outer_cleanup!
+    expect(order).toEqual([
+      'inner_cleanup',
+      'inner_body:1',
+      'outer_cleanup',
+      'outer_body:1'
+    ])
+  })
+
+
+  test('#238-CANONICAL: inner effect pending inside batch must be hard-deleted from queue upon outer dispose', () => {
+    const engine = new ReactiveEngineCore()
+    const triggerInner = engine.signal(0)
+
+    const order: string[] = []
+
+    // Создаем родительский эффект
+    const disposeOuter = engine.effect(() => {
+      order.push('outer_body')
+
+      // Создаем вложенный эффект, зависящий от triggerInner
+      engine.effect(() => {
+        const _ = triggerInner.value
+        order.push('inner_body')
+        return () => {
+          order.push('inner_cleanup')
+        }
+      })
+
+      return () => {
+        order.push('outer_cleanup')
+      }
+    })
+
+    expect(order).toEqual(['outer_body', 'inner_body'])
+    order.length = 0
+
+    // 🎯 СИМУЛЯЦИЯ СРЕДЫ СЬЮТА С САЙТА (Кейс #238):
+    // Открываем батч, пинаем только ВНУТРЕННИЙ сигнал (inner встает в pendingEffects),
+    // и тут же принудительно уничтожаем ВНЕШНИЙ эффект прямо внутри батча!
+    engine.batch(() => {
+      triggerInner.value = 1 // inner планируется в pendingEffects
+      disposeOuter()         // уничтожаем outer каскадом вместе с inner
+    })
+
+    // КРИТИЧЕСКИЙ ИНВАРИАНТ МАТРИЦЫ ТЕСТOВ #238:
+    // После выхода из батча, дочерний эффект обязан быть намертво вычеркнут из
+    // pendingEffects. Очистки должны сработать строго один раз (deepest first).
+    // Если внутренний узел остался в pendingEffects, флуш батча вызовет его фантомно,
+    // что приведет к дублированию или искажению лога вызовов!
+    expect(order).toEqual(['inner_cleanup', 'outer_cleanup'])
+  })
+
+  // =========================================================================
+  // 🔬 TDD-REPRODUCTION: CONTEXTLESS DISPOSAL CASING
+  // =========================================================================
+
+  test('#238-CONTEXTLESS: isolated unsubscribe call must preserve full cascade lexical scope', () => {
+    const engine = new ReactiveEngineCore()
+    const trigger = engine.signal(0)
+
+    const order: string[] = []
+
+    // Сохраняем contextless-функцию отписки, как это делает сайт
+    const unsubscribe = engine.effect(() => {
+      order.push('outer_body')
+
+      engine.effect(() => {
+        order.push('inner_body')
+        return () => {
+          order.push('inner_cleanup')
+        }
+      })
+
+      return () => {
+        order.push('outer_cleanup')
+      }
+    })
+
+    order.length = 0
+
+    // 🎯 ВЫЗЫВАЕМ ОТПИСКУ В АБСОЛЮТНО ИЗОЛИРОВАННОМ КОНТЕКСТE:
+    // Симулируем передачу ссылки в сторонний итератор тест-сьюта сайта
+    const callIsolated = (fn: () => void) => {
+      fn()
+    }
+
+    callIsolated(unsubscribe)
+
+    // КРИТИЧЕСКИЙ ИНВАРИАНТ: Каскад обязан полностью выполниться!
+    // Если на текущем коде из-за contextless-вызова ветка завалится — тест упадет!
+    expect(order).toEqual(['inner_cleanup', 'outer_cleanup'])
+  })
+
 })

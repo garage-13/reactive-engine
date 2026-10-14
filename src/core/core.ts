@@ -2,7 +2,7 @@ import { getExtractedValues } from '../utils/getExtractedValues'
 import { Signal, Computed, IEffect, EngineLoggerOptions, LogEventType, CleanupFn, TransactionContext, LogRecord, SignalOptions, ResourceOptions, ResourceState, Resource } from './types'
 import { createComputed } from './core.method.computed'
 import { createSignal } from './core.method.signal'
-import { executeBatch } from './core.method.batch'
+// import { executeBatch } from './core.method.batch'
 import { executeUntrack } from './core.method.untrack'
 import { createReactive } from './core.method.reactive'
 import { createEffect } from './core.method.effect'
@@ -91,6 +91,14 @@ export class ReactiveEngineCore {
   private cycleDetectionStack = new Set<unknown>()
   public batchedSignals = new Set<any>()
   public activeOwner: any = null
+  // Системная очередь для отложенного батчинга деструкторов
+  public pendingCleanups = new Set<() => void>()
+
+  // Метод для регистрации отложенной очистки
+  public queueCleanup(cleanup: () => void): void {
+    this.pendingCleanups.add(cleanup)
+  }
+
 
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
@@ -99,6 +107,7 @@ export class ReactiveEngineCore {
   public queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
     queueLog(type, label, details)
   }
+
 
   public batch<T>(fn: () => T): T {
     this.batchDepth++
@@ -122,10 +131,11 @@ export class ReactiveEngineCore {
   public flushEffects(): void {
     if (this.batchDepth > 0) return
 
+    if (this.pendingEffects.size === 0) return
     const effects = Array.from(this.pendingEffects)
     this.pendingEffects.clear()
 
-    // Строгая топологическая сортировка
+    // Строгая топологическая сортировка эффектов по глубине depth
     effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
 
     const prevConsumer = this.activeConsumer

@@ -114,12 +114,13 @@ export function createComputed<T>(
     get depVersions() { return depVersions },
     update: () => updateIfNecessary(computedNode),
     run: () => {
-      // 1. Защита от повторного циклического вызова в рамках одного кадра эпохи
+      // 1. Быстрый выход, если узел уже актуализирован в рамках текущего кадра эпохи
       if (evaluatedInEpoch === engine.epoch && isInitialized) {
         return false
       }
       evaluatedInEpoch = engine.epoch
 
+      // 2. Пуленепробиваемая защита от циклических зависимостей
       if (engine.cycleDetectionStack.has(computedNode)) {
         throw new Error('[Graph Error] Cyclic dependency detected')
       }
@@ -128,31 +129,25 @@ export function createComputed<T>(
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
 
-      // Направляем глобальные контексты ядра на текущий computed-узел
+      // 3. Выставляем глобальные контексты Ядра строго ДО выполнения функции fn()
       engine.activeConsumer = computedNode
       engine.activeOwner = computedNode
 
-      // Делаем слепок старых зависимостей перед очисткой текущего кадра
+      // 4. Снимаем слепок старых зависимостей перед оценкой
       const oldDeps = new Set(dependencies)
       dependencies.clear()
 
       try {
-        // 🌳 ФИКС КЕЙСА #242 (Контекст владения):
-        // Перед запуском новой оценки fn(), мы ОБЯЗАНЫ принудительно вызвать .dispose()
-        // у всех внутренних эффектов, созданных этим computed-узлом на предыдущем кадре,
-        // полностью удовлетворяя мировому инварианту "очистка до оценки".
+        // 🌳 ФИКС КЕЙСА #242: Очищаем вложенные эффекты предыдущего кадра строго ДО оценки fn()
         if (ownedEffects) {
           ownedEffects.forEach(child => { if (child.dispose) child.dispose() })
           ownedEffects.clear()
         }
 
-        // Вычисляем новое значение на стабильном и целостном графе родителей
+        // 5. Вычисляем новое значение строго ВНУТРИ изолированного контекста try
         const newValue = fn()
 
-        // 💎 ФИКС КЕЙСА #3 (Стабильность асимметричных алмазов):
-        // Дифференцируем и отписываем внешние зависимости строго ПОСЛЕ вычисления fn().
-        // Это предотвращает преждевременное стирание живых подписчиков параллельных веток,
-        // сохраняя валидность маркеров версий ребер при последовательном прогоне матрицы.
+        // 6. Дифференцируем внешние связи графа строго ПОСЛЕ вычисления fn()
         oldDeps.forEach(dep => {
           if (!dependencies.has(dep)) {
             const rawDepNode = dep._node || dep
@@ -168,7 +163,6 @@ export function createComputed<T>(
           value = newValue
           version++
 
-          // Логирование ядра (срабатывает только при реальной мутации)
           if (engine.log && signalName) {
             engine.log({
               type: 'computed',
@@ -177,7 +171,6 @@ export function createComputed<T>(
             })
           }
 
-          // Веерная рассылка markDirty подписчикам
           subscribers.forEach(sub => {
             const rawSub = sub._node || sub
             if (rawSub.type === 'effect') {
@@ -194,13 +187,15 @@ export function createComputed<T>(
         state = 0
         isInitialized = true
 
-        // Актуализируем числовые версии ребер и пересчитываем топологическую глубину (depth)
+        // 7. Актуализируем числовые версии ребер и пересчитываем depth
         let maxDepDepth = 0
         dependencies.forEach(dep => {
           const rawNode = dep._node || dep
           depVersions.set(dep, rawNode.version)
           if (rawNode.subscribers) rawNode.subscribers.add(computedNode)
-          if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) maxDepDepth = rawNode.depth
+          if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) {
+            maxDepDepth = rawNode.depth
+          }
         })
 
         subscribers.forEach(sub => {
@@ -213,7 +208,7 @@ export function createComputed<T>(
         computedNode.depth = maxDepDepth + 1
         return changed
       } finally {
-        // Восстанавливаем предыдущие контексты выполнения
+        // 8. Всегда гарантированно восстанавливаем контексты Ядра в блоке finally
         engine.activeConsumer = prevConsumer
         engine.activeOwner = prevOwner
         engine.cycleDetectionStack.delete(computedNode)

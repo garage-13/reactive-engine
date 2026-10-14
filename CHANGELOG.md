@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
+## [2.1.14-beta] - Локальная TDD-сборка
+
+### Changed (Изменено)
+- **Cascaded Pull-Driven Dependency Proxying:** Фабрика эффектов `createEffect` переведена на каноническую схему иерархического проксирования контекста потребителя (`engine.activeConsumer = isComputedOwned ? parentOwner : effectNode`). Это полностью исключает паразитную прямую пуш-подписку вложенных эффектов на корни графа, направляя волну инвалидации строго по топологической цепочке `Signal -> Computed -> Outer Effect`.
+
+### Fixed (Исправлено)
+- **Computed Evaluation Lifecycle Alignment:** Финал метода `run` в `createComputed` очищен от дублирующихся строк расчёта топологического веса `computedNode.depth`. Блок синхронной Pull-активации вложенных эффектов изолирован строго в финальной части успешного пересчёта, гарантируя соблюдение эталонного порядка каскада очисток для ленивых Pull-систем.
+
 ## [2.1.13-beta] - 2026-10-14
 
 ### Added (Добавлено)
