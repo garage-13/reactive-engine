@@ -46,9 +46,15 @@ export function createSignal<T>(
 
   const signalInstance: Signal<T> = {
     get value() {
-      if (engine.activeConsumer) {
+      const consumer = engine.activeConsumer
+      if (consumer) {
         subscribers.add(engine.activeConsumer)
         engine.activeConsumer.dependencies.add(signalInstance)
+
+        // Запоминаем маркер: этот сигнал активен в текущем расчете consumer-а
+        if (consumer.activeRunId !== undefined) {
+          (signalInstance as any)._lastSeenInRunId = consumer.activeRunId
+        }
       }
       return value
     },

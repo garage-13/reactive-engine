@@ -95,6 +95,10 @@ export function createComputed<T>(
     return false
   }
 
+  // Счечтик итераций:  Мы внедрим маркерную эпоху вычисления прямо на связь.
+  // Для этого мы будем инкрементировать системный счетчик запусков узла (computedNode.runId), а при чтении геттеров родители будут запоминать этот runId.
+  let currentRunId = 0
+
   const computedNode: any = {
     id: engine.subscriberId++,
     dependencies,
@@ -115,12 +119,10 @@ export function createComputed<T>(
       evaluatedInEpoch = engine.epoch
       verifiedInEpoch = engine.epoch
 
-      // ⚡ СВЕРХБЫСТРАЯ ЗАЩИТА ОТ ЦИКЛОВ (O(1) Inline Flag Bypass):
-      // Вместо тяжелых runtime-мутаций глобальной коллекции Set, используем плоский флаг на узле.
-      if (computedNode.isEvaluating) {
+      if (engine.cycleDetectionStack.has(computedNode)) {
         throw new Error('[Graph Error] Cyclic dependency detected')
       }
-      computedNode.isEvaluating = true // Блокируем узел перед вычислением
+      engine.cycleDetectionStack.add(computedNode)
 
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
@@ -128,8 +130,9 @@ export function createComputed<T>(
       engine.activeConsumer = computedNode
       engine.activeOwner = computedNode
 
-      const oldDeps = dependencies.size > 0 ? Array.from(dependencies) : null
-      dependencies.clear()
+      // Инкрементируем уникальный ID текущего расчета
+      currentRunId++
+      computedNode.activeRunId = currentRunId
 
       try {
         if (ownedEffects.size > 0) {
@@ -141,12 +144,21 @@ export function createComputed<T>(
           ownedEffects.clear()
         }
 
+        // Вычисляем пользовательскую функцию.
+        // В процессе выполнения геттеры сигналов запишут dep._lastSeenInRunId = currentRunId
         const newValue = fn()
 
-        if (oldDeps !== null) {
-          for (const unknownDep of oldDeps) {
+        // ⚡ СВЕРХБЫСТРЫЙ МАРКЕРНЫЙ ДИФФ (Zero-Allocation Hot Path):
+        // Вместо полной очистки коллекции dependencies и создания временных массивов,
+        // мы в один плоский проход удаляем только те ребра, которые не были прочитаны в этом цикле!
+        if (isInitialized && dependencies.size > 0) {
+          // Чтобы безопасно удалять элементы Set во время итерации for...of, V8 не требует копирования,
+          // если мы удаляем элементы точечно.
+          for (const unknownDep of dependencies) {
             const dep = unknownDep as any
-            if (!dependencies.has(dep)) {
+            if (dep._lastSeenInRunId !== currentRunId) {
+              // Это ребро графа умерло в текущем кадре (условное ветвление)
+              dependencies.delete(dep)
               const rawDepNode = dep._node || dep
               if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
               depVersions.delete(dep)
@@ -212,7 +224,7 @@ export function createComputed<T>(
       } finally {
         engine.activeConsumer = prevConsumer
         engine.activeOwner = prevOwner
-        computedNode.isEvaluating = false // ⚡ Снимаем блокировку строго в finally
+        engine.cycleDetectionStack.delete(computedNode)
       }
     },
     markDirty: (parentState: number) => {
@@ -233,15 +245,22 @@ export function createComputed<T>(
 
   const computedInstance: Computed<T> = {
     get value() {
-      if (engine.activeConsumer && engine.activeConsumer !== computedNode) {
-        computedNode.subscribers.add(engine.activeConsumer)
-        engine.activeConsumer.dependencies.add(computedNode)
+      const consumer = engine.activeConsumer
+      if (consumer && consumer !== computedNode) {
+        computedNode.subscribers.add(consumer)
+        consumer.dependencies.add(computedNode)
+
+        // ⚡ Маркерная эпоха (Zero-Allocation Track)
+        if (consumer.activeRunId !== undefined) {
+          computedNode._lastSeenInRunId = consumer.activeRunId
+        }
       }
 
       updateIfNecessary(computedNode)
 
-      if (engine.activeConsumer && engine.activeConsumer.depVersions) {
-        engine.activeConsumer.depVersions.set(computedInstance, version)
+      // Оптимизация: используем локальную ссылку consumer вместо повторного обращения к engine
+      if (consumer && consumer.depVersions) {
+        consumer.depVersions.set(computedInstance, version)
       }
       return value
     },
