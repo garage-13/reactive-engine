@@ -57,14 +57,8 @@ export function createReactive<T extends object>(
         }
       }
 
-      // Graph Pollution Cut:
-      // Если свойство является промежуточным объектом (содержит _proxyCache),
-      // мы полностью ИЗОЛИРУЕМ его чтение от глобального трекинга зависимостей графа.
-      // Потребитель должен подписаться только на конечный примитив, а не на весь каскад родительских веток!
       if ((sig as any)._proxyCache !== undefined) {
-        // Вместо sig.value вызываем чтение БЕЗ трекинга зависимости,
-        // предотвращая комбинаторное раздувание списков dependencies в сьюте dynamic.
-        const _ = sig.valueWithoutTracking
+        sig.value // Честная регистрация ребра для сохранения топологии глубины веток
         return (sig as any)._proxyCache
       }
 

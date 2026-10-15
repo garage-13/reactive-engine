@@ -115,10 +115,12 @@ export function createComputed<T>(
       evaluatedInEpoch = engine.epoch
       verifiedInEpoch = engine.epoch
 
-      if (engine.cycleDetectionStack.has(computedNode)) {
+      // ⚡ СВЕРХБЫСТРАЯ ЗАЩИТА ОТ ЦИКЛОВ (O(1) Inline Flag Bypass):
+      // Вместо тяжелых runtime-мутаций глобальной коллекции Set, используем плоский флаг на узле.
+      if (computedNode.isEvaluating) {
         throw new Error('[Graph Error] Cyclic dependency detected')
       }
-      engine.cycleDetectionStack.add(computedNode)
+      computedNode.isEvaluating = true // Блокируем узел перед вычислением
 
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
@@ -210,7 +212,7 @@ export function createComputed<T>(
       } finally {
         engine.activeConsumer = prevConsumer
         engine.activeOwner = prevOwner
-        engine.cycleDetectionStack.delete(computedNode)
+        computedNode.isEvaluating = false // ⚡ Снимаем блокировку строго в finally
       }
     },
     markDirty: (parentState: number) => {
