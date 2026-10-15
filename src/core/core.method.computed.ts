@@ -12,9 +12,7 @@ export function createComputed<T>(
   let isDirty = true
   let version = 0
   let isInitialized = false
-  // Маркер эпохи вычисления кадра графа
   let evaluatedInEpoch = -1
-  // 0 = STABLE, 1 = CHECK, 2 = DIRTY
   let state = 2
 
   const dependencies = new Set<any>()
@@ -44,33 +42,13 @@ export function createComputed<T>(
     }
   }
 
-  // Заменяем логику автоматического удаления при нуле подписчиков.
-  // Вместо полной зачистки releaseNode() мы просто сбрасываем состояние,
-  // но ОСТАВЛЯЕМ узел в кэше движка!
-  const subscribers = new class extends Set<any> {
-    override delete(val: any): boolean {
-      const res = super.delete(val)
-      if (this.size === 0) {
-        state = 2           // Переводим в DIRTY, чтобы при следующем чтении он пересчитался
-        isDirty = true
-        isInitialized = false
-        // ⚡ ОПТИМИЗАЦИЯ: Убираем releaseNode(computedNode) и удаление из кэша отсюда!
-        // Позволяем ленивому computed оставаться в памяти и удерживать каркас зависимостей.
-      }
-      return res
-    }
-  }()
-
-  // Отслеживание эпохи проверки
+  const subscribers = new Set<any>()
   let verifiedInEpoch = -1
 
   const updateIfNecessary = (node: any): boolean => {
     if (!isInitialized) return node.run()
     if (node.state === 2) return node.run()
 
-    // ⚡ СВЕРХБЫСТРЫЙ BAILOUT (O(1) Hot Path):
-    // Если этот узел уже проверялся или пересчитывался в текущей эпохе,
-    // мы мгновенно выходим, предотвращая комбинаторный взрыв рекурсии.
     if (verifiedInEpoch === engine.epoch) {
       return false
     }
@@ -84,7 +62,6 @@ export function createComputed<T>(
           const rawDep = dep._node || dep
 
           if (!hasChangedParent) {
-            // Рекурсивно погружаемся в родителя, только если предыдущие еще не изменились
             if (rawDep.type === 'computed' && rawDep.state > 0) {
               updateIfNecessary(rawDep)
             }
@@ -96,7 +73,6 @@ export function createComputed<T>(
         }
       }
 
-      // Фиксируем, что в этой эпохе узел полностью проверен и стабилен
       verifiedInEpoch = engine.epoch
       node.state = 0
 
@@ -106,7 +82,6 @@ export function createComputed<T>(
       return false
     }
 
-    // Если узел был в состоянии 0 (STABLE), фиксируем эпоху его валидности
     verifiedInEpoch = engine.epoch
     return false
   }
@@ -125,14 +100,12 @@ export function createComputed<T>(
     get depVersions() { return depVersions },
     update: () => updateIfNecessary(computedNode),
     run: () => {
-      // 1. Быстрый выход, если узел уже актуализирован в рамках текущей эпохи кадра
       if (evaluatedInEpoch === engine.epoch && isInitialized) {
         return false
       }
       evaluatedInEpoch = engine.epoch
-      verifiedInEpoch = engine.epoch // Синхронизируем маркер проверки при честном расчете
+      verifiedInEpoch = engine.epoch
 
-      // 2. Пуленепробиваемая защита от циклических зависимостей графа
       if (engine.cycleDetectionStack.has(computedNode)) {
         throw new Error('[Graph Error] Cyclic dependency detected')
       }
@@ -141,17 +114,13 @@ export function createComputed<T>(
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
 
-      // 3. Выставляем глобальные контексты Ядра строго ДО выполнения функции fn()
       engine.activeConsumer = computedNode
       engine.activeOwner = computedNode
 
-      // 4. ⚡ ZERO-SET OPTIMIZATION: Вместо создания тяжелой коллекции new Set(dependencies)
-      // мы стягиваем элементы в плоский массив. Это в разы легче для Garbage Collector.
       const oldDeps = dependencies.size > 0 ? Array.from(dependencies) : null
-      dependencies.clear() // Честно очищаем, чтобы геттеры собрали только живую ветку!
+      dependencies.clear()
 
       try {
-        // Очищаем вложенные эффекты предыдущего кадра строго ДО оценки fn()
         if (ownedEffects.size > 0) {
           for (const child of ownedEffects) {
             if (child && typeof child.dispose === 'function') {
@@ -163,8 +132,6 @@ export function createComputed<T>(
 
         const newValue = fn()
 
-        // 5. Дифференцируем внешние связи графа строго ПОСЛЕ вычисления fn()
-        // ⚡ ОПТИМИЗАЦИЯ: Быстрый плоский цикл for...of по массиву старых зависимостей
         if (oldDeps !== null) {
           for (const unknownDep of oldDeps) {
             const dep = unknownDep as any
@@ -207,7 +174,6 @@ export function createComputed<T>(
         state = 0
         isInitialized = true
 
-        // 6. Актуализируем числовые версии ребер и пересчитываем depth
         let maxDepDepth = 0
         for (const unknownDep of dependencies) {
           const dep = unknownDep as any
@@ -233,7 +199,6 @@ export function createComputed<T>(
         computedNode.depth = maxDepDepth + 1
         return changed
       } finally {
-        // 7. Всегда гарантированно восстанавливаем контексты Ядра в блоке finally
         engine.activeConsumer = prevConsumer
         engine.activeOwner = prevOwner
         engine.cycleDetectionStack.delete(computedNode)
@@ -293,12 +258,10 @@ export function createComputed<T>(
     subscribeState(cb: () => void): CleanupFn {
       return (computedInstance as any).subscribe(cb)
     },
-    // Полную зачистку графа делаем СТРОГО при явном вызове .destroy(),
-    // который бенчмарк сам вызовет в конце теста через утилиту cleanup/retain!
     destroy: () => {
       computedNode.subscribers.clear()
-      releaseNode(computedNode) // Честная глубокая очистка связей
-      engine.computedCache.delete(fn) // Удаление из кэша строго по требованию
+      releaseNode(computedNode)
+      engine.computedCache.delete(fn)
       isDirty = true
       state = 2
       isInitialized = false

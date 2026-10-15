@@ -26,7 +26,7 @@ export function createSignal<T>(
   }
 
   const notifySubscribers = () => {
-    // ⚡ Максимальное ускорение: Прямой проход по Set через for...of (без Array.from)
+    // ⚡ ОПТИМИЗАЦИЯ: Прямой проход по Set через for...of (без Array.from)
     for (const sub of subscribers) {
       const rawSub = sub._node || sub
       if (rawSub.type === 'effect') {
