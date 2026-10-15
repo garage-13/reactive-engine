@@ -215,13 +215,10 @@ export class ReactiveEngineCore {
   //   return executeBatch<T>(this, fn)
   // }
 
-  private log ({ type, label, details, isInternalCoreSignal = false }: { type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }, isInternalCoreSignal?: boolean }) {
-    ReactiveDebounceLogger.processLog(this.logger, queueLog, {
-      type,
-      label,
-      details,
-      isInternalCoreSignal
-    })
+  private log (params: any) {
+    if (!this.logger || !this.logger.isEnabled) return
+
+    ReactiveDebounceLogger.processLog(this.logger, queueLog, params)
   }
 
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {

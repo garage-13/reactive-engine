@@ -5,8 +5,7 @@ export function createComputed<T>(
   fn: () => T,
   signalName?: string
 ): Computed<T> {
-  const cachedRef = engine.computedCache.get(fn)
-  const existing = cachedRef?.deref()
+  const existing = engine.computedCache.get(fn)
   if (existing) return existing as Computed<T>
 
   let value: T
@@ -46,19 +45,7 @@ export function createComputed<T>(
     }
   }
 
-  const subscribers = new class extends Set<any> {
-    override delete(val: any): boolean {
-      const res = super.delete(val)
-      if (this.size === 0) {
-        state = 2
-        isDirty = true
-        isInitialized = false
-        releaseNode(computedNode)
-        engine.computedCache.delete(fn)
-      }
-      return res
-    }
-  }()
+  const subscribers = new Set<any>()
 
   // ⚡ КАНOНИЧЕСКИЙ АПДЕЙТЕР ГРАФА С ПОСЛЕДОВАТЕЛЬНЫМ ПРЕPЫВАНИЕМ (Pull)
   const updateIfNecessary = (node: any): boolean => {
@@ -303,6 +290,6 @@ export function createComputed<T>(
   computedInstance.type = 'computed'
   computedInstance.run = () => computedNode.run()
 
-  engine.computedCache.set(fn, new WeakRef(computedInstance as any))
+  engine.computedCache.set(fn, computedInstance) // Сохраняем прямую ссылку, WeakMap очистит её сам!
   return computedInstance
 }
