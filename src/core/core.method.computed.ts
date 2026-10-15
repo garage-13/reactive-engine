@@ -125,12 +125,14 @@ export function createComputed<T>(
     get depVersions() { return depVersions },
     update: () => updateIfNecessary(computedNode),
     run: () => {
+      // 1. Быстрый выход, если узел уже актуализирован в рамках текущей эпохи кадра
       if (evaluatedInEpoch === engine.epoch && isInitialized) {
         return false
       }
       evaluatedInEpoch = engine.epoch
-      verifiedInEpoch = engine.epoch // ⚡ Синхронизируем маркер проверки при честном расчете
+      verifiedInEpoch = engine.epoch // Синхронизируем маркер проверки при честном расчете
 
+      // 2. Пуленепробиваемая защита от циклических зависимостей графа
       if (engine.cycleDetectionStack.has(computedNode)) {
         throw new Error('[Graph Error] Cyclic dependency detected')
       }
@@ -139,13 +141,17 @@ export function createComputed<T>(
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
 
+      // 3. Выставляем глобальные контексты Ядра строго ДО выполнения функции fn()
       engine.activeConsumer = computedNode
       engine.activeOwner = computedNode
 
-      const oldDeps = new Set(dependencies)
-      dependencies.clear()
+      // 4. ⚡ ZERO-SET OPTIMIZATION: Вместо создания тяжелой коллекции new Set(dependencies)
+      // мы стягиваем элементы в плоский массив. Это в разы легче для Garbage Collector.
+      const oldDeps = dependencies.size > 0 ? Array.from(dependencies) : null
+      dependencies.clear() // Честно очищаем, чтобы геттеры собрали только живую ветку!
 
       try {
+        // Очищаем вложенные эффекты предыдущего кадра строго ДО оценки fn()
         if (ownedEffects.size > 0) {
           for (const child of ownedEffects) {
             if (child && typeof child.dispose === 'function') {
@@ -157,12 +163,16 @@ export function createComputed<T>(
 
         const newValue = fn()
 
-        for (const unknownDep of oldDeps) {
-          const dep = unknownDep as any
-          if (!dependencies.has(dep)) {
-            const rawDepNode = dep._node || dep
-            if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
-            depVersions.delete(dep)
+        // 5. Дифференцируем внешние связи графа строго ПОСЛЕ вычисления fn()
+        // ⚡ ОПТИМИЗАЦИЯ: Быстрый плоский цикл for...of по массиву старых зависимостей
+        if (oldDeps !== null) {
+          for (const unknownDep of oldDeps) {
+            const dep = unknownDep as any
+            if (!dependencies.has(dep)) {
+              const rawDepNode = dep._node || dep
+              if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
+              depVersions.delete(dep)
+            }
           }
         }
 
@@ -197,6 +207,7 @@ export function createComputed<T>(
         state = 0
         isInitialized = true
 
+        // 6. Актуализируем числовые версии ребер и пересчитываем depth
         let maxDepDepth = 0
         for (const unknownDep of dependencies) {
           const dep = unknownDep as any
@@ -222,6 +233,7 @@ export function createComputed<T>(
         computedNode.depth = maxDepDepth + 1
         return changed
       } finally {
+        // 7. Всегда гарантированно восстанавливаем контексты Ядра в блоке finally
         engine.activeConsumer = prevConsumer
         engine.activeOwner = prevOwner
         engine.cycleDetectionStack.delete(computedNode)
