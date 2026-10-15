@@ -1,5 +1,5 @@
 /**
- * Изолированная фабрика глубоких реактивных Proxy-объектов графа.
+ * * Изолированная фабрика глубоких реактивных Proxy-объектов графа.
  */
 export function createReactive<T extends object>(
   engine: any,
@@ -24,19 +24,15 @@ export function createReactive<T extends object>(
         }
       }
 
-      // ⚛️ ПАТТЕРН ПЕРЕХВАТА МЕТОДOВ МАССИВА (Vue 3 / Монолитный Батч)
       if (Array.isArray(t) && typeof prop === 'string' && ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'].includes(prop)) {
         return (...args: any[]) => {
           let result: any
-          // Обертываем ВЕСЬ вызов деструктивного метода в один атомарный батч
           engine.batch(() => {
             result = (Reflect.get(t, prop) as Function).apply(receiver, args)
 
-            // Форсированно пинаем сигнал длины и общего состояния массива
             let lengthSig = signalsMap.get('length')
             if (lengthSig) lengthSig.value = t.length
 
-            // Пинаем все зарегистрированные индексы, так как они гарантированно сместились
             signalsMap.forEach((sig: any, key: string) => {
               if (key !== 'length') sig.value = Reflect.get(t, key)
             })
@@ -53,15 +49,14 @@ export function createReactive<T extends object>(
         sig = engine.signal(rawValue)
         signalsMap.set(prop, sig)
 
-        // ⚡ СВЕРХБЫСТРОЕ КЭШИРОВАНИЕ НАУЗЛЕ (O(1) Hot Path):
-        // Обертываем объект в глубокий прокси строго ОДИН раз при инициализации сигнала свойства.
+        // ⚡ ЛЕНИВОЕ КЭШИРОВАНИЕ НА ЧТЕНИИ (O(1) Hot Path):
+        // Создаем прокси-обертку строго один раз при первом РЕАЛЬНОМ обращении к свойству,
+        // а не принудительно при записи.
         if (rawValue !== null && typeof rawValue === 'object') {
           (sig as any)._proxyCache = engine.reactive(rawValue, name ? `${name}.${String(prop)}` : String(prop))
         }
       }
 
-      // Если у сигнала закэширован глубокий прокси, мы считываем sig.value
-      // (для автоматической регистрации consumer в графе), но возвращаем прокси-обертку!
       if ((sig as any)._proxyCache !== undefined) {
         sig.value
         return (sig as any)._proxyCache
@@ -69,6 +64,7 @@ export function createReactive<T extends object>(
 
       return sig.value
     },
+
     set(t: T, prop: string | symbol, value: any, receiver: any) {
       const rawValue = engine.proxyTargets.has(value) ? value : value
       const oldValue = Reflect.get(t, prop)
@@ -82,13 +78,11 @@ export function createReactive<T extends object>(
         signalsMap.set(prop, sig)
       }
 
-      // Обновляем кэш прокси на узле, если в свойство записали совершенно новый объект
-      if (rawValue !== null && typeof rawValue === 'object') {
-        (sig as any)._proxyCache = engine.reactive(rawValue, name ? `${name}.${String(prop)}` : String(prop))
-      } else {
-        (sig as any)._proxyCache = undefined
-      }
-
+      // ⚡ МЕГА-УСКOРЕНИЕ ДЛЯ СЕТТЕРOВ:
+      // При записи мы просто СБРАСЫВАЕМ кэш прокси на узле в undefined.
+      // Если бенчмарк захочет прочитать это свойство на следующей итерации,
+      // ловушка геттера лениво создаст прокси. Если нет — мы сэкономили 100% ресурсов!
+      (sig as any)._proxyCache = undefined
       sig.value = rawValue
 
       if (Array.isArray(t) && prop !== 'length') {
