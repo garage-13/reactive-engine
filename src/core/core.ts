@@ -144,13 +144,13 @@ export class ReactiveEngineCore {
   }
 
   public flushEffects(): void {
-  // Если мы еще внутри батча — откладываем выполнение
+    // Если мы еще внутри батча — откладываем выполнение
     if (this.batchDepth > 0) return
 
     const prevConsumer = this.activeConsumer
 
     try {
-    // Итерируемся по уровням глубины от 0 до maxPendingDepth
+      // Итерируемся по уровням глубины от 0 до maxPendingDepth
       for (let depth = 0; depth <= this.maxPendingDepth; depth++) {
         const bucket = this.pendingEffects[depth]
 
@@ -167,15 +167,23 @@ export class ReactiveEngineCore {
           // Pull-валидация версий родителей перед запуском эффекта
           if (effect.dependencies && effect.dependencies.size > 0) {
             let parentChanged = false
+
             for (const dep of effect.dependencies) {
               const rawNode = dep._node || dep
+
+              // ⚡ ВОЗВРАЩАЕМ ПРОВЕРКУ РОДИТЕЛЕЙ (С математической точностью):
+              // Если родитель является computed-свойством и он "загрязнен" (state > 0),
+              // форсируем его апдейт. Благодаря маркеруverifiedInEpoch, этот вызов
+              // отработает за мгновенное O(1), если узел уже актуализировался в этой эпохе.
               if (rawNode.type === 'computed' && rawNode.state > 0) {
                 if (rawNode.update) rawNode.update()
               }
+
               if (effect.depVersions && effect.depVersions.get(dep) !== rawNode.version) {
                 parentChanged = true
               }
             }
+
             if (!parentChanged && effect.dependencies.size > 0) {
               effect.isDirty = false
               continue
@@ -192,8 +200,7 @@ export class ReactiveEngineCore {
         }
 
         // Если в процессе выполнения текущего уровня были добавлены новые эффекты
-        // на этот же или более верхний уровень, сбрасываем указатель цикла,
-        // чтобы гарантировать топологическую строгость.
+        // на этот же или более верхний уровень, сбрасываем указатель цикла.
         if (depth > 0) {
           let hasEarlierEffects = false
           for (let i = 0; i < depth; i++) {
@@ -203,7 +210,7 @@ export class ReactiveEngineCore {
             }
           }
           if (hasEarlierEffects) {
-            depth = -1 // Перезапустит цикл с 0 (учитывая depth++ в конце итерации)
+            depth = -1 // Перезапустит цикл с 0
           }
         }
       }
