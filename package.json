@@ -60,6 +60,7 @@
     "test": "NODE_OPTIONS='--expose-gc' vitest run --exclude '**/report/reactive-framework-test-suite/**'",
     "test:ui": "NODE_OPTIONS='--expose-gc' vitest --ui",
     "test:watch": "vitest",
+    "test:dynamic": "vitest run src/core/core.dynamic.test.ts --reporter=verbose",
     "preversion": "npm run test",
     "prepublishOnly": "npm run test && npm run build",
     "postversion": "git push && git push --tags",
