@@ -1,6 +1,20 @@
 /**
- * * Изолированная фабрика глубоких реактивных Proxy-объектов графа.
+ * Изолированная фабрика глубоких реактивных Proxy-объектов графа.
  */
+
+// ⚡ ОПТИМИЗАЦИЯ СКОРОСТИ O(1) (Направление 1):
+// Выносим деструктивные методы массивов в статический инлайн-объект.
+// Это избавляет V8 от необходимости собирать массивы и вызывать .includes() на каждом геттере.
+const DESTRUCTIVE_ARRAY_METHODS: Record<string | symbol, boolean> = {
+  push: true,
+  pop: true,
+  shift: true,
+  unshift: true,
+  splice: true,
+  sort: true,
+  reverse: true
+}
+
 export function createReactive<T extends object>(
   engine: any,
   target: T,
@@ -24,42 +38,47 @@ export function createReactive<T extends object>(
         }
       }
 
-      if (Array.isArray(t) && typeof prop === 'string' && ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'].includes(prop)) {
+      // ⚡ ОПТИМИЗАЦИЯ O(1) (Направление 1):
+      // Мгновенная проверка по хэш-мапе за константное время вместо .includes()
+      if (Array.isArray(t) && typeof prop === 'string' && DESTRUCTIVE_ARRAY_METHODS[prop]) {
         return (...args: any[]) => {
           let result: any
           engine.batch(() => {
-            result = (Reflect.get(t, prop) as Function).apply(receiver, args)
+            // Оптимизация: прямой вызов метода нативного прототипа
+            result = (t as any)[prop].apply(receiver, args)
 
             let lengthSig = signalsMap.get('length')
             if (lengthSig) lengthSig.value = t.length
 
             signalsMap.forEach((sig: any, key: string) => {
-              if (key !== 'length') sig.value = Reflect.get(t, key)
+              if (key !== 'length') sig.value = (t as any)[key]
             })
           })
           return result
         }
       }
 
-      if (typeof prop === 'symbol' || prop === 'constructor' || prop === 'toJSON') return Reflect.get(t, prop, receiver)
+      // ⚡ ОПТИМИЗАЦИЯ СКОРОСТИ (Направление 2):
+      // Быстрый плоский ленивый выход для системных символов без вызова Reflect.get
+      if (typeof prop === 'symbol' || prop === 'constructor' || prop === 'toJSON') {
+        return (t as any)[prop]
+      }
 
       let sig = signalsMap.get(prop)
       if (!sig) {
-        const rawValue = Reflect.get(t, prop)
+        // ⚡ ОПТИМИЗАЦИЯ (Направление 2): Заменяем Reflect.get на прямое чтение из кучи t[prop]
+        const rawValue = (t as any)[prop]
         sig = engine.signal(rawValue)
         signalsMap.set(prop, sig)
 
-        // ⚡ ЛЕНИВОЕ КЭШИРОВАНИЕ НА ЧТЕНИИ (O(1) Hot Path):
-        // Создаем прокси-обертку строго один раз при первом РЕАЛЬНОМ обращении к свойству,
-        // а не принудительно при записи.
         if (rawValue !== null && typeof rawValue === 'object') {
-          (sig as any)._proxyCache = engine.reactive(rawValue, name ? `${name}.${String(prop)}` : String(prop))
+          sig._proxyCache = engine.reactive(rawValue, name ? `${name}.${String(prop)}` : String(prop))
         }
       }
 
-      if ((sig as any)._proxyCache !== undefined) {
+      if (sig._proxyCache !== undefined) {
         sig.value // Честная регистрация ребра для сохранения топологии глубины веток
-        return (sig as any)._proxyCache
+        return sig._proxyCache
       }
 
       return sig.value
@@ -67,10 +86,13 @@ export function createReactive<T extends object>(
 
     set(t: T, prop: string | symbol, value: any, receiver: any) {
       const rawValue = engine.proxyTargets.has(value) ? value : value
-      const oldValue = Reflect.get(t, prop)
+      // ⚡ ОПТИМИЗАЦИЯ: Прямой доступ к старому значению
+      const oldValue = (t as any)[prop]
 
       if (oldValue === rawValue && prop !== 'length') return true
-      Reflect.set(t, prop, rawValue)
+
+      // Нативное присвоение свойства объекта
+      ;(t as any)[prop] = rawValue
 
       let sig = signalsMap.get(prop)
       if (!sig) {
@@ -78,11 +100,7 @@ export function createReactive<T extends object>(
         signalsMap.set(prop, sig)
       }
 
-      // ⚡ МЕГА-УСКOРЕНИЕ ДЛЯ СЕТТЕРOВ:
-      // При записи мы просто СБРАСЫВАЕМ кэш прокси на узле в undefined.
-      // Если бенчмарк захочет прочитать это свойство на следующей итерации,
-      // ловушка геттера лениво создаст прокси. Если нет — мы сэкономили 100% ресурсов!
-      (sig as any)._proxyCache = undefined
+      sig._proxyCache = undefined
       sig.value = rawValue
 
       if (Array.isArray(t) && prop !== 'length') {

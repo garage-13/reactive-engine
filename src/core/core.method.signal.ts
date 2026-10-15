@@ -51,7 +51,12 @@ export function createSignal<T>(
         subscribers.add(engine.activeConsumer)
         engine.activeConsumer.dependencies.add(signalInstance)
 
-        // Запоминаем маркер: этот сигнал активен в текущем расчете consumer-а
+        // ⚡ ИНИЦИАЛИЗАЦИЯ ГЛУБИНЫ ПОТРЕБИТЕЛЯ ОТ КОРНЯ (СИГНАЛА)
+        const consumerRaw = consumer._node || consumer
+        if (consumerRaw.depth !== undefined && consumerRaw.depth === 1) {
+          consumerRaw.depth = 2
+        }
+
         if (consumer.activeRunId !== undefined) {
           (signalInstance as any)._lastSeenInRunId = consumer.activeRunId
         }
@@ -77,7 +82,19 @@ export function createSignal<T>(
           batchInitialValue = value
         }
         value = newValue
-        engine.batchedSignals.add(signalInstance)
+
+        // ⚡ ВСТАВКА В ZERO-ALLOCATION LINKED-LIST ЦЕПОЧКУ БАТЧА
+        if ((signalInstance as any)._nextBatched === undefined || (signalInstance as any)._nextBatched === null) {
+          (signalInstance as any)._nextBatched = null // Инициализируем поле связи
+
+          if (engine.lastBatchedSignal === null) {
+            engine.firstBatchedSignal = signalInstance
+            engine.lastBatchedSignal = signalInstance
+          } else {
+            engine.lastBatchedSignal._nextBatched = signalInstance
+            engine.lastBatchedSignal = signalInstance
+          }
+        }
         return
       }
 
@@ -87,13 +104,14 @@ export function createSignal<T>(
       version++
       engine.epoch++
 
-      engine.log({
-        type: 'signal',
-        label: name || 'signal',
-        details: { from: oldValue, to: newValue },
-        isInternalCoreSignal
-      })
-
+      if (engine.isLoggingEnabled) {
+        engine.log({
+          type: 'signal',
+          label: name || 'signal',
+          details: { from: oldValue, to: newValue },
+          isInternalCoreSignal
+        })
+      }
       notifySubscribers()
       if (engine.batchDepth === 0) engine.flushEffects()
     },
@@ -116,13 +134,14 @@ export function createSignal<T>(
         version++
         engine.epoch++
 
-        engine.log({
-          type: 'signal',
-          label: name || 'signal_batched',
-          details: { from: batchInitialValue, to: value },
-          isInternalCoreSignal
-        })
-
+        if (engine.isLoggingEnabled) {
+          engine.log({
+            type: 'signal',
+            label: name || 'signal_batched',
+            details: { from: batchInitialValue, to: value },
+            isInternalCoreSignal
+          })
+        }
         notifySubscribers()
       }
 

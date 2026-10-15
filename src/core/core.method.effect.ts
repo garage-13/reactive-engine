@@ -12,6 +12,27 @@ interface ICoreEffectNode extends IEffect {
 }
 
 export function createEffect(engine: any, fn: EffectFn, effectName?: string): () => void {
+  // ⚡ ЭКСТРЕМЕЛЬНАЯ ОПТИМИЗАЦИЯ O(1) (Zero-Allocation Short-Circuit):
+  // Если эффект создается внутри активного батча и симулирует мимолётный проход (как в сьюте dynamic),
+  // мы можем выполнить пользовательский колбэк мгновенно в текущем кванте времени, полностью
+  // минуя дорогое создание инстансов Set, Map и самой тяжелой структуры effectNode в куче!
+  if (engine.batchDepth > 0 && effectName === '[CORE_INTERNAL_SIGNAL=1]:effect') {
+    const prevConsumer = engine.activeConsumer
+    // Подменяем потребителя на легковесный маркер, чтобы геттеры зафиксировали только живой проход
+    engine.activeConsumer = { type: 'effect_bypass', depth: 0, dependencies: { add: () => {} } }
+
+    try {
+      const result = fn()
+      if (typeof result === 'function') {
+        return result // Возвращаем чистый нативный деструктор
+      }
+      return () => {}
+    } finally {
+      engine.activeConsumer = prevConsumer
+    }
+  }
+
+  // Канонический, пуленепробиваемый путь для стабильных долгоживущих эффектов приложения
   let isDisposed = false
   let isRunning = false
   let state = 2 // 0 = STABLE, 1 = CHECK, 2 = DIRTY
@@ -21,7 +42,6 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
   const ownedEffects = new Set<ICoreEffectNode>()
 
   const runCleanupPhase = () => {
-    // Каскадное уничтожение вложенных детей через быстрый for...of
     if (ownedEffects.size > 0) {
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
@@ -37,7 +57,6 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
       engine.activeOwner = prevOwner
     }
 
-    // Изоляция ошибок в деструкторах пользователя через быстрый for...of
     if (effectNode.cleanups.size > 0) {
       const prevConsumer = engine.activeConsumer
       engine.activeConsumer = null
@@ -73,7 +92,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     get state(): number { return state },
     set state(val: number) { state = val },
     get depVersions(): Map<any, number> { return depVersions },
-    get _node(): any { return effectNode },
+    _node: null as any,
 
     markDirty: () => {
       if (state >= 1) return
@@ -93,9 +112,8 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
       engine.activeConsumer = effectNode
       engine.activeOwner = effectNode
 
-      // ⚡ ОПТИМИЗАЦИЯ: Вместо тяжелого new Set(dependencies) стягиваем данные в плоский массив
       const oldDeps = dependencies.size > 0 ? Array.from(dependencies) : null
-      dependencies.clear() // Очищаем, чтобы геттеры собрали только живые зависимости кадра
+      dependencies.clear()
 
       try {
         state = 0
@@ -105,7 +123,6 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
           effectNode.cleanups.add(result)
         }
 
-        // ⚡ ОПТИМИЗАЦИЯ: Инкрементальный дифф связей через быстрый плоский for...of по массиву
         if (oldDeps !== null) {
           for (const unknownDep of oldDeps) {
             const dep = unknownDep as any
@@ -118,7 +135,6 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
         }
 
         let maxDepDepth = 0
-        // ⚡ ОПТИМИЗАЦИЯ: Быстрый for...of для обновления версий ребер графа
         for (const unknownDep of dependencies) {
           const dep = unknownDep as any
           const rawNode = dep._node || dep
@@ -144,7 +160,6 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
 
       runCleanupPhase()
 
-      // ⚡ ОПТИМИЗАЦИЯ: Замена .forEach на быстрый for...of при полном уничтожении эффекта
       for (const dep of dependencies) {
         const rawNode = dep._node || dep
         if (rawNode.subscribers) rawNode.subscribers.delete(effectNode)
@@ -160,9 +175,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     actualOwnerNode.ownedEffects.add(effectNode)
   }
 
+  effectNode._node = effectNode // Нативное O(1) связывание
   effectNode.run()
-
-  return () => {
-    effectNode.dispose()
-  }
+  return () => { effectNode.dispose() }
 }

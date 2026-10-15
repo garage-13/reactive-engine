@@ -30,8 +30,10 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
     let checkSum = 0
     const effectSpy = vi.fn()
 
+    // Замеряем чистое время выполнения циклов мутаций
     const startTime = performance.now()
 
+    // 4. Боевой цикл транзакций обновлений
     for (let iter = 0; iter < iterations; iter++) {
       engine.batch(() => {
         const randomSourceIndex = Math.floor(rng() * nSources)
@@ -42,9 +44,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
           currentLayer.push(
             engine.computed(() => {
               let sum = 0
-              for (const src of sources) {
-                sum += src.value
-              }
+              for (const src of sources) { sum += src.value }
               return sum
             })
           )
@@ -88,9 +88,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
           const node = currentLayer[i]
           const dispose = engine.effect(() => {
             effectSpy()
-            if (rng() < readFraction) {
-              checkSum += node.value
-            }
+            if (rng() < readFraction) { checkSum += node.value }
           })
           cleanups.push(dispose)
         }
@@ -326,7 +324,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
     expect(effectSpy).toHaveBeenCalled()
     expect(checkSum).toBeGreaterThan(0)
   }
-  test(' Amphibia: 🟢 Экспресс-анализ динамического графа (Быстрый чек перед релизом)', () => {
+  test.skip(' Amphibia: 🟢 Экспресс-анализ динамического графа (Быстрый чек перед релизом)', () => {
     evaluateAndReportPerformance({
       suiteLabel: 'Dynamic Graphs (Экспресс-чек)',
       suffix: 'express',
@@ -339,7 +337,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       }
     })
   })
-  test.skip(' DieHard: 💀 Полная спецификация Dynamic Graphs (Полный боевой объем из бенчмарка)', () => {
+  test(' DieHard: 💀 Полная спецификация Dynamic Graphs (Полный боевой объем из бенчмарка)', () => {
     evaluateAndReportPerformance({
       suiteLabel: 'Dynamic Graphs (Die-Hard Полный Объем)',
       suffix: 'die-hard',
