@@ -12,10 +12,8 @@ export function createComputed<T>(
   let isDirty = true
   let version = 0
   let isInitialized = false
-
-  // Канонический маркер эпохи вычисления кадра графа
+  // Маркер эпохи вычисления кадра графа
   let evaluatedInEpoch = -1
-
   // 0 = STABLE, 1 = CHECK, 2 = DIRTY
   let state = 2
 
@@ -31,7 +29,8 @@ export function createComputed<T>(
       actNode.dependencies.clear()
       if (actNode.depVersions) actNode.depVersions.clear()
 
-      snapshotDeps.forEach((dep: any) => {
+      for (const unknownDep of snapshotDeps) {
+        const dep = unknownDep as any
         const rawDepNode = dep._node || dep
         if (rawDepNode.subscribers) {
           rawDepNode.subscribers.delete(actNode)
@@ -41,13 +40,12 @@ export function createComputed<T>(
             releaseNode(rawDepNode)
           }
         }
-      })
+      }
     }
   }
 
   const subscribers = new Set<any>()
 
-  // ⚡ КАНOНИЧЕСКИЙ АПДЕЙТЕР ГРАФА С ПОСЛЕДОВАТЕЛЬНЫМ ПРЕPЫВАНИЕМ (Pull)
   const updateIfNecessary = (node: any): boolean => {
     if (!isInitialized) return node.run()
     if (node.state === 2) return node.run()
@@ -55,34 +53,29 @@ export function createComputed<T>(
     if (node.state === 1) {
       let hasChangedParent = false
 
-      // Опрашиваем родителей ПОСЛЕДOВАТЕЛЬНO, строго по одному!
-      for (const dep of Array.from(node.dependencies || [])) {
-        const rawDep = (dep as any)._node || dep
+      if (node.dependencies && node.dependencies.size > 0) {
+        for (const unknownDep of node.dependencies) {
+          const dep = unknownDep as any
+          const rawDep = dep._node || dep
 
-        // Рекурсивно погружаемся в родителя, только если предыдущие еще не изменились
-        if (!hasChangedParent) {
-          if (rawDep.type === 'computed' && rawDep.state > 0) {
-            updateIfNecessary(rawDep)
-          }
+          if (!hasChangedParent) {
+            if (rawDep.type === 'computed' && rawDep.state > 0) {
+              updateIfNecessary(rawDep)
+            }
 
-          // Сверяем сохраненный слепок версии ребра с актуальной версией родителя
-          if (node.depVersions.get(dep) !== rawDep.version) {
-            hasChangedParent = true
-            // 🎯 VALUE EQUALITY BREAK: Родитель изменился!
-            // Прерываем опрос оставшихся родителей в этом цикле, чтобы не дергать
-            // мёртвые ветки (узел c в тесте #193) холосто до перестройки графа!
+            if (node.depVersions.get(dep) !== rawDep.version) {
+              hasChangedParent = true
+            }
           }
         }
       }
 
-      // Намертво гасим стейт узла в стабильный (0) ДО вызова run(),
-      // пресекая повторные фантомные заходы на чтении геттеров
       node.state = 0
 
       if (hasChangedParent || isDirty) {
-        return node.run() // Пересчитываем узел, что вызовет динамический diff и отписку
+        return node.run()
       }
-      return false // Value Equality Cut
+      return false
     }
     return false
   }
@@ -101,13 +94,11 @@ export function createComputed<T>(
     get depVersions() { return depVersions },
     update: () => updateIfNecessary(computedNode),
     run: () => {
-      // 1. Быстрый выход, если узел уже актуализирован в рамках текущей эпохи кадра
       if (evaluatedInEpoch === engine.epoch && isInitialized) {
         return false
       }
       evaluatedInEpoch = engine.epoch
 
-      // 2. Пуленепробиваемая защита от циклических зависимостей графа
       if (engine.cycleDetectionStack.has(computedNode)) {
         throw new Error('[Graph Error] Cyclic dependency detected')
       }
@@ -116,35 +107,32 @@ export function createComputed<T>(
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
 
-      // 3. Выставляем глобальные контексты Ядра строго ДО выполнения функции fn()
       engine.activeConsumer = computedNode
       engine.activeOwner = computedNode
 
-      // 4. Снимаем слепок старых зависимостей перед оценкой кадра
       const oldDeps = new Set(dependencies)
       dependencies.clear()
 
       try {
-        // 🌳 ФИКС КЕЙСА #242: Очищаем вложенные эффекты предыдущего кадра строго ДО оценки fn()
-        if (ownedEffects) {
-          ownedEffects.forEach(child => {
+        if (ownedEffects.size > 0) {
+          for (const child of ownedEffects) {
             if (child && typeof child.dispose === 'function') {
               child.dispose()
             }
-          })
+          }
           ownedEffects.clear()
         }
 
         const newValue = fn()
 
-        // 5. Дифференцируем внешние связи графа строго ПОСЛЕ вычисления fn()
-        oldDeps.forEach(dep => {
+        for (const unknownDep of oldDeps) {
+          const dep = unknownDep as any
           if (!dependencies.has(dep)) {
             const rawDepNode = dep._node || dep
             if (rawDepNode.subscribers) rawDepNode.subscribers.delete(computedNode)
             depVersions.delete(dep)
           }
-        })
+        }
 
         const changed = isDirty || !Object.is(value, newValue)
 
@@ -161,7 +149,7 @@ export function createComputed<T>(
             })
           }
 
-          subscribers.forEach(sub => {
+          for (const sub of subscribers) {
             const rawSub = sub._node || sub
             if (rawSub.type === 'effect') {
               rawSub.state = 2
@@ -170,7 +158,7 @@ export function createComputed<T>(
             } else if (rawSub.markDirty) {
               rawSub.markDirty(1)
             }
-          })
+          }
         }
 
         isDirty = false
@@ -178,26 +166,26 @@ export function createComputed<T>(
         isInitialized = true
 
         let maxDepDepth = 0
-        dependencies.forEach(dep => {
+        for (const unknownDep of dependencies) {
+          const dep = unknownDep as any
           const rawNode = dep._node || dep
           depVersions.set(dep, rawNode.version)
           if (rawNode.subscribers) rawNode.subscribers.add(computedNode)
           if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) {
             maxDepDepth = rawNode.depth
           }
-        })
+        }
 
-        subscribers.forEach(sub => {
+        for (const sub of subscribers) {
           const rawSub = sub._node || sub
           if (rawSub.type === 'effect') {
             rawSub.state = 2
             rawSub.isDirty = true
-
             engine.scheduleEffect(sub)
           } else if (rawSub.markDirty) {
             rawSub.markDirty(1)
           }
-        })
+        }
 
         computedNode.depth = maxDepDepth + 1
         return changed
@@ -211,7 +199,7 @@ export function createComputed<T>(
       if (state >= parentState) return
       state = parentState
 
-      subscribers.forEach(sub => {
+      for (const sub of subscribers) {
         const rawSub = sub._node || sub
         if (rawSub.type === 'effect') {
           rawSub.isDirty = true
@@ -219,7 +207,7 @@ export function createComputed<T>(
         } else if (rawSub.markDirty) {
           rawSub.markDirty(1)
         }
-      })
+      }
     }
   }
 
@@ -290,6 +278,6 @@ export function createComputed<T>(
   computedInstance.type = 'computed'
   computedInstance.run = () => computedNode.run()
 
-  engine.computedCache.set(fn, computedInstance) // Сохраняем прямую ссылку, WeakMap очистит её сам!
+  engine.computedCache.set(fn, computedInstance)
   return computedInstance
 }

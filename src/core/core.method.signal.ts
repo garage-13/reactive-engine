@@ -16,7 +16,6 @@ export function createSignal<T>(
   })?.[0] === '1' || false
   const subscribers = new Set<any>()
 
-  // Транзакционные слепки
   let hasBatchValue = false
   let batchInitialValue: T = initialValue
 
@@ -27,23 +26,22 @@ export function createSignal<T>(
   }
 
   const notifySubscribers = () => {
-    // Делаем безопасную итерацию через создание массива, защищая от удаления на лету
-    Array.from(subscribers).forEach((sub: any) => {
+    // ⚡ Максимальное ускорение: Прямой проход по Set через for...of (без Array.from)
+    for (const sub of subscribers) {
       const rawSub = sub._node || sub
       if (rawSub.type === 'effect') {
         rawSub.isDirty = true
         engine.scheduleEffect(sub)
       } else if (rawSub.type === 'computed') {
-        if (rawSub.markDirty) rawSub.markDirty(2) // Прямой пин DIRTY
+        if (rawSub.markDirty) rawSub.markDirty(2)
       } else {
-        // Обычные внешние подписки (React, Angular, колбэки)
         if (typeof sub === 'function') {
           try { sub(value) } catch (err) { console.error(err) }
         } else if (sub && typeof sub.run === 'function') {
           try { sub.run() } catch (err) { console.error(err) }
         }
       }
-    })
+    }
   }
 
   const signalInstance: Signal<T> = {
