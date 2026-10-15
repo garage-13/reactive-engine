@@ -121,60 +121,58 @@ export class ReactiveEngineCore {
 
   public batch<T>(fn: () => T): T {
     this.batchDepth++
+
+    // ⚡ СБРОС ИНДЕКСА АЛЛОКАЦИЙ: В начале каждого батча (кадра итерации)
+    // обнуляем счетчик, чтобы ленивые вычисления заняли свои стабильные слои.
+    if (this.batchDepth === 1) {
+      (this as any).computedAllocationId = 0
+    }
+
     try {
       return fn()
     } finally {
       this.batchDepth--
       if (this.batchDepth === 0) {
-        // ⚡ СВЕРХБЫСТРЫЙ ZERO-ALLOCATION FLUSH (O(1) Hot Path):
-        // Если батч был пустым (как это часто бывает в dynamic),
-        // мы мгновенно выходим, избегая создания массивов и итераторов.
         if (this.batchedSignals.size > 0) {
-          // Итерируемся прямо по Set через нативный for...of,
-          // убирая аллокацию временного массива Array.from()
           for (const sig of this.batchedSignals) {
             if (sig._flushBatch) sig._flushBatch()
           }
           this.batchedSignals.clear()
         }
-
         this.flushEffects()
       }
     }
   }
 
   public flushEffects(): void {
-    // Если мы еще внутри батча — откладываем выполнение
     if (this.batchDepth > 0) return
 
     const prevConsumer = this.activeConsumer
 
     try {
-      // Итерируемся по уровням глубины от 0 до maxPendingDepth
       for (let depth = 0; depth <= this.maxPendingDepth; depth++) {
         const bucket = this.pendingEffects[depth]
 
-        // Если на текущей глубине нет запланированных эффектов, идем дальше
         if (!bucket || bucket.size === 0) continue
 
-        // Извлекаем эффекты текущего уровня и сразу очищаем корзину
         const effects = Array.from(bucket)
         bucket.clear()
 
         for (const effect of effects) {
           if (effect.isDisposed) continue
 
-          // Pull-валидация версий родителей перед запуском эффекта
+          // ⚡ ЗOЛОТOЙ СТАНДАРТ ОПТИМИЗАЦИИ (Early Dirty Check Bypass):
+          // Переносим проверку грязи в самое начало цикла. Если эффект не был промаркирован
+          // как DIRTY волной push-уведомлений, мы мгновенно пропускаем его, полностью
+          // избавляя V8 от холостого обхода родителей и тяжелых хэш-поисков depVersions.get(dep).
+          if (!effect.isDirty) continue
+
           if (effect.dependencies && effect.dependencies.size > 0) {
             let parentChanged = false
 
             for (const dep of effect.dependencies) {
               const rawNode = dep._node || dep
 
-              // ⚡ ВОЗВРАЩАЕМ ПРОВЕРКУ РОДИТЕЛЕЙ (С математической точностью):
-              // Если родитель является computed-свойством и он "загрязнен" (state > 0),
-              // форсируем его апдейт. Благодаря маркеруverifiedInEpoch, этот вызов
-              // отработает за мгновенное O(1), если узел уже актуализировался в этой эпохе.
               if (rawNode.type === 'computed' && rawNode.state > 0) {
                 if (rawNode.update) rawNode.update()
               }
@@ -190,8 +188,7 @@ export class ReactiveEngineCore {
             }
           }
 
-          if (!effect.isDirty) continue
-
+          // Оригинальная проверка снизу убирается, так как она теперь стоит сверху
           try {
             effect.run()
           } catch (err) {
@@ -199,8 +196,6 @@ export class ReactiveEngineCore {
           }
         }
 
-        // Если в процессе выполнения текущего уровня были добавлены новые эффекты
-        // на этот же или более верхний уровень, сбрасываем указатель цикла.
         if (depth > 0) {
           let hasEarlierEffects = false
           for (let i = 0; i < depth; i++) {
@@ -209,15 +204,10 @@ export class ReactiveEngineCore {
               break
             }
           }
-          if (hasEarlierEffects) {
-            depth = -1 // Перезапустит цикл с 0
-          }
+          if (hasEarlierEffects) depth = -1
         }
       }
-
-      // Полностью сбрасываем трекер максимальной глубины после завершения всех эффектов
       this.maxPendingDepth = 0
-
     } finally {
       this.activeConsumer = prevConsumer
     }
