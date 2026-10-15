@@ -61,9 +61,19 @@ export function createComputed<T>(
     }
   }()
 
+  // Отслеживание эпохи проверки
+  let verifiedInEpoch = -1
+
   const updateIfNecessary = (node: any): boolean => {
     if (!isInitialized) return node.run()
     if (node.state === 2) return node.run()
+
+    // ⚡ СВЕРХБЫСТРЫЙ BAILOUT (O(1) Hot Path):
+    // Если этот узел уже проверялся или пересчитывался в текущей эпохе,
+    // мы мгновенно выходим, предотвращая комбинаторный взрыв рекурсии.
+    if (verifiedInEpoch === engine.epoch) {
+      return false
+    }
 
     if (node.state === 1) {
       let hasChangedParent = false
@@ -74,6 +84,7 @@ export function createComputed<T>(
           const rawDep = dep._node || dep
 
           if (!hasChangedParent) {
+            // Рекурсивно погружаемся в родителя, только если предыдущие еще не изменились
             if (rawDep.type === 'computed' && rawDep.state > 0) {
               updateIfNecessary(rawDep)
             }
@@ -85,6 +96,8 @@ export function createComputed<T>(
         }
       }
 
+      // Фиксируем, что в этой эпохе узел полностью проверен и стабилен
+      verifiedInEpoch = engine.epoch
       node.state = 0
 
       if (hasChangedParent || isDirty) {
@@ -92,6 +105,9 @@ export function createComputed<T>(
       }
       return false
     }
+
+    // Если узел был в состоянии 0 (STABLE), фиксируем эпоху его валидности
+    verifiedInEpoch = engine.epoch
     return false
   }
 
@@ -113,6 +129,7 @@ export function createComputed<T>(
         return false
       }
       evaluatedInEpoch = engine.epoch
+      verifiedInEpoch = engine.epoch // ⚡ Синхронизируем маркер проверки при честном расчете
 
       if (engine.cycleDetectionStack.has(computedNode)) {
         throw new Error('[Graph Error] Cyclic dependency detected')
