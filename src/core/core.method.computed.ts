@@ -179,7 +179,7 @@ export function createComputed<T>(
             if (rawSub.type === 'effect') {
               rawSub.state = 2
               rawSub.isDirty = true
-              engine.pendingEffects.add(sub)
+              engine.scheduleEffect(sub)
             } else if (rawSub.markDirty) {
               rawSub.markDirty(1)
             }
@@ -190,7 +190,6 @@ export function createComputed<T>(
         state = 0
         isInitialized = true
 
-        // 6. Актуализируем числовые версии ребер и пересчитываем depth
         let maxDepDepth = 0
         dependencies.forEach(dep => {
           const rawNode = dep._node || dep
@@ -203,15 +202,19 @@ export function createComputed<T>(
 
         subscribers.forEach(sub => {
           const rawSub = sub._node || sub
-          if (rawSub.depVersions) {
-            rawSub.depVersions.set(computedInstance, version)
+          if (rawSub.type === 'effect') {
+            rawSub.state = 2
+            rawSub.isDirty = true
+
+            engine.scheduleEffect(sub)
+          } else if (rawSub.markDirty) {
+            rawSub.markDirty(1)
           }
         })
 
         computedNode.depth = maxDepDepth + 1
         return changed
       } finally {
-        // 7. Всегда гарантированно восстанавливаем контексты Ядра в блоке finally
         engine.activeConsumer = prevConsumer
         engine.activeOwner = prevOwner
         engine.cycleDetectionStack.delete(computedNode)
@@ -225,7 +228,7 @@ export function createComputed<T>(
         const rawSub = sub._node || sub
         if (rawSub.type === 'effect') {
           rawSub.isDirty = true
-          engine.pendingEffects.add(sub)
+          engine.scheduleEffect(sub)
         } else if (rawSub.markDirty) {
           rawSub.markDirty(1)
         }

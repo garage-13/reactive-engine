@@ -81,8 +81,9 @@ export class ReactiveEngineCore {
   public activeConsumer: any = null
   public batchDepth = 0
   public subscriberId = 0
-  public pendingEffects = new Set<any>()
-  public computedCache = new Map<Function, WeakRef<Computed<unknown>>>()
+  public pendingEffects: Array<Set<any> | undefined> = []
+  public maxPendingDepth = 0
+  public computedCache = new WeakMap<Function, any>()
   private diRegistry = new Map<unknown, unknown>()
   private diCache = new Map<unknown, unknown>()
   private proxyCache = new WeakMap<object, any>()
@@ -99,15 +100,24 @@ export class ReactiveEngineCore {
     this.pendingCleanups.add(cleanup)
   }
 
-
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
+  }
+
+  public scheduleEffect(effect: any): void {
+    const depth = effect.depth || 0
+    if (!this.pendingEffects[depth]) {
+      this.pendingEffects[depth] = new Set()
+    }
+    this.pendingEffects[depth]!.add(effect)
+    if (depth > this.maxPendingDepth) {
+      this.maxPendingDepth = depth
+    }
   }
 
   public queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
     queueLog(type, label, details)
   }
-
 
   public batch<T>(fn: () => T): T {
     this.batchDepth++
@@ -129,47 +139,73 @@ export class ReactiveEngineCore {
   }
 
   public flushEffects(): void {
+  // Если мы еще внутри батча — откладываем выполнение
     if (this.batchDepth > 0) return
-
-    if (this.pendingEffects.size === 0) return
-    const effects = Array.from(this.pendingEffects)
-    this.pendingEffects.clear()
-
-    // Строгая топологическая сортировка эффектов по глубине depth
-    effects.sort((a, b) => (a.depth || 0) - (b.depth || 0) || a.id - b.id)
 
     const prevConsumer = this.activeConsumer
 
     try {
-      for (const effect of effects) {
-        if (effect.isDisposed) continue
+    // Итерируемся по уровням глубины от 0 до maxPendingDepth
+      for (let depth = 0; depth <= this.maxPendingDepth; depth++) {
+        const bucket = this.pendingEffects[depth]
 
-        // Pull-валидация версий родителей перед запуском эффекта
-        if (effect.dependencies && effect.dependencies.size > 0) {
-          let parentChanged = false
-          for (const dep of effect.dependencies) {
-            const rawNode = dep._node || dep
-            if (rawNode.type === 'computed' && rawNode.state > 0) {
-              if (rawNode.update) rawNode.update()
+        // Если на текущей глубине нет запланированных эффектов, идем дальше
+        if (!bucket || bucket.size === 0) continue
+
+        // Извлекаем эффекты текущего уровня и сразу очищаем корзину
+        const effects = Array.from(bucket)
+        bucket.clear()
+
+        for (const effect of effects) {
+          if (effect.isDisposed) continue
+
+          // Pull-валидация версий родителей перед запуском эффекта
+          if (effect.dependencies && effect.dependencies.size > 0) {
+            let parentChanged = false
+            for (const dep of effect.dependencies) {
+              const rawNode = dep._node || dep
+              if (rawNode.type === 'computed' && rawNode.state > 0) {
+                if (rawNode.update) rawNode.update()
+              }
+              if (effect.depVersions && effect.depVersions.get(dep) !== rawNode.version) {
+                parentChanged = true
+              }
             }
-            if (effect.depVersions && effect.depVersions.get(dep) !== rawNode.version) {
-              parentChanged = true
+            if (!parentChanged && effect.dependencies.size > 0) {
+              effect.isDirty = false
+              continue
             }
           }
-          if (!parentChanged && effect.dependencies.size > 0) {
-            effect.isDirty = false
-            continue
+
+          if (!effect.isDirty) continue
+
+          try {
+            effect.run()
+          } catch (err) {
+            throw err
           }
         }
 
-        if (!effect.isDirty) continue
-
-        try {
-          effect.run()
-        } catch (err) {
-          throw err
+        // Если в процессе выполнения текущего уровня были добавлены новые эффекты
+        // на этот же или более верхний уровень, сбрасываем указатель цикла,
+        // чтобы гарантировать топологическую строгость.
+        if (depth > 0) {
+          let hasEarlierEffects = false
+          for (let i = 0; i < depth; i++) {
+            if (this.pendingEffects[i] && this.pendingEffects[i]!.size > 0) {
+              hasEarlierEffects = true
+              break
+            }
+          }
+          if (hasEarlierEffects) {
+            depth = -1 // Перезапустит цикл с 0 (учитывая depth++ в конце итерации)
+          }
         }
       }
+
+      // Полностью сбрасываем трекер максимальной глубины после завершения всех эффектов
+      this.maxPendingDepth = 0
+
     } finally {
       this.activeConsumer = prevConsumer
     }

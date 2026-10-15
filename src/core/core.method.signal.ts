@@ -32,7 +32,7 @@ export function createSignal<T>(
       const rawSub = sub._node || sub
       if (rawSub.type === 'effect') {
         rawSub.isDirty = true
-        engine.pendingEffects.add(sub)
+        engine.scheduleEffect(sub)
       } else if (rawSub.type === 'computed') {
         if (rawSub.markDirty) rawSub.markDirty(2) // Прямой пин DIRTY
       } else {

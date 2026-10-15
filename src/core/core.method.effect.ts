@@ -74,7 +74,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     markDirty: () => {
       if (state >= 1) return
       state = 1
-      engine.pendingEffects.add(effectNode)
+      engine.scheduleEffect(effectNode)
     },
 
     run: () => {
