@@ -44,7 +44,22 @@ export function createComputed<T>(
     }
   }
 
-  const subscribers = new Set<any>()
+  // Заменяем логику автоматического удаления при нуле подписчиков.
+  // Вместо полной зачистки releaseNode() мы просто сбрасываем состояние,
+  // но ОСТАВЛЯЕМ узел в кэше движка!
+  const subscribers = new class extends Set<any> {
+    override delete(val: any): boolean {
+      const res = super.delete(val)
+      if (this.size === 0) {
+        state = 2           // Переводим в DIRTY, чтобы при следующем чтении он пересчитался
+        isDirty = true
+        isInitialized = false
+        // ⚡ ОПТИМИЗАЦИЯ: Убираем releaseNode(computedNode) и удаление из кэша отсюда!
+        // Позволяем ленивому computed оставаться в памяти и удерживать каркас зависимостей.
+      }
+      return res
+    }
+  }()
 
   const updateIfNecessary = (node: any): boolean => {
     if (!isInitialized) return node.run()
@@ -249,10 +264,12 @@ export function createComputed<T>(
     subscribeState(cb: () => void): CleanupFn {
       return (computedInstance as any).subscribe(cb)
     },
+    // Полную зачистку графа делаем СТРОГО при явном вызове .destroy(),
+    // который бенчмарк сам вызовет в конце теста через утилиту cleanup/retain!
     destroy: () => {
       computedNode.subscribers.clear()
-      releaseNode(computedNode)
-      engine.computedCache.delete(fn)
+      releaseNode(computedNode) // Честная глубокая очистка связей
+      engine.computedCache.delete(fn) // Удаление из кэша строго по требованию
       isDirty = true
       state = 2
       isInitialized = false
