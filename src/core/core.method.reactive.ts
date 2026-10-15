@@ -49,13 +49,25 @@ export function createReactive<T extends object>(
 
       let sig = signalsMap.get(prop)
       if (!sig) {
-        sig = engine.signal(Reflect.get(t, prop))
+        const rawValue = Reflect.get(t, prop)
+        sig = engine.signal(rawValue)
         signalsMap.set(prop, sig)
+
+        // ⚡ СВЕРХБЫСТРОЕ КЭШИРОВАНИЕ НАУЗЛЕ (O(1) Hot Path):
+        // Обертываем объект в глубокий прокси строго ОДИН раз при инициализации сигнала свойства.
+        if (rawValue !== null && typeof rawValue === 'object') {
+          (sig as any)._proxyCache = engine.reactive(rawValue, name ? `${name}.${String(prop)}` : String(prop))
+        }
       }
-      const val = sig.value
-      if (engine.activeConsumer) engine.log({ type: 'reactive', label: `Read ${name || ''}.${String(prop)}`, details: { to: val } })
-      if (val !== null && typeof val === 'object') return engine.reactive(val, name ? `${name}.${String(prop)}` : String(prop))
-      return val
+
+      // Если у сигнала закэширован глубокий прокси, мы считываем sig.value
+      // (для автоматической регистрации consumer в графе), но возвращаем прокси-обертку!
+      if ((sig as any)._proxyCache !== undefined) {
+        sig.value
+        return (sig as any)._proxyCache
+      }
+
+      return sig.value
     },
     set(t: T, prop: string | symbol, value: any, receiver: any) {
       const rawValue = engine.proxyTargets.has(value) ? value : value
@@ -69,6 +81,14 @@ export function createReactive<T extends object>(
         sig = engine.signal(oldValue)
         signalsMap.set(prop, sig)
       }
+
+      // Обновляем кэш прокси на узле, если в свойство записали совершенно новый объект
+      if (rawValue !== null && typeof rawValue === 'object') {
+        (sig as any)._proxyCache = engine.reactive(rawValue, name ? `${name}.${String(prop)}` : String(prop))
+      } else {
+        (sig as any)._proxyCache = undefined
+      }
+
       sig.value = rawValue
 
       if (Array.isArray(t) && prop !== 'length') {
