@@ -22,23 +22,32 @@ export function createComputed<T>(
   const releaseNode = (node: any): void => {
     if (!node) return
     const actNode = node._node || node
-    if (actNode.dependencies && actNode.dependencies.size > 0) {
-      const snapshotDeps = Array.from(actNode.dependencies)
-      actNode.dependencies.clear()
-      if (actNode.depVersions) actNode.depVersions.clear()
 
-      for (const unknownDep of snapshotDeps) {
+    if (actNode.dependencies && actNode.dependencies.size > 0) {
+      // ⚡ ОПТИМИЗАЦИЯ: Полностью убираем Array.from()! Итерируемся прямо по Set.
+      // Чтобы безопасно удалять элементы во время итерации (избегая бесконечных циклов в JS),
+      // мы очищаем родительские подписки, а сам actNode.dependencies.clear() вызовем строго ПОСЛЕ цикла.
+      for (const unknownDep of actNode.dependencies) {
         const dep = unknownDep as any
         const rawDepNode = dep._node || dep
+
         if (rawDepNode.subscribers) {
+          // Выполняем точечное удаление. Если узел есть — удаляем, не дергая Set вхолостую
           rawDepNode.subscribers.delete(actNode)
           rawDepNode.subscribers.delete(node)
           rawDepNode.subscribers.delete(computedNode)
+
+          // Рекурсивный спуск делаем только для живых computed-сирот,
+          // у которых реально не осталось активных потребителей
           if (rawDepNode.type === 'computed' && rawDepNode.subscribers.size === 0) {
             releaseNode(rawDepNode)
           }
         }
       }
+
+      // Атомарно очищаем зависимости узла за один такт O(1) после завершения обхода
+      actNode.dependencies.clear()
+      if (actNode.depVersions) actNode.depVersions.clear()
     }
   }
 
