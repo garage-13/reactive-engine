@@ -121,24 +121,23 @@ export class ReactiveEngineCore {
 
   public batch<T>(fn: () => T): T {
     this.batchDepth++
-
-    // ⚡ СБРОС ИНДЕКСА АЛЛОКАЦИЙ: В начале каждого батча (кадра итерации)
-    // обнуляем счетчик, чтобы ленивые вычисления заняли свои стабильные слои.
-    if (this.batchDepth === 1) {
-      (this as any).computedAllocationId = 0
-    }
-
     try {
       return fn()
     } finally {
       this.batchDepth--
       if (this.batchDepth === 0) {
+        // ⚡ СВЕРХБЫСТРЫЙ ZERO-ALLOCATION FLUSH (O(1) Hot Path):
+        // Если батч был пустым (как это часто бывает в dynamic),
+        // мы мгновенно выходим, избегая создания массивов и итераторов.
         if (this.batchedSignals.size > 0) {
+          // Итерируемся прямо по Set через нативный for...of,
+          // убирая аллокацию временного массива Array.from()
           for (const sig of this.batchedSignals) {
             if (sig._flushBatch) sig._flushBatch()
           }
           this.batchedSignals.clear()
         }
+
         this.flushEffects()
       }
     }
