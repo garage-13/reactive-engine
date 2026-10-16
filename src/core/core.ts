@@ -136,8 +136,7 @@ export class ReactiveEngineCore {
         this.flushEffects()
 
         // ⚡ ЭКСТРЕМЕЛЬНЫЙ ПЕРФОРМАНС-БАЙПАС:
-        // После завершения батча полностью уничтожаем временный строковый кэш,
-        // предотвращая утечки памяти и ложное переиспользование между тестами!
+        // Полностью уничтожаем временный кэш итерации, защищая тесты от коллизий строк
         if ((this as any).batchComputedCache) {
           (this as any).batchComputedCache.clear();
           (this as any).batchComputedCache = null

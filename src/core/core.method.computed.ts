@@ -9,16 +9,17 @@ export function createComputed<T>(
   const existing = engine.computedCache.get(fn)
   if (existing) return existing as Computed<T>
 
-  // 2. ⚡ ИНСТАНС-СКОУПЕД СТРОКОВЫЙ КЭШ (Оптимизация аллокаций V8):
-  // Переиспользуем ноды по сигнатуре исходного кода для спасения кучи от Churn-эффекта.
-  // Защищен от утечек, так как очищается целиком при сбросе ядра между тестами.
+  // 2. ⚡ БЕЗОПАСНЫЙ ТРАНЗАКЦИОННЫЙ СТРОКОВЫЙ КЭШ:
+  // Переиспользуем ноды по сигнатуре только внутри ОДНОГО батча (цикла генерации графа).
   const cacheKey = fn.toString()
-  if (!engine.computedStringCache) {
-    engine.computedStringCache = new Map<string, any>()
-  }
-  const cachedNode = engine.computedStringCache.get(cacheKey)
-  if (cachedNode) {
-    return cachedNode as Computed<T>
+  if (engine.batchDepth > 0) {
+    if (!engine.batchComputedCache) {
+      engine.batchComputedCache = new Map<string, any>()
+    }
+    const cachedNode = engine.batchComputedCache.get(cacheKey)
+    if (cachedNode) {
+      return cachedNode as Computed<T>
+    }
   }
 
   let value: T
@@ -35,6 +36,7 @@ export function createComputed<T>(
 
   const releaseNode = (node: any): void => {
     if (!node) return
+    // Строго извлекаем внутреннее ядро ноды
     const actNode = node._node || node
 
     if (actNode.dependencies && actNode.dependencies.size > 0) {
@@ -43,10 +45,14 @@ export function createComputed<T>(
         const rawDepNode = dep._node || dep
 
         if (rawDepNode.subscribers) {
+          // Удаляем связи, не затирая сами объекты
           rawDepNode.subscribers.delete(actNode)
           rawDepNode.subscribers.delete(node)
           rawDepNode.subscribers.delete(computedNode)
 
+          // ⚡ БЕЗОПАСНЫЙ КАСКАДНЫЙ ПЕРЕХОД:
+          // Передаем в рекурсию строго внутренний приватный computedNode (rawDepNode),
+          // чтобы V8 распутывал граф без зануления внешних инстансов прокси
           if (rawDepNode.type === 'computed' && rawDepNode.subscribers.size === 0) {
             releaseNode(rawDepNode)
           }
@@ -266,15 +272,23 @@ export function createComputed<T>(
       return (computedInstance as any).subscribe(cb)
     },
     destroy: () => {
-      subscribers.clear()
+      // 1. Распутываем зависимости вверх по графу, пока subscribers живы
       releaseNode(computedNode)
+
+      // 2. Очищаем локальные сеты графа, сохраняя ссылки на сами структуры
+      if (subscribers) subscribers.clear()
+
+      // 3. Вычищаем строго из кэшей
+      engine.computedCache.delete(fn)
       if (engine.batchComputedCache) {
         engine.batchComputedCache.delete(cacheKey)
       }
-      engine.computedCache.delete(fn)
+
+      // 4. Мягкий сброс флагов вычислений
       isDirty = true
       state = 2
       isInitialized = false
+      // ⚛️ ГАРАНТИЯ СТАБИЛЬНОСТИ: Никаких занулений computedInstance._node = undefined!
     },
     __subscribe(cb: () => void): CleanupFn {
       const hookEffect: any = {
@@ -290,14 +304,18 @@ export function createComputed<T>(
     }
   } as any
 
-  ;(computedInstance as any)._node = computedNode
-  ;(computedInstance as any).subscribers = subscribers
-  computedInstance._isDirty = () => state > 0
-  computedInstance.type = 'computed'
   computedInstance.run = () => computedNode.run()
 
+  // Сохраняем в канонический кэш
   engine.computedCache.set(fn, computedInstance)
-  engine.computedStringCache.set(cacheKey, computedInstance)
+
+  ;(computedInstance as any)._node = computedNode
+  ;(computedInstance as any).subscribers = subscribers
+
+  // ⚡ Записываем во временный батч-кэш для оптимизации аллокаций
+  if (engine.batchDepth > 0 && engine.batchComputedCache) {
+    engine.batchComputedCache.set(cacheKey, computedInstance)
+  }
 
   return computedInstance
 }
