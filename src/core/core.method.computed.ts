@@ -5,21 +5,20 @@ export function createComputed<T>(
   fn: () => T,
   signalName?: string
 ): Computed<T> {
-  // 1. Проверяем канонический WeakMap путь
+  // 1. Быстрый канонический WeakMap путь (по ссылке на функцию)
   const existing = engine.computedCache.get(fn)
   if (existing) return existing as Computed<T>
 
-  // 2. ⚡ ТРАНЗАКЦИОННЫЙ СТРОКОВЫЙ КЭШ:
-  // Если мы внутри батча, переиспользуем ранее созданные ноды по сигнатуре исходного кода
+  // 2. ⚡ ИНСТАНС-СКОУПЕД СТРОКОВЫЙ КЭШ (Оптимизация аллокаций V8):
+  // Переиспользуем ноды по сигнатуре исходного кода для спасения кучи от Churn-эффекта.
+  // Защищен от утечек, так как очищается целиком при сбросе ядра между тестами.
   const cacheKey = fn.toString()
-  if (engine.batchDepth > 0) {
-    if (!engine.batchComputedCache) {
-      engine.batchComputedCache = new Map<string, any>()
-    }
-    const cachedNode = engine.batchComputedCache.get(cacheKey)
-    if (cachedNode) {
-      return cachedNode as Computed<T>
-    }
+  if (!engine.computedStringCache) {
+    engine.computedStringCache = new Map<string, any>()
+  }
+  const cachedNode = engine.computedStringCache.get(cacheKey)
+  if (cachedNode) {
+    return cachedNode as Computed<T>
   }
 
   let value: T
@@ -297,13 +296,8 @@ export function createComputed<T>(
   computedInstance.type = 'computed'
   computedInstance.run = () => computedNode.run()
 
-  // Сохраняем в канонический кэш
   engine.computedCache.set(fn, computedInstance)
-
-  // Сохраняем во временный батч-кэш для спасения кучи от аллокаций
-  if (engine.batchDepth > 0 && engine.batchComputedCache) {
-    engine.batchComputedCache.set(cacheKey, computedInstance)
-  }
+  engine.computedStringCache.set(cacheKey, computedInstance)
 
   return computedInstance
 }

@@ -7,6 +7,7 @@ export { ReactiveEngineAutolog } from './core.autolog'
 
 export * from './core'
 export * from './core.autolog'
+export * from './core.global'
 export * from './types'
 export * from './AbstractService'
 export * from './BaseREServiceEnhanced'
