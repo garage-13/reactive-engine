@@ -123,12 +123,26 @@ export function createSignal<T>(
           isInternalCoreSignal
         })
 
-        notifySubscribers()
+        // ⚡ ЗOЛОТOЙ МOСТ ТРАНЗАКЦИИ:
+        // Вместо обычного notifySubscribers, принудительно переводим
+        // всех прямых computed-подписчиков в боевой статус DIRTY (2)
+        for (const sub of subscribers) {
+          const rawSub = sub._node || sub
+          if (rawSub.type === 'effect') {
+            rawSub.isDirty = true
+            engine.scheduleEffect(sub)
+          } else if (rawSub.markDirty) {
+            rawSub.markDirty(2) // 👈 Переводим в DIRTY (2), а не в CHECK (1)
+          } else if (typeof sub === 'function') {
+            try { sub(value) } catch (err) { console.error(err) }
+          }
+        }
       }
 
       hasBatchValue = false
       batchInitialValue = value
     },
+
     get hasBatchValue() { return hasBatchValue },
   } as any
 

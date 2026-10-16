@@ -218,6 +218,7 @@ export function createComputed<T>(
         }
       }
     }
+
   }
 
   const computedInstance: Computed<T> = {

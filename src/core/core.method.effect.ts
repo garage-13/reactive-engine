@@ -93,19 +93,17 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
       engine.activeConsumer = effectNode
       engine.activeOwner = effectNode
 
-      // ⚡ ОПТИМИЗАЦИЯ: Вместо тяжелого new Set(dependencies) стягиваем данные в плоский массив
       const oldDeps = dependencies.size > 0 ? Array.from(dependencies) : null
-      dependencies.clear() // Очищаем, чтобы геттеры собрали только живые зависимости кадра
+      dependencies.clear()
 
       try {
-        state = 0
+        state = 0 // Сбрасываем флаг грязи перед чтением графа
 
         const result = fn()
         if (typeof result === 'function') {
           effectNode.cleanups.add(result)
         }
 
-        // ⚡ ОПТИМИЗАЦИЯ: Инкрементальный дифф связей через быстрый плоский for...of по массиву
         if (oldDeps !== null) {
           for (const unknownDep of oldDeps) {
             const dep = unknownDep as any
@@ -118,7 +116,6 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
         }
 
         let maxDepDepth = 0
-        // ⚡ ОПТИМИЗАЦИЯ: Быстрый for...of для обновления версий ребер графа
         for (const unknownDep of dependencies) {
           const dep = unknownDep as any
           const rawNode = dep._node || dep
