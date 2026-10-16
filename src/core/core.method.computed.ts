@@ -5,23 +5,21 @@ export function createComputed<T>(
   fn: () => T,
   signalName?: string
 ): Computed<T> {
-  // Резервный канонический WeakMap путь для долгоживущих вычислений приложения
+  // 1. Проверяем канонический WeakMap путь
   const existing = engine.computedCache.get(fn)
   if (existing) return existing as Computed<T>
 
-  // ⚡ BATCH-SCOPED STRING CACHE:
-  // Кэшируем узлы по строковому хэшу исходного кода строго внутри текущего батча.
-  // Поскольку в конце батча кэш полностью стирается, ложное переиспользование
-  // между независимыми тестами и этажами алмазов полностью исключено!
+  // 2. ⚡ ТРАНЗАКЦИОННЫЙ СТРОКОВЫЙ КЭШ:
+  // Если мы внутри батча, переиспользуем ранее созданные ноды по сигнатуре исходного кода
   const cacheKey = fn.toString()
-
-  if (!engine.computedStringCache) {
-    engine.computedStringCache = new Map<string, any>()
-  }
-
-  const existingStringNode = engine.computedStringCache.get(cacheKey)
-  if (existingStringNode) {
-    return existingStringNode as Computed<T>
+  if (engine.batchDepth > 0) {
+    if (!engine.batchComputedCache) {
+      engine.batchComputedCache = new Map<string, any>()
+    }
+    const cachedNode = engine.batchComputedCache.get(cacheKey)
+    if (cachedNode) {
+      return cachedNode as Computed<T>
+    }
   }
 
   let value: T
@@ -29,7 +27,7 @@ export function createComputed<T>(
   let version = 0
   let isInitialized = false
   let evaluatedInEpoch = -1
-  let state = 2
+  let state = 2 // 2 = DIRTY, 1 = CHECK, 0 = STABLE
 
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
@@ -55,7 +53,6 @@ export function createComputed<T>(
           }
         }
       }
-
       actNode.dependencies.clear()
       if (actNode.depVersions) actNode.depVersions.clear()
     }
@@ -64,43 +61,39 @@ export function createComputed<T>(
   let verifiedInEpoch = -1
 
   const updateIfNecessary = (node: any): boolean => {
-    if (!isInitialized) return node.run()
-    if (node.state === 2) return node.run()
+    if (!isInitialized || state === 2) {
+      return node.run()
+    }
 
-    if (verifiedInEpoch === engine.epoch) {
+    if (verifiedInEpoch === engine.epoch && engine.batchDepth === 0) {
       return false
     }
 
-    if (node.state === 1) {
-      let hasChangedParent = false
+    let hasChangedParent = false
 
-      if (node.dependencies && node.dependencies.size > 0) {
-        for (const unknownDep of node.dependencies) {
-          const dep = unknownDep as any
-          const rawDep = dep._node || dep
+    if (dependencies && dependencies.size > 0) {
+      for (const dep of dependencies) {
+        const rawDep = dep._node || dep
 
-          if (!hasChangedParent) {
-            if (rawDep.type === 'computed' && rawDep.state > 0) {
-              updateIfNecessary(rawDep)
-            }
+        if (rawDep.type === 'computed') {
+          if (rawDep.update) rawDep.update()
+        }
 
-            if (node.depVersions.get(dep) !== rawDep.version) {
-              hasChangedParent = true
-            }
-          }
+        // Если родительский сигнал мутировал в текущем батче или версии разошлись
+        if (dep.hasBatchValue || depVersions.get(dep) !== rawDep.version) {
+          hasChangedParent = true
+          break
         }
       }
-
-      verifiedInEpoch = engine.epoch
-      node.state = 0
-
-      if (hasChangedParent || isDirty) {
-        return node.run()
-      }
-      return false
     }
 
     verifiedInEpoch = engine.epoch
+
+    if (hasChangedParent || isDirty) {
+      return node.run()
+    }
+
+    state = 0
     return false
   }
 
@@ -120,7 +113,7 @@ export function createComputed<T>(
     get depVersions() { return depVersions },
     update: () => updateIfNecessary(computedNode),
     run: () => {
-      if (evaluatedInEpoch === engine.epoch && isInitialized) {
+      if (evaluatedInEpoch === engine.epoch && isInitialized && state === 0 && engine.batchDepth === 0) {
         return false
       }
       evaluatedInEpoch = engine.epoch
@@ -157,7 +150,6 @@ export function createComputed<T>(
 
         if (oldDeps !== null) {
           const isSizeIdentical = oldDeps.length === dependencies.size
-
           for (const unknownDep of oldDeps) {
             const dep = unknownDep as any
             if (!isSizeIdentical || !dependencies.has(dep)) {
@@ -182,17 +174,6 @@ export function createComputed<T>(
               details: { from: previousValueSnapshot, to: newValue }
             })
           }
-
-          for (const sub of subscribers) {
-            const rawSub = sub._node || sub
-            if (rawSub.type === 'effect') {
-              rawSub.state = 2
-              rawSub.isDirty = true
-              engine.scheduleEffect(sub)
-            } else if (rawSub.markDirty) {
-              rawSub.markDirty(1)
-            }
-          }
         }
 
         isDirty = false
@@ -207,17 +188,6 @@ export function createComputed<T>(
           if (rawNode.subscribers) rawNode.subscribers.add(computedNode)
           if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) {
             maxDepDepth = rawNode.depth
-          }
-        }
-
-        for (const sub of subscribers) {
-          const rawSub = sub._node || sub
-          if (rawSub.type === 'effect') {
-            rawSub.state = 2
-            rawSub.isDirty = true
-            engine.scheduleEffect(sub)
-          } else if (rawSub.markDirty) {
-            rawSub.markDirty(1)
           }
         }
 
@@ -299,7 +269,9 @@ export function createComputed<T>(
     destroy: () => {
       subscribers.clear()
       releaseNode(computedNode)
-      engine.computedStringCache.delete(cacheKey)
+      if (engine.batchComputedCache) {
+        engine.batchComputedCache.delete(cacheKey)
+      }
       engine.computedCache.delete(fn)
       isDirty = true
       state = 2
@@ -325,8 +297,13 @@ export function createComputed<T>(
   computedInstance.type = 'computed'
   computedInstance.run = () => computedNode.run()
 
-  engine.computedStringCache.set(cacheKey, computedInstance)
+  // Сохраняем в канонический кэш
   engine.computedCache.set(fn, computedInstance)
+
+  // Сохраняем во временный батч-кэш для спасения кучи от аллокаций
+  if (engine.batchDepth > 0 && engine.batchComputedCache) {
+    engine.batchComputedCache.set(cacheKey, computedInstance)
+  }
 
   return computedInstance
 }

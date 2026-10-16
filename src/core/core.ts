@@ -136,11 +136,11 @@ export class ReactiveEngineCore {
         this.flushEffects()
 
         // ⚡ ЭКСТРЕМЕЛЬНЫЙ ПЕРФОРМАНС-БАЙПАС:
-        // После того как все эффекты текущего кадра транзакции полностью выполнились,
-        // мы атомарно очищаем строковый кэш замыканий. Это гарантирует 100% изоляцию
-        // условных веток в тестах оракула и каскадных алмазах, но удерживает скорость бенчмарка!
-        if ((this as any).computedStringCache) {
-          (this as any).computedStringCache.clear()
+        // После завершения батча полностью уничтожаем временный строковый кэш,
+        // предотвращая утечки памяти и ложное переиспользование между тестами!
+        if ((this as any).batchComputedCache) {
+          (this as any).batchComputedCache.clear();
+          (this as any).batchComputedCache = null
         }
       }
     }

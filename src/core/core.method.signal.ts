@@ -128,7 +128,8 @@ export function createSignal<T>(
 
       hasBatchValue = false
       batchInitialValue = value
-    }
+    },
+    get hasBatchValue() { return hasBatchValue },
   } as any
 
   ;(signalInstance as any)._node = signalNode
