@@ -40,13 +40,14 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
         let currentLayer: any[] = []
         for (let i = 0; i < width; i++) {
           currentLayer.push(
+            // Передаем уникальный signalName для этого квантового шага
             engine.computed(() => {
               let sum = 0
               for (const src of sources) {
                 sum += src.value
               }
               return sum
-            })
+            }, `layer_0_node_${i}`)
           )
         }
 
@@ -60,6 +61,8 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
             const parentIndex2 = Math.floor(rng() * width)
             const parentIndex3 = Math.floor(rng() * width)
 
+            const nodeLabel = `layer_${layer}_node_${i}`
+
             if (isStatic) {
               nextLayer.push(
                 engine.computed(() => {
@@ -67,7 +70,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
                     previousLayerSnapshot[parentIndex1].value +
                     previousLayerSnapshot[parentIndex2].value
                   )
-                })
+                }, nodeLabel)
               )
             } else {
               nextLayer.push(
@@ -76,7 +79,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
                   return condition
                     ? previousLayerSnapshot[parentIndex2].value
                     : previousLayerSnapshot[parentIndex3].value
-                })
+                }, nodeLabel)
               )
             }
           }

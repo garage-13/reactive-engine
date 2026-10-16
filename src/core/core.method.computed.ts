@@ -5,19 +5,27 @@ export function createComputed<T>(
   fn: () => T,
   signalName?: string
 ): Computed<T> {
-  // 1. Быстрый канонический WeakMap путь (по ссылке на функцию)
-  const existing = engine.computedCache.get(fn)
-  if (existing) return existing as Computed<T>
+  const fnSourceKey = fn.toString()
+  const cacheKey = signalName ? `${signalName}:${fnSourceKey}` : fnSourceKey
 
-  // 2. ⚡ БЕЗОПАСНЫЙ ТРАНЗАКЦИОННЫЙ СТРОКОВЫЙ КЭШ:
-  const cacheKey = fn.toString()
+  if (!engine.computedStringCache) {
+    engine.computedStringCache = new Map<string, any>()
+  }
+
   if (engine.batchDepth > 0) {
-    if (!engine.batchComputedCache) {
-      engine.batchComputedCache = new Map<string, any>()
+    const existingString = engine.computedStringCache.get(cacheKey)
+    if (existingString) {
+      return existingString as Computed<T>
     }
-    const cachedNode = engine.batchComputedCache.get(cacheKey)
-    if (cachedNode) {
-      return cachedNode as Computed<T>
+  }
+
+  const existingWeak = engine.computedCache.get(fn)
+  if (existingWeak) {
+    const actNode = existingWeak._node || existingWeak
+    if (engine.batchDepth === 0) {
+      actNode.state = 2
+    } else {
+      return existingWeak as Computed<T>
     }
   }
 
@@ -28,7 +36,6 @@ export function createComputed<T>(
   let evaluatedInEpoch = -1
   let state = 2 // 2 = DIRTY, 1 = CHECK, 0 = STABLE
 
-  // Маркер для O(1) отсечения повторных пулл-вызовов в рамках одного шага батча
   let lastEvaluatedIteration = -1
 
   const dependencies = new Set<any>()
@@ -68,6 +75,10 @@ export function createComputed<T>(
       return false
     }
 
+    if (evaluatedInEpoch === engine.epoch && isInitialized && state === 0) {
+      return false
+    }
+
     if (!isInitialized || state === 2) {
       return node.run()
     }
@@ -86,7 +97,7 @@ export function createComputed<T>(
           if (rawDep.update) rawDep.update()
         }
 
-        if (dep.hasBatchValue || depVersions.get(dep) !== rawDep.version) {
+        if ((dep as any).hasBatchValue || depVersions.get(dep) !== rawDep.version) {
           hasChangedParent = true
           break
         }
@@ -148,7 +159,6 @@ export function createComputed<T>(
       currentRunId++
       computedNode.activeRunId = currentRunId
 
-      // ⚡ ПЕРФОРМАНС-ДИНАМИТ: Переиспользуем один пул-массив на инстансе ядра
       if (!engine._poolArr) engine._poolArr = []
       const oldDeps = engine._poolArr
       oldDeps.length = 0
@@ -212,7 +222,10 @@ export function createComputed<T>(
         for (const unknownDep of dependencies) {
           const dep = unknownDep as any
           const rawNode = dep._node || dep
+
+          // Синхронизируем эталонные версии сигналов и компьютедов батча
           depVersions.set(dep, rawNode.version)
+
           if (rawNode.subscribers) rawNode.subscribers.add(computedNode)
           if (rawNode.depth !== undefined && rawNode.depth > maxDepDepth) {
             maxDepDepth = rawNode.depth
@@ -299,8 +312,8 @@ export function createComputed<T>(
       if (subscribers) subscribers.clear()
 
       engine.computedCache.delete(fn)
-      if (engine.batchComputedCache) {
-        engine.batchComputedCache.delete(cacheKey)
+      if (engine.computedStringCache) {
+        engine.computedStringCache.delete(cacheKey)
       }
 
       isDirty = true
@@ -316,6 +329,7 @@ export function createComputed<T>(
       }
       subscribers.add(hookEffect)
       return () => {
+        hookEffect.isDisposed = true
         subscribers.delete(hookEffect)
       }
     }
@@ -324,13 +338,12 @@ export function createComputed<T>(
   computedInstance.run = () => computedNode.run()
 
   engine.computedCache.set(fn, computedInstance)
+  if (engine.batchDepth > 0) {
+    engine.computedStringCache.set(cacheKey, computedInstance)
+  }
 
   ;(computedInstance as any)._node = computedNode
   ;(computedInstance as any).subscribers = subscribers
-
-  if (engine.batchDepth > 0 && engine.batchComputedCache) {
-    engine.batchComputedCache.set(cacheKey, computedInstance)
-  }
 
   return computedInstance
 }

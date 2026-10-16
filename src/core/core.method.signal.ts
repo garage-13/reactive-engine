@@ -9,11 +9,14 @@ export function createSignal<T>(
   let value = initialValue
   let version = 0
   let name = typeof optionsOrName === 'string' ? optionsOrName : optionsOrName?.name
-  const isInternalCoreSignal = !!name && getExtractedValues({
+
+  const extracted = !!name ? getExtractedValues({
     tested: [name],
     expectedKey: 'CORE_INTERNAL_SIGNAL',
     valueType: 'number',
-  })?.[0] === '1' || false
+  })?.[0] : null
+  const isInternalCoreSignal = extracted && extracted === '1'
+
   const subscribers = new Set<any>()
 
   let hasBatchValue = false
@@ -25,15 +28,14 @@ export function createSignal<T>(
     subscribers
   }
 
-  const notifySubscribers = () => {
-    // ⚡ ОПТИМИЗАЦИЯ: Прямой проход по Set через for...of (без Array.from)
+  const notifySubscribers = (parentState: number = 2) => {
     for (const sub of subscribers) {
       const rawSub = sub._node || sub
       if (rawSub.type === 'effect') {
         rawSub.isDirty = true
         engine.scheduleEffect(sub)
       } else if (rawSub.type === 'computed') {
-        if (rawSub.markDirty) rawSub.markDirty(2)
+        if (rawSub.markDirty) rawSub.markDirty(parentState)
       } else {
         if (typeof sub === 'function') {
           try { sub(value) } catch (err) { console.error(err) }
@@ -51,7 +53,11 @@ export function createSignal<T>(
         subscribers.add(engine.activeConsumer)
         engine.activeConsumer.dependencies.add(signalInstance)
 
-        // Запоминаем маркер: этот сигнал активен в текущем расчете consumer-а
+        const consumerRaw = consumer._node || consumer
+        if (consumerRaw.depth !== undefined && consumerRaw.depth === 1) {
+          consumerRaw.depth = 2
+        }
+
         if (consumer.activeRunId !== undefined) {
           (signalInstance as any)._lastSeenInRunId = consumer.activeRunId
         }
@@ -77,6 +83,10 @@ export function createSignal<T>(
           batchInitialValue = value
         }
         value = newValue
+
+        ;(signalInstance as any).hasBatchValue = true
+        notifySubscribers(1) // Мягкая маркировка CHECK (1) интра-ран чтений батча
+
         engine.batchedSignals.add(signalInstance)
         return
       }
@@ -87,14 +97,7 @@ export function createSignal<T>(
       version++
       engine.epoch++
 
-      engine.log({
-        type: 'signal',
-        label: name || 'signal',
-        details: { from: oldValue, to: newValue },
-        isInternalCoreSignal
-      })
-
-      notifySubscribers()
+      notifySubscribers(2)
       if (engine.batchDepth === 0) engine.flushEffects()
     },
 
@@ -107,43 +110,37 @@ export function createSignal<T>(
       return () => { subscribers.delete(cb) }
     },
 
-    _flushBatch: () => {
-      if (!hasBatchValue) return
-
+    // ⚛️ ФАЗА 1: Чистая фиксация новых версий
+    _applyBatchValue: () => {
+      if (!hasBatchValue) return false
       const wasChanged = !Object.is(batchInitialValue, value) || (value !== null && typeof value === 'object')
-
       if (wasChanged) {
         version++
-        engine.epoch++
+        return true
+      }
+      return false
+    },
 
-        engine.log({
-          type: 'signal',
-          label: name || 'signal_batched',
-          details: { from: batchInitialValue, to: value },
-          isInternalCoreSignal
-        })
+    // ⚛️ ФАЗА 2: Чистый атомарный push-уведомитель
+    _flushBatch: (wasChanged: boolean, isAlreadyEpochShifted?: boolean) => {
+      if (!hasBatchValue) return
 
-        // ⚡ ЗOЛОТOЙ МOСТ ТРАНЗАКЦИИ:
-        // Вместо обычного notifySubscribers, принудительно переводим
-        // всех прямых computed-подписчиков в боевой статус DIRTY (2)
-        for (const sub of subscribers) {
-          const rawSub = sub._node || sub
-          if (rawSub.type === 'effect') {
-            rawSub.isDirty = true
-            engine.scheduleEffect(sub)
-          } else if (rawSub.markDirty) {
-            rawSub.markDirty(2) // 👈 Переводим в DIRTY (2), а не в CHECK (1)
-          } else if (typeof sub === 'function') {
-            try { sub(value) } catch (err) { console.error(err) }
-          }
+      if (wasChanged) {
+        if (!isAlreadyEpochShifted) {
+          engine.epoch++
         }
+        // ⚛️ КAНОНИЧЕСКИЙ БАТЧИНГ: Переводим в CHECK (1) вместо DIRTY (2).
+        // Это блокирует веерные перезапуски сирот и алмазов на выходе из батча!
+        notifySubscribers(1)
+      } else {
+        notifySubscribers(0)
       }
 
       hasBatchValue = false
+      ;(signalInstance as any).hasBatchValue = false
       batchInitialValue = value
-    },
+    }
 
-    get hasBatchValue() { return hasBatchValue },
   } as any
 
   ;(signalInstance as any)._node = signalNode

@@ -2,7 +2,7 @@
 export { ReactiveEngineAutomatic as ReactiveEngine } from './core.automatic'
 
 // 2. Экспорт всей цепочки специализированных ядер
-export { ReactiveEngineCore } from './core'
+// export { ReactiveEngineCore } from './core'
 export { ReactiveEngineAutolog } from './core.autolog'
 
 export * from './core'

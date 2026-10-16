@@ -2,78 +2,15 @@ import { getExtractedValues } from '../utils/getExtractedValues'
 import { Signal, Computed, IEffect, EngineLoggerOptions, LogEventType, CleanupFn, TransactionContext, LogRecord, SignalOptions, ResourceOptions, ResourceState, Resource } from './types'
 import { createComputed } from './core.method.computed'
 import { createSignal } from './core.method.signal'
-// import { executeBatch } from './core.method.batch'
 import { executeUntrack } from './core.method.untrack'
 import { createReactive } from './core.method.reactive'
 import { createEffect } from './core.method.effect'
 import { ReactiveDebounceLogger } from './core.logger'
 
-// Тип для конструктора класса
 type Constructor<T> = new (...args: any[]) => T
-// Тип для фабричной функции зависимостей
 type Factory<T> = (engine: any) => T
-// Универсальный тип токена DI
 type InjectionToken<T> = Constructor<T> | Factory<T> | symbol | string
 
-const badgeColors: Record<LogEventType, string> = {
-  signal: 'background: #007acc; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  computed: 'background: #42b883; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  effect: 'background: #e01e5a; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  batch: 'background: #7952b3; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  resource: 'background: #d97706; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  reactive: 'background: #007acc; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;'
-}
-let currentTransaction: TransactionContext | null = null
-function safeValueToString(value: unknown): string {
-  if (value === null) return 'null'
-  if (value === undefined) return 'undefined'
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value)
-    } catch (e) {
-      return '[Cyclic Object or Layer]'
-    }
-  }
-  return String(value)
-}
-export function queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
-  if (!currentTransaction) {
-    currentTransaction = { id: Math.random().toString(36).substring(2, 9), pendingLogQueue: [], isFlushing: false }
-    queueMicrotask(() => flushLogs())
-  }
-  currentTransaction.pendingLogQueue.push({ type, label, from: details?.from, to: details?.to, payload: details?.payload, timestamp: Date.now() })
-}
-export function flushLogs(): void {
-  if (!currentTransaction || currentTransaction.isFlushing) return
-  currentTransaction.isFlushing = true
-  const queue = currentTransaction.pendingLogQueue
-  if (queue.length === 0) {
-    currentTransaction = null
-    return
-  }
-  console.groupCollapsed(`%cREACTIVE TRANSACTION%c [id: ${currentTransaction.id}] (${queue.length} operations)`, 'background: #7952b3; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;', 'color: #888; font-weight: normal;')
-  for (const record of queue) {
-    const colorStyle = badgeColors[record.type]
-    const hasTransition = record.from !== undefined || record.to !== undefined
-    let logMessage = `%c${record.type.toUpperCase()}%c ${record.label}`
-
-    if (hasTransition) {
-      if (!!record.from)
-        logMessage += ` ${safeValueToString(record.from)} → ${safeValueToString(record.to)}`
-      else logMessage += ` (${safeValueToString(record.to)})`
-    }
-
-    if (record.payload !== undefined) {
-      console.groupCollapsed(logMessage, colorStyle, 'color: inherit;')
-      console.log('Payload:', record.payload)
-      console.groupEnd()
-    } else {
-      console.log(logMessage, colorStyle, 'color: inherit;')
-    }
-  }
-  console.groupEnd()
-  currentTransaction = null
-}
 export class ReactiveEngineCore {
   protected frameworkPrefix = 'core'
   private logger: EngineLoggerOptions
@@ -84,27 +21,35 @@ export class ReactiveEngineCore {
   public pendingEffects: Array<Set<any> | undefined> = []
   public maxPendingDepth = 0
   public computedCache = new WeakMap<Function, any>()
+  public computedStringCache = new Map<string, any>()
   private diRegistry = new Map<unknown, unknown>()
   private diCache = new Map<unknown, unknown>()
   private proxyCache = new WeakMap<object, any>()
   private proxyTargets = new WeakSet<object>()
   private reactiveSignals = new WeakMap<object, Map<string | symbol, any>>()
-  private cycleDetectionStack = new Set<unknown>()
+  public cycleDetectionStack = new Set<unknown>()
   public batchedSignals = new Set<any>()
   public activeOwner: any = null
-  // Системная очередь для отложенного батчинга деструкторов
   public pendingCleanups = new Set<() => void>()
+  public isLoggingEnabled = false
+  public _poolArr: any[] = []
 
-  // Метод для регистрации отложенной очистки
   public queueCleanup(cleanup: () => void): void {
     this.pendingCleanups.add(cleanup)
   }
 
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
+    this.isLoggingEnabled = !!this.logger.isEnabled
   }
 
   public scheduleEffect(effect: any): void {
+    // ⚛️ ЖЕЛЕЗНЫЙ ДЕДУПЛИКАТОР: Если флаг взведен, эффект уже в очереди!
+    if (effect._isScheduled) {
+      return
+    }
+    effect._isScheduled = true
+
     const depth = effect.depth || 0
     if (!this.pendingEffects[depth]) {
       this.pendingEffects[depth] = new Set()
@@ -115,49 +60,52 @@ export class ReactiveEngineCore {
     }
   }
 
-  public queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
-    queueLog(type, label, details)
-  }
-
   public batch<T>(fn: () => T): T {
     this.batchDepth++
-
-    // ⚡ БЕЗОПАСНЫЙ TS-БАЙПАС: Динамически инкрементируем счетчик итерации
-    if (!(this as any).batchIterationId) (this as any).batchIterationId = 0
-    ;(this as any).batchIterationId++
-
     try {
       return fn()
     } finally {
       this.batchDepth--
       if (this.batchDepth === 0) {
+        if (!(this as any).batchIterationId) (this as any).batchIterationId = 0
+        ;(this as any).batchIterationId++
+
         if (this.batchedSignals.size > 0) {
+          const changeFlags = new Map<any, boolean>()
+
+          // Фаза 1: Фиксация версий
           for (const sig of this.batchedSignals) {
-            if (sig._flushBatch) sig._flushBatch()
+            if (sig._applyBatchValue) {
+              changeFlags.set(sig, sig._applyBatchValue())
+            }
+          }
+
+          // Атомарный сдвиг общей макро-эпохи ядра
+          this.epoch++
+
+          // Фаза 2: Каскадный пуш со статусом CHECK (1)
+          for (const sig of this.batchedSignals) {
+            if (sig._flushBatch) {
+              const changed = changeFlags.get(sig) ?? false
+              sig._flushBatch(changed, true)
+            }
           }
           this.batchedSignals.clear()
         }
 
+        // Запускаем планировщик под единым защищенным барьером итерации
         this.flushEffects()
-
-        // Полностью уничтожаем временный кэш итерации
-        if ((this as any).batchComputedCache) {
-          (this as any).batchComputedCache.clear();
-          (this as any).batchComputedCache = null
-        }
       }
     }
   }
 
   public flushEffects(): void {
     if (this.batchDepth > 0) return
-
     const prevConsumer = this.activeConsumer
 
     try {
       for (let depth = 0; depth <= this.maxPendingDepth; depth++) {
         const bucket = this.pendingEffects[depth]
-
         if (!bucket || bucket.size === 0) continue
 
         const effects = Array.from(bucket)
@@ -166,34 +114,28 @@ export class ReactiveEngineCore {
         for (const effect of effects) {
           if (effect.isDisposed) continue
 
-          // ⚡ ЗOЛОТOЙ СТАНДАРТ ОПТИМИЗАЦИИ (Early Dirty Check Bypass):
-          // Переносим проверку грязи в самое начало цикла. Если эффект не был промаркирован
-          // как DIRTY волной push-уведомлений, мы мгновенно пропускаем его, полностью
-          // избавляя V8 от холостого обхода родителей и тяжелых хэш-поисков depVersions.get(dep).
+          // Сбрасываем флаг планировщика строго перед вызовом тела
+          effect._isScheduled = false
+
           if (!effect.isDirty) continue
 
           if (effect.dependencies && effect.dependencies.size > 0) {
             let parentChanged = false
-
             for (const dep of effect.dependencies) {
               const rawNode = dep._node || dep
-
               if (rawNode.type === 'computed' && rawNode.state > 0) {
                 if (rawNode.update) rawNode.update()
               }
-
               if (effect.depVersions && effect.depVersions.get(dep) !== rawNode.version) {
                 parentChanged = true
               }
             }
-
             if (!parentChanged && effect.dependencies.size > 0) {
               effect.isDirty = false
               continue
             }
           }
 
-          // Оригинальная проверка снизу убирается, так как она теперь стоит сверху
           try {
             effect.run()
           } catch (err) {
@@ -218,22 +160,11 @@ export class ReactiveEngineCore {
     }
   }
 
-  // public batch<T>(fn: () => T): T {
-  //   return executeBatch<T>(this, fn)
-  // }
-
-  private log (params: any) {
-    if (!this.logger || !this.logger.isEnabled) return
-
-    ReactiveDebounceLogger.processLog(this.logger, queueLog, params)
-  }
-
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
     return createSignal<T>(this, initialValue, optionsOrName)
   }
 
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
-    // Просто делегируем вызов строго изолированной чистой функции
     return createComputed<T>(this, fn, signalName)
   }
 
@@ -263,14 +194,6 @@ export class ReactiveEngineCore {
       if (this.diRegistry.has(token)) {
         const entry = this.diRegistry.get(token)
         if (typeof entry === 'function') {
-          if ((entry as any)._isMockFunction) {
-            const mockRes = (entry as Function)(this)
-            if (mockRes !== undefined) {
-              this.diCache.set(token, mockRes)
-              return mockRes as T
-            }
-            return entry as unknown as T
-          }
           const str = entry.toString()
           const isClass = str.startsWith('class ') || str.startsWith('class{') || (entry.prototype && entry.prototype.constructor === entry && !str.startsWith('function') && !str.includes('=>'))
           if (!isClass) {
@@ -293,191 +216,69 @@ export class ReactiveEngineCore {
     }
   }
 
-  private delay(ms: number, signal: AbortSignal): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (signal.aborted) {
-        return reject(new DOMException('Aborted', 'AbortError'))
-      }
-
-      const timeoutId = setTimeout(() => {
-        signal.removeEventListener('abort', onAbort)
-        resolve()
-      }, ms)
-
-      const onAbort = () => {
-        clearTimeout(timeoutId)
-        reject(new DOMException('Aborted', 'AbortError'))
-      }
-
-      signal.addEventListener('abort', onAbort, { once: true })
-    })
-  }
-
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
     source?: { value: S },
     optionsOrName?: string | ResourceOptions<T, S>,
   ): Resource<T> {
     const isOptionsObject = optionsOrName && typeof optionsOrName === 'object'
-    const resourceSignalName = isOptionsObject
-      ? ((optionsOrName as ResourceOptions<T, S>).name || 'unnamed_resource')
-      : (optionsOrName as string) || 'unnamed_resource'
+    const resourceSignalName = isOptionsObject ? ((optionsOrName as ResourceOptions<T, S>).name || 'unnamed_resource') : (optionsOrName as string) || 'unnamed_resource'
 
-    const options: Partial<ResourceOptions<T, S>> = isOptionsObject
-      ? (optionsOrName as ResourceOptions<T, S>)
-      : {}
-
+    const options: Partial<ResourceOptions<T, S>> = isOptionsObject ? (optionsOrName as ResourceOptions<T, S>) : {}
     const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true
     const responseValidate = options.responseValidate
     const validateBeforeFetch = options.validateBeforeFetch
-    const retryCount = 0
-    const baseDelay = 1000
-    const useExponential = true
-    const maxRetryDelay = 1000 * 60 * 5
-    const timeoutMs = 1000
+
     const state = this.signal<ResourceState<T>>(
       { data: null, loading: true, error: null, isRetrying: false },
       `[CORE_INTERNAL_SIGNAL=1]:resource:state:${resourceSignalName}`
     )
 
-    const updateResourceState = (nextState: ResourceState<T>) => {
-      this.log({ type: 'resource', label: resourceSignalName, details: { to: nextState, from: state.value } })
-      state.value = nextState
-    }
-
     const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
       if (effectSignal.aborted) return
-      const isValid = options.validateBeforeFetch ? options.validateBeforeFetch(sValue) : true
-
-      /**
-       * 🧐 WIP_CORE: Есть два пути, ни один не будет ошибкой, если разкомментировать код ниже. Чуть бозже добавлю опци для более тонкой отладки ядра.
-       *
-       * - АКТИВНО: Разделяем мирную блокировку (false) и боевую ошибку (string): работать будет идеально, но без логов, связанных с пре-валидацией
-       * - НЕАКТИВНО: Более очевидное логирование процессов пре-валидации (выставление ошибок и мониторинг разработчиком)
-      */
-      // --
-      // if (isValid === false) {
-      //   // Если валидатор вернул строго false — мы тихо блокируем старт фетчера,
-      //   // переводя ресурс в состояние ПОКОЯ (loading: false, error: null).
-      //   // Это полностью ликвидирует генерацию ложных ошибок при монтировании!
-      //   state.value = {
-      //     loading: false,
-      //     data: null,
-      //     error: null, // Ошибки нет! Стейт стабилен.
-      //     isRetrying: false
-      //   }
-      //   return
-      // }
-      // if (typeof isValid === 'string') {
-      //   // Если валидатор вернул строку — это боевая декларативная ошибка валидации формы.
-      //   // Здесь мы честно переводим ресурс в стейт ошибки, как и требовалось ранее.
-      //   state.value = {
-      //     loading: false,
-      //     data: null,
-      //     error: 'Core internal stopper',
-      //     isRetrying: false
-      //   }
-      //   return
-      // }
-      // --
       if (validateBeforeFetch) {
         const preValidationResult = validateBeforeFetch(sValue)
         if (preValidationResult === false || typeof preValidationResult === 'string') {
           if (effectSignal.aborted) return
-          const errorMsg = typeof preValidationResult === 'string'
-            ? preValidationResult
-            : 'Pre-fetch validation failed for resource'
-
-          const currentData = isSourceChange ? null : this.untrack(() => state.value.data)
-          updateResourceState({ data: currentData, loading: false, error: errorMsg, isRetrying: false })
+          const errorMsg = typeof preValidationResult === 'string' ? preValidationResult : 'Pre-fetch validation failed'
+          state.value = { data: isSourceChange ? null : state.value.data, loading: false, error: errorMsg, isRetrying: false }
           return
         }
       }
-      const shouldClear = isSourceChange && resetDataOnSourceChange
-      const currentData = shouldClear ? null : this.untrack(() => state.value.data)
-      updateResourceState({ data: currentData, loading: true, error: null, isRetrying: false })
-      for (let attempt = 0; attempt <= retryCount; attempt++) {
+
+      state.value = { data: (isSourceChange && resetDataOnSourceChange) ? null : state.value.data, loading: true, error: null, isRetrying: false }
+
+      try {
+        const data = await fetcher(sValue, effectSignal)
         if (effectSignal.aborted) return
-        let combinedSignal = effectSignal
-        try {
-          const data = await fetcher(sValue, combinedSignal)
-          if (effectSignal.aborted) return
-          if (combinedSignal.aborted) {
-            throw new DOMException('The operation timed out.', 'TimeoutError')
-          }
-          if (responseValidate) {
-            const validationResult = responseValidate(data)
-            if (validationResult === false || typeof validationResult === 'string') {
-              if (effectSignal.aborted) return
-              const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed'
-              updateResourceState({ data: null, loading: false, error: errorMsg, isRetrying: false })
-              return
-            }
-          }
-          if (effectSignal.aborted) return
-          updateResourceState({ data, loading: false, error: null, isRetrying: false })
-          return
-        } catch (e: unknown) {
-          if (effectSignal.aborted || ((e as Error).name === 'AbortError' && effectSignal.aborted)) return
-          const isTimeout = (e as Error).name === 'TimeoutError' || (e as Error).name === 'AbortError' || (e as Error).message?.includes('timeout')
-          const isCustomValidationError = getExtractedValues({
-            tested: [(e as Error).message], expectedKey: 'THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY', valueType: 'number',
-          })?.[0] === '1' || false
-          const __defaultCustomValidationErrorMessage = 'Custom validation error'
-          let customValidationErrorMessage: string = isCustomValidationError
-            ? (getExtractedValues({
-              tested: [(e as Error).message], expectedKey: 'MESSAGE', valueType: 'string',
-            })?.[0] || __defaultCustomValidationErrorMessage)
-            : __defaultCustomValidationErrorMessage
-          const isFetchBodyValidationError = isCustomValidationError || (e as Error).name === 'ValidationError'
-          if (attempt === retryCount || isFetchBodyValidationError) {
-            if (effectSignal.aborted) return
-            const finalError = isTimeout
-              ? new Error(`Request timed out after ${timeoutMs}ms`, { cause: e })
-              : isCustomValidationError
-                ? new Error(customValidationErrorMessage, { cause: e })
-                : e
-
-            updateResourceState({
-              data: null, loading: false,
-              error: finalError instanceof Error ? finalError.message : typeof finalError === 'string' ? finalError : `typeof finalError is ${typeof finalError}`,
-              isRetrying: false,
-            })
+        if (responseValidate) {
+          const validationResult = responseValidate(data)
+          if (validationResult === false || typeof validationResult === 'string') {
+            const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed'
+            state.value = { data: null, loading: false, error: errorMsg, isRetrying: false }
             return
-          } else {
-            if (effectSignal.aborted) return
-            let currentDelay = useExponential ? baseDelay * Math.pow(2, attempt) : baseDelay
-            currentDelay = Math.min(currentDelay, maxRetryDelay)
-            const jitter = Math.random() * 200
-            currentDelay = currentDelay + jitter
-            updateResourceState({ data: state.value.data, loading: true, error: null, isRetrying: true })
-            const logReason = isTimeout ? 'таймауту' : 'ошибке сети'
-            console.warn(`[Resource Retry] "${resourceSignalName}" сбой по ${logReason}. Попытка ${attempt + 1}/${retryCount > 0 ? retryCount + 1 : attempt + 1}...`)
-
-            try {
-              await this.delay(currentDelay, effectSignal)
-              if (effectSignal.aborted) return
-            } catch (delayError) {
-              return
-            }
           }
         }
+        state.value = { data, loading: false, error: null, isRetrying: false }
+      } catch (e: any) {
+        if (effectSignal.aborted) return
+        state.value = { data: null, loading: false, error: e.message || 'Fetch error', isRetrying: false }
       }
     }
 
-    let activeEffectController: AbortController | null = null
+    let activeController: AbortController | null = null
 
     this.effect(() => {
       const sValue = source ? source.value : undefined as S
-      const effectController = new AbortController()
-      activeEffectController = effectController
+      const controller = new AbortController()
+      activeController = controller
 
       this.untrack(() => {
-        load(sValue as S, effectController.signal, true)
+        load(sValue, controller.signal, true)
       })
 
-      return () => effectController.abort()
-    }, '[CORE_INTERNAL_SIGNAL=1]:effect')
+      return () => controller.abort()
+    })
 
     return {
       get data() { return state.value.data },
@@ -486,13 +287,15 @@ export class ReactiveEngineCore {
       get isRetrying() { return state.value.isRetrying },
       get value() { return state.value },
       refetch: () => {
-        activeEffectController?.abort()
-        activeEffectController = new AbortController()
-        load(source ? source.value : undefined as S, activeEffectController.signal, false)
+        activeController?.abort()
+        const controller = new AbortController()
+        activeController = controller
+        load(source ? source.value : undefined as S, controller.signal, false)
       },
       subscribe: (cb: (val: ResourceState<T>) => void) => state.subscribe(cb)
     }
   }
+
 }
 
-export { ReactiveEngineCore as ReactiveEngine, ReactiveEngineCore as ReactiveEngineAutomatic }
+export class ReactiveEngineAutomatic extends ReactiveEngineCore {}

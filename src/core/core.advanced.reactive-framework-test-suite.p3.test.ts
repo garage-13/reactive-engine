@@ -99,7 +99,6 @@ describe('⚛️ Тест на воспроизведение регресса �
       // Из-за утечки batchComputedCache в globalEngine вернется нода из Теста №1!
       const c2 = computed(() => s2.value * 2)
 
-      // 🔴 КРИТИЧЕСКИЙ ФЕЙЛ МАТРИЦЫ: Вернет 10 вместо 200!
       expect(c2.value).toBe(200)
     })
   })
@@ -136,7 +135,7 @@ describe('⚛️ Тест на воспроизведение регресса �
 
     // Стягиваем значение.
     // Из-за коллизии в engine._poolArr связи сломаются, и вернется старое значение 22!
-    expect(child.value).toBe(24) // 🔴 ЗДЕСЬ БУДЕТ ФЕЙЛ (Received: 22 вместо 24)!
+    expect(child.value).toBe(24)
   })
 
   it('Локальный TDD-тест: глубокая мутация свойств объекта по одной ссылке внутри батча', () => {
@@ -199,6 +198,217 @@ describe('⚛️ Тест на воспроизведение регресса �
     // узел tail должен пересчитаться строго 1 раз. Если markDirty(2) сбросил кэш вслепую,
     // здесь выполнится лишний проход.
     expect(tailRuns).toBe(2)
+  })
+
+  // it('#12/#13/#166/#189/#205 TDD Тест: переиспользование одной ссылки на функцию между независимыми графами // фундаментальный архитектурный баг коллизии канонического кэша, из-за которого в матрице reactive-framework-test-suite рухнули сразу 60 тестов (включая #12, #13, #166 из сектора Dynamic Dependencies, а также #189, #205 из Graph Propagation)', () => {
+  //   const engine = new ReactiveEngineCore()
+
+  //   const sharedFn = () => engine.untrack(() => currentSignal.value * 2)
+
+  //   let currentSignal = engine.signal(5)
+  //   const c1 = engine.computed(sharedFn)
+  //   expect(c1.value).toBe(10)
+
+  //   // Симулируем следующий тест: сигнал пересоздан, но функция та же!
+  //   currentSignal = engine.signal(50)
+  //   const c2 = engine.computed(sharedFn)
+
+  //   // На 2.5.0-alpha.0 из-за WeakMap вернется c1, привязанный к старому сиротскому сигналу!
+  //   expect(c2.value).toBe(100)
+  // })
+
+  it('#12/#13/#166/#189/#205 Репродукция #3-TDD (Site Strict): Переиспользование одной ссылки на функцию (WeakMap Pollution) между независимыми графами', () => {
+    const engine = new ReactiveEngineCore()
+
+    let currentSignal = engine.signal(5)
+    const sharedFn = () => engine.untrack(() => currentSignal.value * 2)
+
+    const c1 = engine.computed(sharedFn)
+    expect(c1.value).toBe(10)
+
+    // Симулируем следующий тест матрицы: сигнал пересоздан, но функция sharedFn та же!
+    currentSignal = engine.signal(50)
+    const c2 = engine.computed(sharedFn)
+
+    expect(c2.value).toBe(100)
+  })
+
+  it('Репродукция деградации Dynamic Dependencies: Коллизия пересоздания бесбатчевых нод на долгоживущем ядре', () => {
+    const engine = new ReactiveEngineCore()
+
+    const sharedFn = () => currentSignal.value + 10
+
+    // --- ИМИТАЦИЯ ТЕСТА №1 (БЕЗ БАТЧА) ---
+    let currentSignal = engine.signal(1)
+    const c1 = engine.computed(sharedFn)
+    expect(c1.value).toBe(11)
+
+    // --- ИМИТАЦИЯ ТЕСТА №2 (БЕЗ БАТЧА) ---
+    // Пересоздаем сигнал, имитируя новый тест спецификации
+    currentSignal = engine.signal(50)
+
+    // Пересоздаем компьютед на той же функции.
+    // В 2.5.0-alpha.1 создастся новая нода, но старая c1 не вычистит subscribers,
+    // либо затрет кэш, нарушив канонический порядок динамических веток.
+    const c2 = engine.computed(sharedFn)
+
+    expect(c2.value).toBe(60)
+  })
+
+})
+
+describe('⚛️ Критический регрессионный сьют: Изоляция текстового кэша между бесбатчевыми тестами', () => {
+
+  it('Репродукция деградации Dynamic Dependencies: Коллизия пересоздания бесбатчевых нод с подписчиком', () => {
+    const engine = new ReactiveEngineCore()
+
+    const sharedFn = () => currentSignal.value * 2
+
+    // --- ИМИТАЦИЯ ТЕСТА №1 РAНЕРA (БЕЗ БAТЧA) ---
+    let currentSignal = engine.signal(10)
+    const c1 = engine.computed(sharedFn)
+
+    // Имитируем живой контекст ранера сьюта: подписываемся на computed,
+    // переводя subscribers.size в значение > 0
+    const unsubscribe = c1.subscribe(() => {})
+    expect(c1.value).toBe(20)
+
+    // --- ИМИТАЦИЯ ТЕСТА №2 РAНЕРA (БЕЗ БAТЧA) ---
+    // Сигнал пересоздан в лексическом скоупе ранера
+    currentSignal = engine.signal(100)
+
+    // В 2.5.0-alpha.4 из-за subscribers.size > 0 проверка сброса промахнется,
+    // и вызов вернет старый стабильный узел c1, смотрящий на мертвый сигнал!
+    const c2 = engine.computed(sharedFn)
+
+    expect(c2.value).toBe(200)
+
+    unsubscribe()
+  })
+})
+
+describe('⚛️ Финальный регрессионный сьют: Топология и Восстановление динамических ребер', () => {
+
+  it('Репродукция #166: Полная семантика восстановления динамической зависимости после деактивации', () => {
+    const engine = new ReactiveEngineCore()
+
+    const flag = engine.signal(true)
+    const src = engine.signal(10)
+
+    let computedRuns = 0
+    const c = engine.computed(() => {
+      computedRuns++
+      return flag.value ? src.value : 0
+    })
+
+    // 1. Создаем живой эффект, как это делает серверный ранер
+    let effectValue = 0
+    let effectRuns = 0
+    engine.effect(() => {
+      effectRuns++
+      effectValue = c.value
+    })
+
+    expect(effectValue).toBe(10)
+    expect(computedRuns).toBe(1)
+    expect(effectRuns).toBe(1)
+
+    // 2. Отключаем ветку: flag -> false. Узел c больше не зависит от src
+    flag.value = false
+    expect(effectValue).toBe(0)
+    expect(computedRuns).toBe(2)
+    expect(effectRuns).toBe(2)
+
+    // 3. Мутируем спящий src. Узел c и эффект НЕ ДОЛЖНЫ просыпаться!
+    src.value = 50
+    expect(computedRuns).toBe(2) // Спит
+    expect(effectRuns).toBe(2)   // Спит
+
+    // 4. Возвращаем flag -> true. Узел c ОБЯЗАН лениво восстановить ребро с src и забрать актуальное 50
+    flag.value = true
+
+    // Из-за ложного совпадения эпох verifiedInEpoch узел c посчитает себя стабильным,
+    // эффект выполнится, но запишет старое закэшированное значение 10 вместо 50!
+    expect(effectValue).toBe(50)
+    expect(computedRuns).toBe(3)
+  })
+
+  it('Репродукция #189: batch + dynamic deps — предотвращение лишних вычислений сирот (Transitive Unreachable Cut)', () => {
+    const engine = new ReactiveEngineCore()
+
+    const a = engine.signal(1)
+    const b = engine.signal(2)
+    const c = engine.signal(3)
+
+    let dRuns = 0
+    const d = engine.computed(() => {
+      dRuns++
+      return c.value + 100
+    })
+
+    let eRuns = 0
+    const e = engine.computed(() => {
+      eRuns++
+      return a.value > 0 ? b.value + d.value : b.value
+    })
+
+    let effectValue = 0
+    engine.effect(() => {
+      effectValue = e.value
+    })
+
+    expect(effectValue).toBe(105) // 2 + (3 + 100) = 105
+    expect(dRuns).toBe(1)
+    expect(eRuns).toBe(1)
+
+    // ⚡ ТРИГГЕР ЛОЖНОГО ГЛИЧА: Изменяем все 3 источника в одном батче.
+    // Переводим a в 0, что делает ветку с d транзитивно недостижимой (unreachable).
+    engine.batch(() => {
+      a.value = 0
+      b.value = 10
+      c.value = 300 // Сигнал изменился, но его потребитель d больше не нужен!
+    })
+
+    // Идеальный граф обязан понять, что ветка d отсечена, и dRuns ДОЛЖНО остаться строго 1.
+    // Но наше ядро выполнит холостой рекомпьют d, увеличив dRuns до 2!
+    expect(dRuns).toBe(1)
+    expect(effectValue).toBe(10) // e.value должно стать просто b.value (10)
+  })
+
+  it('Репродукция #189/#205: Нарушение топологического порядка из-за не-атомарного флуша батча', () => {
+    const engine = new ReactiveEngineCore()
+
+    const a = engine.signal(1)
+    const b = engine.signal(2)
+
+    // c зависит от b, d зависит от a и c (классический асимметричный алмаз)
+    const c = engine.computed(() => b.value * 10)
+
+    let dRuns = 0
+    const d = engine.computed(() => {
+      dRuns++
+      return a.value + c.value
+    })
+
+    let effectValue = 0
+    engine.effect(() => {
+      effectValue = d.value
+    })
+
+    expect(effectValue).toBe(21) // 1 + 20
+    expect(dRuns).toBe(1)
+
+    // Мутируем оба сигнала в батче.
+    // Из-за поочередного флуша сигналов, d увидит промежуточное грязное состояние
+    // и выполнится лишний раз (Glitch), нарушая спецификацию стабильности!
+    engine.batch(() => {
+      b.value = 3 // c станет 30
+      a.value = 5
+    })
+
+    expect(effectValue).toBe(35) // 5 + 30
+
+    expect(dRuns).toBe(1)
   })
 
 })
