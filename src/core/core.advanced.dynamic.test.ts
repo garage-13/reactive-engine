@@ -340,8 +340,8 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       fallbackDefaultMs: 1462.79,
       maxSafeMsPerIter: 0.6,
       borderStyle: {
-        top: '\n➕ [ START: EXPRESS CHECK ] ➕',
-        bottom: '➕ [ END: EXPRESS CHECK ] ➕\n'
+        top: '\n--- ➕ [ START: EXPRESS CHECK ] ---',
+        bottom: '--- ➕ [ END: EXPRESS CHECK ] ---\n'
       }
     })
   })
@@ -353,9 +353,9 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       fallbackDefaultMs: 21941.85,
       maxSafeMsPerIter: 0.6,
       borderStyle: {
-        top: '\n⚠️ [ START: DIE-HARD WORKLOAD ] ⚠️',
-        bottom: '⚠️ [ END: DIE-HARD WORKLOAD ] ⚠️\n'
+        top: '\n--- ⚠️ [ START: DIE-HARD WORKLOAD ] ⚠️ ---',
+        bottom: '--- ⚠️ [ END: DIE-HARD WORKLOAD ] ⚠️ ---\n'
       }
     })
-  })
+  }, 30000)
 })

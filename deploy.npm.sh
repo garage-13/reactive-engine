@@ -19,6 +19,6 @@ yarn build
 echo "🚀 Публикация в реестр npm..."
 # Если пакет находится в scope организации (@pravosleva/...),
 # обязательно добавляем флаг --access public
-npm publish --access public
+npm publish --access public --tag alpha
 
 echo "✅ Библиотека успешно обновлена и опубликована!"

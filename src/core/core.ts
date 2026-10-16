@@ -121,6 +121,11 @@ export class ReactiveEngineCore {
 
   public batch<T>(fn: () => T): T {
     this.batchDepth++
+
+    // ⚡ БЕЗОПАСНЫЙ TS-БАЙПАС: Динамически инкрементируем счетчик итерации
+    if (!(this as any).batchIterationId) (this as any).batchIterationId = 0
+    ;(this as any).batchIterationId++
+
     try {
       return fn()
     } finally {
@@ -135,8 +140,7 @@ export class ReactiveEngineCore {
 
         this.flushEffects()
 
-        // ⚡ ЭКСТРЕМЕЛЬНЫЙ ПЕРФОРМАНС-БАЙПАС:
-        // Полностью уничтожаем временный кэш итерации, защищая тесты от коллизий строк
+        // Полностью уничтожаем временный кэш итерации
         if ((this as any).batchComputedCache) {
           (this as any).batchComputedCache.clear();
           (this as any).batchComputedCache = null
