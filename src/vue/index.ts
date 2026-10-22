@@ -4,15 +4,28 @@ import { getCurrentInstance, getCurrentScope, onScopeDispose, onUnmounted, shall
 
 export { useReactiveValue } from './core.vue-adapter'
 
+/**
+ * ⚛️ Расширенный интерфейс для поддержки внутренних маркеров Vue и Ядра на прокси-объектах
+ */
+interface IVueProxyExtensions {
+  __subscribe?: (cb: () => void) => CleanupFn;
+  __v_skip?: boolean;
+}
+
 class ExtendedReactiveEngine extends ReactiveEngineAutomatic {
   protected override frameworkPrefix = 'vue-auto'
 
   public override reactive<T extends object>(target: T, name?: string): T {
-    const injectVueMarkers = (obj: any) => {
-      if (!obj || typeof obj !== 'object' || Symbol.iterator in obj) return
+    // Внутренний кэш оригинального прокси, который будет доступен в замыкании макрозадачи подписки
+    let originalProxy: T
 
-      if (!Reflect.has(obj, '__subscribe')) {
-        Object.defineProperty(obj, '__subscribe', {
+    const injectVueMarkers = (obj: unknown): void => {
+      if (!obj || typeof obj !== 'object' || Symbol.iterator in (obj as object)) return
+
+      const targetObj = obj as Record<string, unknown> & IVueProxyExtensions
+
+      if (!Reflect.has(targetObj, '__subscribe')) {
+        Object.defineProperty(targetObj, '__subscribe', {
           get: () => {
             return (cb: () => void) => {
               return this.effect(() => {
@@ -30,23 +43,26 @@ class ExtendedReactiveEngine extends ReactiveEngineAutomatic {
         })
       }
 
-      if (!Reflect.has(obj, '__v_skip')) {
-        Object.defineProperty(obj, '__v_skip', {
+      if (!Reflect.has(targetObj, '__v_skip')) {
+        Object.defineProperty(targetObj, '__v_skip', {
           get: () => true,
           configurable: true,
           enumerable: false
         })
       }
 
-      for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key) && typeof obj[key] === 'object') {
-          injectVueMarkers(obj[key])
+      for (const key in targetObj) {
+        if (Object.prototype.hasOwnProperty.call(targetObj, key)) {
+          const value = targetObj[key]
+          if (value !== null && typeof value === 'object') {
+            injectVueMarkers(value)
+          }
         }
       }
     }
 
     injectVueMarkers(target)
-    const originalProxy = super.reactive(target, name)
+    originalProxy = super.reactive(target, name)
     return originalProxy
   }
 
@@ -55,33 +71,35 @@ class ExtendedReactiveEngine extends ReactiveEngineAutomatic {
    * Полностью изолирует начальное чтение от реактивного контекста ядра (Topological Isolation).
    */
   public use<T>(item: T): T extends ISignalLike<infer V> ? ShallowRef<V> : ShallowRef<T> {
+    type ReturnType = T extends ISignalLike<infer V> ? ShallowRef<V> : ShallowRef<T>
+
     if (item === null || item === undefined || typeof item !== 'object') {
-      return shallowRef(item) as any
+      return shallowRef(item) as ReturnType
     }
 
     const isSignal = 'subscribe' in item && typeof (item as Record<string, unknown>).subscribe === 'function'
 
     if (isSignal) {
-      const signalItem = (item as unknown) as ISignalLike<unknown>
-      
+      const signalItem = item as unknown as ISignalLike<unknown>
+
       // ⚛️ КЛЮЧЕВОЙ ФИКС: Чтение стартового значения оборачиваем в untrack(),
       // предотвращая ложные каскадные вызовы Pull-валидатора при инициализации!
       const initialValue = this.untrack(() => signalItem.value)
       const state = shallowRef(initialValue)
 
-      // Используем пассивный хук __subscribe, если он доступен (для computed-нод),
+      // Используем пассивный системный хук __subscribe, если он доступен (для computed-нод),
       // чтобы избежать спама множественных push-уведомлений посреди транзакции
-      const hasHook = '__subscribe' in signalItem && typeof (signalItem as any).__subscribe === 'function'
-      
-      const unsubscribe = hasHook 
-        ? (signalItem as any).__subscribe(() => {
-            state.value = signalItem.value
-            triggerRef(state)
-          })
+      const hasHook = '__subscribe' in signalItem && typeof signalItem.__subscribe === 'function'
+
+      const unsubscribe = hasHook && signalItem.__subscribe
+        ? signalItem.__subscribe(() => {
+          state.value = signalItem.value
+          triggerRef(state)
+        })
         : signalItem.subscribe((newValue) => {
-            state.value = newValue
-            triggerRef(state)
-          })
+          state.value = newValue
+          triggerRef(state)
+        })
 
       if (getCurrentInstance()) {
         onUnmounted(() => unsubscribe())
@@ -89,13 +107,14 @@ class ExtendedReactiveEngine extends ReactiveEngineAutomatic {
         onScopeDispose(() => unsubscribe())
       }
 
-      return state as any
+      return state as ReturnType
     }
 
     const state = shallowRef(item)
+    const potentialProxy = item as Record<string, unknown> & IVueProxyExtensions
 
-    if ('__subscribe' in item && typeof (item as Record<string, unknown>).__subscribe === 'function') {
-      const unsubscribe = ((item as Record<string, unknown>).__subscribe as (cb: () => void) => CleanupFn)(() => {
+    if ('__subscribe' in potentialProxy && typeof potentialProxy.__subscribe === 'function') {
+      const unsubscribe = potentialProxy.__subscribe(() => {
         triggerRef(state)
       })
 
@@ -106,7 +125,7 @@ class ExtendedReactiveEngine extends ReactiveEngineAutomatic {
       }
     }
 
-    return state as any
+    return state as ReturnType
   }
 }
 

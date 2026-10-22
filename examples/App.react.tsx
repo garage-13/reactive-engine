@@ -37,6 +37,7 @@ import { ThrottleCacheExample as Example213 } from './213-resource-withThrottleA
 // import { LiveNotificationsExample as Example214 } from './214-long-polling-as-while'
 import { LiveNotificationsExample as Example215 } from './215-resource-withLongPolling'
 import { Example254 } from './254-form-wizard-validation-d-withValidation/Example254'
+import { Example121 } from './121-computed-array/Example121'
 
 export const App = () => {
   return (
@@ -164,6 +165,12 @@ export const App = () => {
             description='Reactive form & files (3)'
           >
             <Example118 />
+          </CardModalWrapper>
+          <CardModalWrapper
+            title='Example 121'
+            description='Array via Global Signal (0 React Renders)'
+          >
+            <Example121 />
           </CardModalWrapper>
 
         </div>
