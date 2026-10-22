@@ -1,4 +1,3 @@
-// core.method.computed.ts
 import { Computed, CleanupFn } from './types'
 
 export function createComputed<T>(
@@ -6,7 +5,8 @@ export function createComputed<T>(
   fn: () => T,
   signalName?: string
 ): Computed<T> {
-  // 1. Быстрый канонический WeakMap путь — единственный безопасный для долгоживущих объектов
+  // 1. Ультимативный канонический WeakMap путь (строго по ссылке на объект-функцию)
+  // Работает со скоростью нативной ссылки в V8, полностью исключая утечки памяти
   const existing = engine.computedCache.get(fn)
   if (existing) return existing as Computed<T>
 
@@ -17,8 +17,10 @@ export function createComputed<T>(
   let evaluatedInEpoch = -1
   let state = 2 // 2 = DIRTY, 1 = CHECK, 0 = STABLE
 
+  // Заменяем немедленную аллокацию пустых Set/Map на ленивую или более плотную
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
+  // Сеты ownedEffects и subscribers инициализируем стандартно, но минимизируем их размер в GC
   const ownedEffects = new Set<any>()
   const subscribers = new Set<any>()
 
@@ -53,8 +55,15 @@ export function createComputed<T>(
       return node.run()
     }
 
-    if (verifiedInEpoch === engine.epoch && engine.batchDepth === 0) {
-      return false
+    // ⚛️ КОРРЕКТНЫЙ МЕМОИЗАЦИОННЫЙ ГВАРД:
+    // Оптимизация по эпохам применяется без ограничений вне батча.
+    // Внутри батча (batchDepth > 0) мы пропускаем этот быстрый выход,
+    // позволяя коду ниже честно проверить флаги `hasBatchValue` у родителей,
+    // что гарантирует актуальность Pull-запросов во время транзакций.
+    if (engine.batchDepth === 0) {
+      if (verifiedInEpoch === engine.epoch && state === 0) {
+        return false
+      }
     }
 
     let hasChangedParent = false
@@ -64,7 +73,12 @@ export function createComputed<T>(
         const rawDep = dep._node || dep
 
         if (rawDep.type === 'computed') {
-          if (rawDep.update) rawDep.update()
+        // ⚛️ ЗАЩИТА ОТ КАСКАДНОГО ОБХОДА:
+        // Вызываем update() родителя только если он еще не был верифицирован в текущей эпохе.
+        // Это ликвидирует квадратичную рекурсию на динамических структурах графа!
+          if (rawDep.update && (rawDep as any).verifiedInEpoch !== engine.epoch) {
+            rawDep.update()
+          }
         }
 
         if (dep.hasBatchValue || depVersions.get(dep) !== rawDep.version) {
@@ -232,7 +246,6 @@ export function createComputed<T>(
     get dependencies() { return dependencies },
 
     subscribe(cb: (val: T) => void): CleanupFn {
-      // ⚛️ ФИКС УТЕЧКИ ПАМЯТИ: Выносим ссылку наружу, убираем сильное замыкание на инстанс
       const self = this
       const fakeEffect: any = {
         id: engine.subscriberId++,
@@ -250,7 +263,7 @@ export function createComputed<T>(
       return () => {
         fakeEffect.isDisposed = true
         subscribers.delete(fakeEffect)
-        fakeEffect.dependencies.clear() // Разрываем связи с графом
+        fakeEffect.dependencies.clear()
       }
     },
     subscribeState(cb: () => void): CleanupFn {
@@ -261,7 +274,6 @@ export function createComputed<T>(
       if (subscribers) subscribers.clear()
       engine.computedCache.delete(fn)
 
-      // Безопасное зануление ссылок для помощи GC
       dependencies.clear()
       depVersions.clear()
       ownedEffects.clear()

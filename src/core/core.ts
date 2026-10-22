@@ -135,13 +135,6 @@ export class ReactiveEngineCore {
         }
 
         this.flushEffects()
-
-        // ⚡ ЭКСТРЕМЕЛЬНЫЙ ПЕРФОРМАНС-БАЙПАС:
-        // Полностью уничтожаем временный кэш итерации, защищая тесты от коллизий строк
-        if ((this as any).batchComputedCache) {
-          (this as any).batchComputedCache.clear();
-          (this as any).batchComputedCache = null
-        }
       }
     }
   }
