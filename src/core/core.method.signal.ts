@@ -26,7 +26,6 @@ export function createSignal<T>(
   }
 
   const notifySubscribers = () => {
-    // ⚡ ОПТИМИЗАЦИЯ: Прямой проход по Set через for...of (без Array.from)
     for (const sub of subscribers) {
       const rawSub = sub._node || sub
       if (rawSub.type === 'effect') {
@@ -51,7 +50,6 @@ export function createSignal<T>(
         subscribers.add(engine.activeConsumer)
         engine.activeConsumer.dependencies.add(signalInstance)
 
-        // Запоминаем маркер: этот сигнал активен в текущем расчете consumer-а
         if (consumer.activeRunId !== undefined) {
           (signalInstance as any)._lastSeenInRunId = consumer.activeRunId
         }
@@ -123,16 +121,13 @@ export function createSignal<T>(
           isInternalCoreSignal
         })
 
-        // ⚡ ЗOЛОТOЙ МOСТ ТРАНЗАКЦИИ:
-        // Вместо обычного notifySubscribers, принудительно переводим
-        // всех прямых computed-подписчиков в боевой статус DIRTY (2)
         for (const sub of subscribers) {
           const rawSub = sub._node || sub
           if (rawSub.type === 'effect') {
             rawSub.isDirty = true
             engine.scheduleEffect(sub)
           } else if (rawSub.markDirty) {
-            rawSub.markDirty(2) // 👈 Переводим в DIRTY (2), а не в CHECK (1)
+            rawSub.markDirty(2)
           } else if (typeof sub === 'function') {
             try { sub(value) } catch (err) { console.error(err) }
           }
@@ -144,6 +139,20 @@ export function createSignal<T>(
     },
 
     get hasBatchValue() { return hasBatchValue },
+
+    // ⚛️ ФИКС ДЛЯ РЕЛИЗА 2.5.0: Метод тотальной деструкции сигнала
+    destroy: () => {
+      if (subscribers) {
+        subscribers.clear()
+      }
+      if (engine.batchedSignals) {
+        engine.batchedSignals.delete(signalInstance)
+      }
+      hasBatchValue = false
+      // Помогаем GC, убирая ссылки на тяжелые объекты
+      value = undefined as any
+      batchInitialValue = undefined as any
+    }
   } as any
 
   ;(signalInstance as any)._node = signalNode

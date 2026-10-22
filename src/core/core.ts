@@ -7,6 +7,7 @@ import { executeUntrack } from './core.method.untrack'
 import { createReactive } from './core.method.reactive'
 import { createEffect } from './core.method.effect'
 import { ReactiveDebounceLogger } from './core.logger'
+import { createResource } from './core.method.resource'
 
 // Тип для конструктора класса
 type Constructor<T> = new (...args: any[]) => T
@@ -218,9 +219,10 @@ export class ReactiveEngineCore {
   //   return executeBatch<T>(this, fn)
   // }
 
-  private log (params: any) {
+  // ⚛️ ФИКС ДЛЯ РЕЛИЗА 2.5.0: Меняем private на public,
+  // чтобы изолированные функции-методы имели легальный доступ к регистратору логов
+  public log(params: any) {
     if (!this.logger || !this.logger.isEnabled) return
-
     ReactiveDebounceLogger.processLog(this.logger, queueLog, params)
   }
 
@@ -289,7 +291,7 @@ export class ReactiveEngineCore {
     }
   }
 
-  private delay(ms: number, signal: AbortSignal): Promise<void> {
+  public delay(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) {
         return reject(new DOMException('Aborted', 'AbortError'))
@@ -309,185 +311,17 @@ export class ReactiveEngineCore {
     })
   }
 
+  /**
+   * Создает умную реактивную декларативную обертку над асинхронными операциями
+   * с автоматическим подавлением Race Conditions и встроенным методом .destroy().
+   */
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
     source?: { value: S },
     optionsOrName?: string | ResourceOptions<T, S>,
   ): Resource<T> {
-    const isOptionsObject = optionsOrName && typeof optionsOrName === 'object'
-    const resourceSignalName = isOptionsObject
-      ? ((optionsOrName as ResourceOptions<T, S>).name || 'unnamed_resource')
-      : (optionsOrName as string) || 'unnamed_resource'
-
-    const options: Partial<ResourceOptions<T, S>> = isOptionsObject
-      ? (optionsOrName as ResourceOptions<T, S>)
-      : {}
-
-    const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true
-    const responseValidate = options.responseValidate
-    const validateBeforeFetch = options.validateBeforeFetch
-    const retryCount = 0
-    const baseDelay = 1000
-    const useExponential = true
-    const maxRetryDelay = 1000 * 60 * 5
-    const timeoutMs = 1000
-    const state = this.signal<ResourceState<T>>(
-      { data: null, loading: true, error: null, isRetrying: false },
-      `[CORE_INTERNAL_SIGNAL=1]:resource:state:${resourceSignalName}`
-    )
-
-    const updateResourceState = (nextState: ResourceState<T>) => {
-      this.log({ type: 'resource', label: resourceSignalName, details: { to: nextState, from: state.value } })
-      state.value = nextState
-    }
-
-    const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
-      if (effectSignal.aborted) return
-      const isValid = options.validateBeforeFetch ? options.validateBeforeFetch(sValue) : true
-
-      /**
-       * 🧐 WIP_CORE: Есть два пути, ни один не будет ошибкой, если разкомментировать код ниже. Чуть бозже добавлю опци для более тонкой отладки ядра.
-       *
-       * - АКТИВНО: Разделяем мирную блокировку (false) и боевую ошибку (string): работать будет идеально, но без логов, связанных с пре-валидацией
-       * - НЕАКТИВНО: Более очевидное логирование процессов пре-валидации (выставление ошибок и мониторинг разработчиком)
-      */
-      // --
-      // if (isValid === false) {
-      //   // Если валидатор вернул строго false — мы тихо блокируем старт фетчера,
-      //   // переводя ресурс в состояние ПОКОЯ (loading: false, error: null).
-      //   // Это полностью ликвидирует генерацию ложных ошибок при монтировании!
-      //   state.value = {
-      //     loading: false,
-      //     data: null,
-      //     error: null, // Ошибки нет! Стейт стабилен.
-      //     isRetrying: false
-      //   }
-      //   return
-      // }
-      // if (typeof isValid === 'string') {
-      //   // Если валидатор вернул строку — это боевая декларативная ошибка валидации формы.
-      //   // Здесь мы честно переводим ресурс в стейт ошибки, как и требовалось ранее.
-      //   state.value = {
-      //     loading: false,
-      //     data: null,
-      //     error: 'Core internal stopper',
-      //     isRetrying: false
-      //   }
-      //   return
-      // }
-      // --
-      if (validateBeforeFetch) {
-        const preValidationResult = validateBeforeFetch(sValue)
-        if (preValidationResult === false || typeof preValidationResult === 'string') {
-          if (effectSignal.aborted) return
-          const errorMsg = typeof preValidationResult === 'string'
-            ? preValidationResult
-            : 'Pre-fetch validation failed for resource'
-
-          const currentData = isSourceChange ? null : this.untrack(() => state.value.data)
-          updateResourceState({ data: currentData, loading: false, error: errorMsg, isRetrying: false })
-          return
-        }
-      }
-      const shouldClear = isSourceChange && resetDataOnSourceChange
-      const currentData = shouldClear ? null : this.untrack(() => state.value.data)
-      updateResourceState({ data: currentData, loading: true, error: null, isRetrying: false })
-      for (let attempt = 0; attempt <= retryCount; attempt++) {
-        if (effectSignal.aborted) return
-        let combinedSignal = effectSignal
-        try {
-          const data = await fetcher(sValue, combinedSignal)
-          if (effectSignal.aborted) return
-          if (combinedSignal.aborted) {
-            throw new DOMException('The operation timed out.', 'TimeoutError')
-          }
-          if (responseValidate) {
-            const validationResult = responseValidate(data)
-            if (validationResult === false || typeof validationResult === 'string') {
-              if (effectSignal.aborted) return
-              const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed'
-              updateResourceState({ data: null, loading: false, error: errorMsg, isRetrying: false })
-              return
-            }
-          }
-          if (effectSignal.aborted) return
-          updateResourceState({ data, loading: false, error: null, isRetrying: false })
-          return
-        } catch (e: unknown) {
-          if (effectSignal.aborted || ((e as Error).name === 'AbortError' && effectSignal.aborted)) return
-          const isTimeout = (e as Error).name === 'TimeoutError' || (e as Error).name === 'AbortError' || (e as Error).message?.includes('timeout')
-          const isCustomValidationError = getExtractedValues({
-            tested: [(e as Error).message], expectedKey: 'THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY', valueType: 'number',
-          })?.[0] === '1' || false
-          const __defaultCustomValidationErrorMessage = 'Custom validation error'
-          let customValidationErrorMessage: string = isCustomValidationError
-            ? (getExtractedValues({
-              tested: [(e as Error).message], expectedKey: 'MESSAGE', valueType: 'string',
-            })?.[0] || __defaultCustomValidationErrorMessage)
-            : __defaultCustomValidationErrorMessage
-          const isFetchBodyValidationError = isCustomValidationError || (e as Error).name === 'ValidationError'
-          if (attempt === retryCount || isFetchBodyValidationError) {
-            if (effectSignal.aborted) return
-            const finalError = isTimeout
-              ? new Error(`Request timed out after ${timeoutMs}ms`, { cause: e })
-              : isCustomValidationError
-                ? new Error(customValidationErrorMessage, { cause: e })
-                : e
-
-            updateResourceState({
-              data: null, loading: false,
-              error: finalError instanceof Error ? finalError.message : typeof finalError === 'string' ? finalError : `typeof finalError is ${typeof finalError}`,
-              isRetrying: false,
-            })
-            return
-          } else {
-            if (effectSignal.aborted) return
-            let currentDelay = useExponential ? baseDelay * Math.pow(2, attempt) : baseDelay
-            currentDelay = Math.min(currentDelay, maxRetryDelay)
-            const jitter = Math.random() * 200
-            currentDelay = currentDelay + jitter
-            updateResourceState({ data: state.value.data, loading: true, error: null, isRetrying: true })
-            const logReason = isTimeout ? 'таймауту' : 'ошибке сети'
-            console.warn(`[Resource Retry] "${resourceSignalName}" сбой по ${logReason}. Попытка ${attempt + 1}/${retryCount > 0 ? retryCount + 1 : attempt + 1}...`)
-
-            try {
-              await this.delay(currentDelay, effectSignal)
-              if (effectSignal.aborted) return
-            } catch (delayError) {
-              return
-            }
-          }
-        }
-      }
-    }
-
-    let activeEffectController: AbortController | null = null
-
-    this.effect(() => {
-      const sValue = source ? source.value : undefined as S
-      const effectController = new AbortController()
-      activeEffectController = effectController
-
-      this.untrack(() => {
-        load(sValue as S, effectController.signal, true)
-      })
-
-      return () => effectController.abort()
-    }, '[CORE_INTERNAL_SIGNAL=1]:effect')
-
-    return {
-      get data() { return state.value.data },
-      get loading() { return state.value.loading },
-      get error() { return state.value.error },
-      get isRetrying() { return state.value.isRetrying },
-      get value() { return state.value },
-      refetch: () => {
-        activeEffectController?.abort()
-        activeEffectController = new AbortController()
-        load(source ? source.value : undefined as S, activeEffectController.signal, false)
-      },
-      subscribe: (cb: (val: ResourceState<T>) => void) => state.subscribe(cb)
-    }
+    // Передаем инстанс движка (this) как IReactiveEngine для соблюдения строгой типизации
+    return createResource<T, S>(this, fetcher, source, optionsOrName)
   }
 }
 

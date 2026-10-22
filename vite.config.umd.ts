@@ -30,8 +30,8 @@ export default defineConfig({
         const distDir = path.resolve(__dirname, 'dist')
         const targetDocsDir = path.resolve(__dirname, 'docs/public/build')
 
-        const umdFileName = `reactive-engine@${pkg.version}.umd.js`
-        const mapFileName = `reactive-engine@${pkg.version}.umd.js.map`
+        const umdFileName = 'reactive-engine.umd.js'
+        const mapFileName = 'reactive-engine.umd.js.map'
 
         const targetUmdPath = path.join(distDir, umdFileName)
         const targetMapPath = path.join(distDir, mapFileName)
@@ -76,7 +76,7 @@ export default defineConfig({
       entry: path.resolve(__dirname, 'src/core/index.ts'),
       name: "ReactiveEngineLib",
       formats: ['umd'],
-      fileName: () => `reactive-engine@${pkg.version}.umd.js`
+      fileName: () => 'reactive-engine.umd.js'
     },
     rollupOptions: {
       external: ['react', 'react-dom', 'vue', '@angular/core'],

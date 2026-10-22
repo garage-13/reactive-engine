@@ -1,3 +1,4 @@
+// core.logger.ts
 import { LogEventType } from "./types"
 
 interface LogDetails {
@@ -27,12 +28,21 @@ export class ReactiveDebounceLogger {
 
     const history = this.churnTracker.get(label)!
     const cutoff = now - this.TIME_WINDOW_MS
+    // Фильтруем историю
     const activeHistory = history.filter(ts => ts > cutoff)
     activeHistory.push(now)
-    this.churnTracker.set(label, activeHistory)
 
     const updateCount = activeHistory.length
     const intervalSec = (this.TIME_WINDOW_MS / 1000).toFixed(1)
+
+    // ⚛️ ФИКС УТЕЧКИ ПАМЯТИ: Если узел стабилен и старых логов нет,
+    // удаляем ключ из Map целиком, чтобы не копить мусор
+    if (activeHistory.length <= 1) {
+      this.churnTracker.delete(label)
+      return { marker: '🟢', info: `[STABLE] (1 изм./${intervalSec}s)` }
+    } else {
+      this.churnTracker.set(label, activeHistory)
+    }
 
     if (updateCount >= this.CHURN_CRITICAL_THRESHOLD) {
       return {
@@ -64,32 +74,22 @@ export class ReactiveDebounceLogger {
     if (!engineLogger.isEnabled) return
     if (isInternalCoreSignal && !engineLogger.isCoreOptimizationDebugEnabled) return
 
-    // 1. ОБРАБОТКА ХОЛОСТЫХ ВЫЗОВОВ (Value Equality Cut)
     if (details && 'from' in details && 'to' in details) {
       if (this.isDeepEqual(details.from, details.to)) {
-        // ⚛️ ФИКС: Выводим холостые pull-вызовы вычислений ИСКЛЮЧИТЕЛЬНО в режиме тонкой отладки кэша!
         if (type === 'computed') {
-          // if (engineLogger.isCoreOptimizationDebugEnabled) {
-          //   queueLogFn(type, `🔵 [IDLE PULL] ${label} (Значение кэша не изменилось)`, details);
-          // }
           queueLogFn(type, `🔵 [IDLE PULL] ${label} (Значение кэша не изменилось)`, details)
           return
         }
-        // Для остальных типов (batch, effect) холостой мусор полностью глушим
         return
       }
     }
 
-    // 2. SIGNAL CHURN DETECTION: Обсчет частоты обновлений и дребезга
     let churnInfo = ''
     if (type === 'signal' || type === 'resource' || type === 'computed') {
       const churn = this.analyzeSignalChurn(label)
       churnInfo = churn.marker === '🟢' ? ` ${churn.marker}` : ` ${churn.marker} ${churn.info}`
     }
 
-    // Отправляем очищенный лог в системную очередь
     queueLogFn(type, `${label}${churnInfo}`, details)
   }
-
 }
-

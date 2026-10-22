@@ -31,6 +31,8 @@ export type Factory<T> = (engine: ReactiveEngineCore) => T;
 export interface Signal<T> {
   value: T;
   subscribe: (cb: (val: T) => void) => CleanupFn;
+  // ⚛️ ДОБАВЛЕНО В 2.5.0: Полное уничтожение сигнала и отписка всех слушателей
+  destroy: () => void;
 }
 
 /**
@@ -87,6 +89,8 @@ export interface Resource<T> extends ResourceState<T> {
   refetch: () => void;
   subscribe: (cb: (val: ResourceState<T>) => void) => CleanupFn;
   readonly value: ResourceState<T>;
+  // ⚛️ ДОБАВЛЕНО В 2.5.0: Отмена текущих AbortController и очистка внутреннего стейта
+  destroy: () => void;
 }
 
 /**

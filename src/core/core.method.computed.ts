@@ -1,3 +1,4 @@
+// core.method.computed.ts
 import { Computed, CleanupFn } from './types'
 
 export function createComputed<T>(
@@ -5,22 +6,9 @@ export function createComputed<T>(
   fn: () => T,
   signalName?: string
 ): Computed<T> {
-  // 1. Быстрый канонический WeakMap путь (по ссылке на функцию)
+  // 1. Быстрый канонический WeakMap путь — единственный безопасный для долгоживущих объектов
   const existing = engine.computedCache.get(fn)
   if (existing) return existing as Computed<T>
-
-  // 2. ⚡ БЕЗОПАСНЫЙ ТРАНЗАКЦИОННЫЙ СТРОКОВЫЙ КЭШ:
-  // Переиспользуем ноды по сигнатуре только внутри ОДНОГО батча (цикла генерации графа).
-  const cacheKey = fn.toString()
-  if (engine.batchDepth > 0) {
-    if (!engine.batchComputedCache) {
-      engine.batchComputedCache = new Map<string, any>()
-    }
-    const cachedNode = engine.batchComputedCache.get(cacheKey)
-    if (cachedNode) {
-      return cachedNode as Computed<T>
-    }
-  }
 
   let value: T
   let isDirty = true
@@ -36,7 +24,6 @@ export function createComputed<T>(
 
   const releaseNode = (node: any): void => {
     if (!node) return
-    // Строго извлекаем внутреннее ядро ноды
     const actNode = node._node || node
 
     if (actNode.dependencies && actNode.dependencies.size > 0) {
@@ -45,14 +32,10 @@ export function createComputed<T>(
         const rawDepNode = dep._node || dep
 
         if (rawDepNode.subscribers) {
-          // Удаляем связи, не затирая сами объекты
           rawDepNode.subscribers.delete(actNode)
           rawDepNode.subscribers.delete(node)
           rawDepNode.subscribers.delete(computedNode)
 
-          // ⚡ БЕЗОПАСНЫЙ КАСКАДНЫЙ ПЕРЕХОД:
-          // Передаем в рекурсию строго внутренний приватный computedNode (rawDepNode),
-          // чтобы V8 распутывал граф без зануления внешних инстансов прокси
           if (rawDepNode.type === 'computed' && rawDepNode.subscribers.size === 0) {
             releaseNode(rawDepNode)
           }
@@ -84,7 +67,6 @@ export function createComputed<T>(
           if (rawDep.update) rawDep.update()
         }
 
-        // Если родительский сигнал мутировал в текущем батче или версии разошлись
         if (dep.hasBatchValue || depVersions.get(dep) !== rawDep.version) {
           hasChangedParent = true
           break
@@ -218,7 +200,6 @@ export function createComputed<T>(
         }
       }
     }
-
   }
 
   const computedInstance: Computed<T> = {
@@ -251,6 +232,8 @@ export function createComputed<T>(
     get dependencies() { return dependencies },
 
     subscribe(cb: (val: T) => void): CleanupFn {
+      // ⚛️ ФИКС УТЕЧКИ ПАМЯТИ: Выносим ссылку наружу, убираем сильное замыкание на инстанс
+      const self = this
       const fakeEffect: any = {
         id: engine.subscriberId++,
         isDirty: true,
@@ -259,37 +242,33 @@ export function createComputed<T>(
         type: 'effect',
         run: () => {
           if (fakeEffect.isDisposed) return
-          try { cb(computedInstance.value) } catch (err) { console.error(err) }
+          try { cb(self.value) } catch (err) { console.error(err) }
         }
       }
       subscribers.add(fakeEffect)
-      cb(computedInstance.value)
+      cb(this.value)
       return () => {
         fakeEffect.isDisposed = true
         subscribers.delete(fakeEffect)
+        fakeEffect.dependencies.clear() // Разрываем связи с графом
       }
     },
     subscribeState(cb: () => void): CleanupFn {
       return (computedInstance as any).subscribe(cb)
     },
     destroy: () => {
-      // 1. Распутываем зависимости вверх по графу, пока subscribers живы
       releaseNode(computedNode)
-
-      // 2. Очищаем локальные сеты графа, сохраняя ссылки на сами структуры
       if (subscribers) subscribers.clear()
-
-      // 3. Вычищаем строго из кэшей
       engine.computedCache.delete(fn)
-      if (engine.batchComputedCache) {
-        engine.batchComputedCache.delete(cacheKey)
-      }
 
-      // 4. Мягкий сброс флагов вычислений
+      // Безопасное зануление ссылок для помощи GC
+      dependencies.clear()
+      depVersions.clear()
+      ownedEffects.clear()
+
       isDirty = true
       state = 2
       isInitialized = false
-      // ⚛️ ГАРАНТИЯ СТАБИЛЬНОСТИ: Никаких занулений computedInstance._node = undefined!
     },
     __subscribe(cb: () => void): CleanupFn {
       const hookEffect: any = {
@@ -306,17 +285,10 @@ export function createComputed<T>(
   } as any
 
   computedInstance.run = () => computedNode.run()
-
-  // Сохраняем в канонический кэш
   engine.computedCache.set(fn, computedInstance)
 
   ;(computedInstance as any)._node = computedNode
   ;(computedInstance as any).subscribers = subscribers
-
-  // ⚡ Записываем во временный батч-кэш для оптимизации аллокаций
-  if (engine.batchDepth > 0 && engine.batchComputedCache) {
-    engine.batchComputedCache.set(cacheKey, computedInstance)
-  }
 
   return computedInstance
 }
