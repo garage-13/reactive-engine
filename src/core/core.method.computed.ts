@@ -17,10 +17,8 @@ export function createComputed<T>(
   let evaluatedInEpoch = -1
   let state = 2 // 2 = DIRTY, 1 = CHECK, 0 = STABLE
 
-  // Заменяем немедленную аллокацию пустых Set/Map на ленивую или более плотную
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
-  // Сеты ownedEffects и subscribers инициализируем стандартно, но минимизируем их размер в GC
   const ownedEffects = new Set<any>()
   const subscribers = new Set<any>()
 
@@ -48,20 +46,17 @@ export function createComputed<T>(
     }
   }
 
-  let verifiedInEpoch = -1
-
   const updateIfNecessary = (node: any): boolean => {
     if (!isInitialized || state === 2) {
       return node.run()
     }
 
-    // ⚛️ КОРРЕКТНЫЙ МЕМОИЗАЦИОННЫЙ ГВАРД:
-    // Оптимизация по эпохам применяется без ограничений вне батча.
-    // Внутри батча (batchDepth > 0) мы пропускаем этот быстрый выход,
-    // позволяя коду ниже честно проверить флаги `hasBatchValue` у родителей,
-    // что гарантирует актуальность Pull-запросов во время транзакций.
-    if (engine.batchDepth === 0) {
-      if (verifiedInEpoch === engine.epoch && state === 0) {
+    // ⚛️ КОРРЕКТНЫЙ МЕМОИЗАЦИОННЫЙ ГВАРД (Pull-совместимый проход):
+    // Если у узла есть активные подписчики (observed), мы можем оптимизировать расчет через эпохи.
+    // Но если подписчиков НЕТ (unobserved), мы ОБЯЗАНЫ пропустить быстрый выход по эпохам
+    // и честно проверить, изменились ли версии родителей ниже.
+    if (subscribers && subscribers.size > 0) {
+      if (node.verifiedInEpoch === engine.epoch && engine.batchDepth === 0 && state === 0) {
         return false
       }
     }
@@ -72,15 +67,17 @@ export function createComputed<T>(
       for (const dep of dependencies) {
         const rawDep = dep._node || dep
 
-        if (rawDep.type === 'computed') {
-        // ⚛️ ЗАЩИТА ОТ КАСКАДНОГО ОБХОДА:
-        // Вызываем update() родителя только если он еще не был верифицирован в текущей эпохе.
-        // Это ликвидирует квадратичную рекурсию на динамических структурах графа!
-          if (rawDep.update && (rawDep as any).verifiedInEpoch !== engine.epoch) {
+        if (rawDep.type === 'computed' && rawDep.state > 0) {
+          // ⚛️ ЗАЩИТА ОТ КАСКАДНОГО ОБХОДА:
+          // Вызываем update() родителя только если он еще не был верифицирован в текущей эпохе.
+          // Это ликвидирует квадратичную рекурсию на динамических структурах графа!
+          if (rawDep.update && rawDep.verifiedInEpoch !== engine.epoch) {
             rawDep.update()
           }
         }
 
+        // Если родитель имеет отложенное батч-значение (hasBatchValue)
+        // или его версия изменилась — кэш невалиден!
         if (dep.hasBatchValue || depVersions.get(dep) !== rawDep.version) {
           hasChangedParent = true
           break
@@ -88,7 +85,7 @@ export function createComputed<T>(
       }
     }
 
-    verifiedInEpoch = engine.epoch
+    node.verifiedInEpoch = engine.epoch
 
     if (hasChangedParent || isDirty) {
       return node.run()
@@ -112,13 +109,18 @@ export function createComputed<T>(
     get state() { return state },
     set state(val: number) { state = val },
     get depVersions() { return depVersions },
+    verifiedInEpoch: -1, // Перенесено напрямую на объект ноды для ультимативного O(1)
     update: () => updateIfNecessary(computedNode),
     run: () => {
+      // Стандартный быстрый выход для стабильных эпох
       if (evaluatedInEpoch === engine.epoch && isInitialized && state === 0 && engine.batchDepth === 0) {
         return false
       }
-      evaluatedInEpoch = engine.epoch
-      verifiedInEpoch = engine.epoch
+
+      // Запоминаем стартовую эпоху до вызова функции пользователя
+      const startEpoch = engine.epoch
+      evaluatedInEpoch = startEpoch
+      computedNode.verifiedInEpoch = startEpoch
 
       if (engine.cycleDetectionStack.has(computedNode)) {
         throw new Error('[Graph Error] Cyclic dependency detected')
@@ -147,6 +149,7 @@ export function createComputed<T>(
           ownedEffects.clear()
         }
 
+        // Выполняем пользовательскую функцию (здесь могут произойти inner writes из тестов #179, #180, #186)
         const newValue = fn()
 
         if (oldDeps !== null) {
@@ -193,6 +196,17 @@ export function createComputed<T>(
         }
 
         computedNode.depth = maxDepDepth + 1
+
+        // ⚡ ФИКС ДЛЯ INNER WRITES (#179, #180, #186):
+        // Если во время исполнения fn() эпоха ядра сдвинулась (был вложенный сеттер),
+        // мы обязаны сбросить кэш верификации этой эпохи, чтобы последующие цепочки
+        // зависимостей внутри этого же тика пересчитали свои значения нативно.
+        if (engine.epoch !== startEpoch) {
+          evaluatedInEpoch = -1
+          computedNode.verifiedInEpoch = -1
+          state = 2 // Переводим в DIRTY для немедленной инвалидации
+        }
+
         return changed
       } finally {
         engine.activeConsumer = prevConsumer

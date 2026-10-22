@@ -183,12 +183,25 @@ export class ReactiveEngineCore {
             }
           }
 
-          // Оригинальная проверка снизу убирается, так как она теперь стоит сверху
           try {
             effect.run()
           } catch (err) {
-            throw err
+            // ⚡ ФИКС ТЕСТА #177: Если один из эффектов выбросил исключение,
+            // принудительно очищаем и гасим флаги грязи (isDirty) у всех оставшихся
+            // в очереди эффектов текущего и последующих уровней глубины.
+            for (let d = depth; d <= this.maxPendingDepth; d++) {
+              const remainingBucket = this.pendingEffects[d]
+              if (remainingBucket) {
+                for (const remEffect of remainingBucket) {
+                  remEffect.isDirty = false
+                }
+                remainingBucket.clear()
+              }
+            }
+            this.maxPendingDepth = 0
+            throw err // Прокидываем ошибку дальше по спецификации
           }
+
         }
 
         if (depth > 0) {

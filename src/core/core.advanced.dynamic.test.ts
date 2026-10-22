@@ -340,7 +340,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
     })
   })
 
-  test.skip(' DieHard: 💀 Полная спецификация Dynamic Graphs (Полный боевой объем из бенчмарка)', () => {
+  test(' DieHard: 💀 Полная спецификация Dynamic Graphs (Полный боевой объем из бенчмарка)', () => {
     evaluateAndReportPerformance({
       suiteLabel: 'Dynamic Graphs (Die-Hard Полный Объем)',
       suffix: 'die-hard',
