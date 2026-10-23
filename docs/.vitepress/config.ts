@@ -190,7 +190,6 @@ export default withPwa(defineConfig({
                 { text: 'Обзор хуков', link: '/react/hooks/' },
                 { text: 'engine.use', link: '/react/hooks/use' },
                 { text: 'useReactiveValue', link: '/react/hooks/useReactiveValue' },
-                { text: 'useReactiveSubscription', link: '/react/hooks/useReactiveSubscription' },
               ]
             }
           ],
