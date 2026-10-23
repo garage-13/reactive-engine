@@ -45,18 +45,20 @@ export function createSignal<T>(
 
   const signalInstance: Signal<T> = {
     get value() {
+      // 🛡️ АТОМАРНАЯ ЗАЩИТА: Работаем строго с локально зафиксированной константой consumer
       const consumer = engine.activeConsumer
       if (consumer) {
-        subscribers.add(engine.activeConsumer)
-        engine.activeConsumer.dependencies.add(signalInstance)
+        if (consumer.dependencies && typeof consumer.dependencies.add === 'function') {
+          subscribers.add(consumer)
+          consumer.dependencies.add(signalInstance)
 
-        if (consumer.activeRunId !== undefined) {
-          (signalInstance as any)._lastSeenInRunId = consumer.activeRunId
+          if (consumer.activeRunId !== undefined) {
+            (signalInstance as any)._lastSeenInRunId = consumer.activeRunId
+          }
         }
       }
       return value
     },
-
     set value(newValue: T) {
       const isObjectKick = value === newValue && value !== null && typeof value === 'object'
       if (Object.is(value, newValue) && !isObjectKick) return
@@ -140,7 +142,6 @@ export function createSignal<T>(
 
     get hasBatchValue() { return hasBatchValue },
 
-    // ⚛️ ФИКС ДЛЯ РЕЛИЗА 2.5.0: Метод тотальной деструкции сигнала
     destroy: () => {
       if (subscribers) {
         subscribers.clear()
@@ -149,7 +150,6 @@ export function createSignal<T>(
         engine.batchedSignals.delete(signalInstance)
       }
       hasBatchValue = false
-      // Помогаем GC, убирая ссылки на тяжелые объекты
       value = undefined as any
       batchInitialValue = undefined as any
     }

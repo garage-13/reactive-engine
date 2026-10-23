@@ -232,19 +232,24 @@ export function createComputed<T>(
 
   const computedInstance: Computed<T> = {
     get value() {
+      // 🛡️ АТОМАРНАЯ ЗАЩИТА: Фиксируем ссылку локально и работаем строго с ней.
+      // Это полностью предотвращает TypeError: ... reading 'add' на проде Next.js.
       const consumer = engine.activeConsumer
       if (consumer && consumer !== computedNode) {
-        subscribers.add(consumer)
-        consumer.dependencies.add(computedNode)
+        // Проверяем наличие метода add у консьюмера, страхуя граф от стороннего мусора Webpack
+        if (typeof consumer.dependencies?.add === 'function') {
+          subscribers.add(consumer)
+          consumer.dependencies.add(computedNode)
 
-        const currentDepth = computedNode.depth || 1
-        const consumerRaw = consumer._node || consumer
-        if (consumerRaw.depth !== undefined && currentDepth >= consumerRaw.depth) {
-          consumerRaw.depth = currentDepth + 1
-        }
+          const currentDepth = computedNode.depth || 1
+          const consumerRaw = consumer._node || consumer
+          if (consumerRaw.depth !== undefined && currentDepth >= consumerRaw.depth) {
+            consumerRaw.depth = currentDepth + 1
+          }
 
-        if (consumer.activeRunId !== undefined) {
-          computedNode._lastSeenInRunId = consumer.activeRunId
+          if (consumer.activeRunId !== undefined) {
+            computedNode._lastSeenInRunId = consumer.activeRunId
+          }
         }
       }
 
