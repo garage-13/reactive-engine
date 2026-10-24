@@ -5,9 +5,9 @@ import { ReactiveEngine } from '@pravosleva/reactive-engine/react'
 const engine = new ReactiveEngine({
   logger: {
     isEnabled: true, // Включаем логгер
-    isCoreOptimizationDebugEnabled: false,
+    isCoreOptimizationDebugEnabled: true,
     traceTime: true, // Добавляем вывод таймингов по желанию
-    filter: /^example-201:*/ // Можно фильтровать только нужные логи
+    filter: /^example-201:*/, // Можно фильтровать только нужные логи
   }
 })
 

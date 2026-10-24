@@ -92,6 +92,9 @@ export interface ResourceState<T> {
   loading: boolean;
   error: string | null;
   isRetrying?: boolean;
+  attemptIndex: number; // Текущий номер попытки (0 — первый запрос, 1 — первый ретрай и т.д.)
+  retryCount: number;   // Сколько всего ретраев разрешено
+  totalElapsedMs?: number; // Суммарно затраченное время
 }
 
 export interface Resource<T> extends ResourceState<T> {
@@ -106,6 +109,8 @@ export interface ResourceOptions<T, S = void> {
   resetDataOnSourceChange?: boolean;
   validateBeforeFetch?: (source: S) => boolean | string;
   responseValidate?: (data: T) => boolean | string;
+  timeout?: number;
+  retryCount?: number;
 }
 
 export interface EngineLoggerOptions {

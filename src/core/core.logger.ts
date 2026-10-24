@@ -72,12 +72,23 @@ export class ReactiveDebounceLogger {
     const { type, label, details, isInternalCoreSignal = false } = params
 
     if (!engineLogger.isEnabled) return
+
+    // ⚛️ ФИКС #1: Включаем валидацию RegExp фильтра из настроек
+    if (engineLogger.filter) {
+      const isMatch = engineLogger.filter instanceof RegExp
+        ? engineLogger.filter.test(label)
+        : label.includes(engineLogger.filter)
+      if (!isMatch) return
+    }
+
     if (isInternalCoreSignal && !engineLogger.isCoreOptimizationDebugEnabled) return
 
     if (details && 'from' in details && 'to' in details) {
       if (this.isDeepEqual(details.from, details.to)) {
-        if (type === 'computed') {
-          queueLogFn(type, `🔵 [IDLE PULL] ${label} (Значение кэша не изменилось)`, details)
+      // ⚛️ ФИКС #2: Разрешаем логам типов 'resource' выводить IDLE транзакции,
+      // иначе глубокое равенство объектов состояния блокирует их вывод
+        if ((type === 'computed' || type === 'resource') && engineLogger.isCoreOptimizationDebugEnabled) {
+          queueLogFn(type, `🔵 [IDLE] ${label}`, details)
           return
         }
         return
@@ -92,4 +103,5 @@ export class ReactiveDebounceLogger {
 
     queueLogFn(type, `${label}${churnInfo}`, details)
   }
+
 }

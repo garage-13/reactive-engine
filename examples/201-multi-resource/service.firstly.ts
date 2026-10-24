@@ -57,7 +57,10 @@ export class UserInfoService extends AbstractService {
       return res.json()
     },
     this.counter,
-    'example-201:resource:profileSearch'
+    {
+      name: 'example-201:resource:profileSearch',
+      // timeout: 200,
+    }
   )
 
   public inc = () => {

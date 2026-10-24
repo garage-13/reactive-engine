@@ -1,4 +1,4 @@
-import { getExtractedValues } from '../utils/getExtractedValues'
+// import { getExtractedValues } from '../utils/getExtractedValues'
 import { Signal, Computed, IEffect, EngineLoggerOptions, LogEventType, CleanupFn, TransactionContext, LogRecord, SignalOptions, ResourceOptions, ResourceState, Resource } from './types'
 import { createComputed } from './core.method.computed'
 import { createSignal } from './core.method.signal'
@@ -77,7 +77,7 @@ export function flushLogs(): void {
 }
 export class ReactiveEngineCore {
   protected frameworkPrefix = 'core'
-  private logger: EngineLoggerOptions
+  public logger: EngineLoggerOptions
   public epoch = 0
   public activeConsumer: any = null
   public batchDepth = 0

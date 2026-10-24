@@ -26,14 +26,13 @@ export class MapLogic extends AbstractService {
           url.searchParams.append('bbox', bboxValue)
 
           const res = await fetch(url.toString(), {
-            signal: abortSignal,
+            signal: abortSignal, // ⚡ Сюда прилетит combinedSignal, нативно отменяемый ядром по таймауту
             headers: { 'Accept': 'application/json' }
           })
 
           if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
           return res.json() as Promise<Station[]>
-        },
-        { initialData: [] }
+        }
       ),
       { delay: 500 }
     ),
@@ -41,6 +40,8 @@ export class MapLogic extends AbstractService {
     {
       name: 'map:resource:fetch-stations',
       validateBeforeFetch: (bboxValue) => !!bboxValue,
+      timeout: 5 * 1000, // ⚡ Настройка таймаута на уровне конфигурации ядра ресурса
+      retryCount: 3 // ⚡ В случае 502 или таймаута движок сделает еще 3 попытки, плавно увеличивая паузы
     }
   )
 

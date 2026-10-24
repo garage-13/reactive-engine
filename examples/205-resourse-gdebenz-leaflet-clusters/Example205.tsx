@@ -8,7 +8,8 @@ const engine = new ReactiveEngine({
   logger: {
     isEnabled: true, // Включаем логгер
     traceTime: true, // Добавляем вывод таймингов по желанию
-    filter: /^example-*/ // Можно фильтровать только нужные логи
+    filter: /^(example-|map:)/, // Можно фильтровать только нужные логи
+    isCoreOptimizationDebugEnabled: false,
   }
 })
 
@@ -17,7 +18,7 @@ export const MapExample = () => {
   const logic = engine.inject(MapLogic)
 
   // Достаем состояние ресурса АЗС для декларативного отображения статуса в UI
-  const { loading, error } = useReactiveValue(logic.stationsResource)
+  const { loading, error, isRetrying, attemptIndex, retryCount, totalElapsedMs } = useReactiveValue(logic.stationsResource)
 
   const markersCount = engine.use(logic.validMarkersData).length// По аналогии с Example100
 
@@ -68,14 +69,24 @@ export const MapExample = () => {
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
         <span>
           {loading
-            ? '🟡 Получение АЗС...'
+            ? isRetrying
+              ? `🔄 Восстановление сети (попытка ${attemptIndex} из ${retryCount})...`
+              : '🟡 Получение АЗС...'
             : !error
               ? `🟢 Найдено АЗС: ${markersCount}`
-              : error
-                ? '🔴 Ошибка запроса'
-                : '⚪'}
+              : '🔴 Ошибка запроса'}
         </span>
         {error && <em style={{ color: 'red' }}>{error}</em>}
+        {error && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <em style={{ color: 'red', fontSize: '13px' }}>{error}</em>
+            {totalElapsedMs !== undefined && (
+              <span style={{ color: '#888', fontSize: '11px' }}>
+                ⏱️ Общее время ожидания графа: {(totalElapsedMs / 1000).toFixed(2)} сек.
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
