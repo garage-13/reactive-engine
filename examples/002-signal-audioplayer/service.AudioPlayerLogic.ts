@@ -10,12 +10,12 @@ const TRACK_LIST: Track[] = [
   {
     id: '1',
     title: 'Что Где когда - Пауза 1',
-    url: 'https://pravosleva.pro/d/sounds-in-access-2025/static/projects/what-where-when/audio/pause1.mp3',
+    url: '/audio-proxy/d/sounds-in-access-2025/static/projects/what-where-when/audio/pause1.mp3',
   },
   {
     id: '2',
     title: 'Что Где когда - Пауза  3',
-    url: 'https://pravosleva.pro/d/sounds-in-access-2025/static/projects/what-where-when/audio/pause3.mp3',
+    url: '/audio-proxy/d/sounds-in-access-2025/static/projects/what-where-when/audio/pause3.mp3',
   },
   {
     id: '3',

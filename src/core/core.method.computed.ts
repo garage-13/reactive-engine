@@ -47,14 +47,17 @@ export function createComputed<T>(
   }
 
   const updateIfNecessary = (node: any): boolean => {
+    // ⚛️ ФИКС ТЕСТОВ #180 и #186:
+    // Если глобальная эпоха изменилась, узел обязан аннулировать свой быстрый кэш верификации,
+    // чтобы принудительно запустить обход родителей и честно сравнить depVersions.get(dep) с rawDep.version!
+    if (node.verifiedInEpoch !== -1 && node.verifiedInEpoch < engine.epoch) {
+      node.verifiedInEpoch = -1
+    }
+
     if (!isInitialized || state === 2) {
       return node.run()
     }
 
-    // ⚛️ КОРРЕКТНЫЙ МЕМОИЗАЦИОННЫЙ ГВАРД (Pull-совместимый проход):
-    // Если у узла есть активные подписчики (observed), мы можем оптимизировать расчет через эпохи.
-    // Но если подписчиков НЕТ (unobserved), мы ОБЯЗАНЫ пропустить быстрый выход по эпохам
-    // и честно проверить, изменились ли версии родителей ниже.
     if (subscribers && subscribers.size > 0) {
       if (node.verifiedInEpoch === engine.epoch && engine.batchDepth === 0 && state === 0) {
         return false
@@ -68,16 +71,11 @@ export function createComputed<T>(
         const rawDep = dep._node || dep
 
         if (rawDep.type === 'computed' && rawDep.state > 0) {
-          // ⚛️ ЗАЩИТА ОТ КАСКАДНОГО ОБХОДА:
-          // Вызываем update() родителя только если он еще не был верифицирован в текущей эпохе.
-          // Это ликвидирует квадратичную рекурсию на динамических структурах графа!
           if (rawDep.update && rawDep.verifiedInEpoch !== engine.epoch) {
             rawDep.update()
           }
         }
 
-        // Если родитель имеет отложенное батч-значение (hasBatchValue)
-        // или его версия изменилась — кэш невалиден!
         if (dep.hasBatchValue || depVersions.get(dep) !== rawDep.version) {
           hasChangedParent = true
           break
@@ -85,12 +83,14 @@ export function createComputed<T>(
       }
     }
 
-    node.verifiedInEpoch = engine.epoch
-
     if (hasChangedParent || isDirty) {
+      // Перед принудительным запуском run() сбрасываем evaluatedInEpoch,
+      // чтобы обойти внутренний Bypass-гвард метода run()
+      evaluatedInEpoch = -1
       return node.run()
     }
 
+    node.verifiedInEpoch = engine.epoch
     state = 0
     return false
   }
@@ -112,12 +112,10 @@ export function createComputed<T>(
     verifiedInEpoch: -1, // Перенесено напрямую на объект ноды для ультимативного O(1)
     update: () => updateIfNecessary(computedNode),
     run: () => {
-      // Стандартный быстрый выход для стабильных эпох
       if (evaluatedInEpoch === engine.epoch && isInitialized && state === 0 && engine.batchDepth === 0) {
         return false
       }
 
-      // Запоминаем стартовую эпоху до вызова функции пользователя
       const startEpoch = engine.epoch
       evaluatedInEpoch = startEpoch
       computedNode.verifiedInEpoch = startEpoch
@@ -149,7 +147,6 @@ export function createComputed<T>(
           ownedEffects.clear()
         }
 
-        // Выполняем пользовательскую функцию (здесь могут произойти inner writes из тестов #179, #180, #186)
         const newValue = fn()
 
         if (oldDeps !== null) {
@@ -197,14 +194,11 @@ export function createComputed<T>(
 
         computedNode.depth = maxDepDepth + 1
 
-        // ⚡ ФИКС ДЛЯ INNER WRITES (#179, #180, #186):
-        // Если во время исполнения fn() эпоха ядра сдвинулась (был вложенный сеттер),
-        // мы обязаны сбросить кэш верификации этой эпохи, чтобы последующие цепочки
-        // зависимостей внутри этого же тика пересчитали свои значения нативно.
+        // ⚡ ЗОЛОТОЙ ФИКС ДЛЯ INNER WRITES:
         if (engine.epoch !== startEpoch) {
           evaluatedInEpoch = -1
           computedNode.verifiedInEpoch = -1
-          state = 2 // Переводим в DIRTY для немедленной инвалидации
+          state = 2
         }
 
         return changed
@@ -224,7 +218,7 @@ export function createComputed<T>(
           rawSub.isDirty = true
           engine.scheduleEffect(sub)
         } else if (rawSub.markDirty) {
-          rawSub.markDirty(1)
+          rawSub.markDirty(1) // Промежуточные узлы строго переводятся в CHECK (1)
         }
       }
     }
@@ -232,11 +226,8 @@ export function createComputed<T>(
 
   const computedInstance: Computed<T> = {
     get value() {
-      // 🛡️ АТОМАРНАЯ ЗАЩИТА: Фиксируем ссылку локально и работаем строго с ней.
-      // Это полностью предотвращает TypeError: ... reading 'add' на проде Next.js.
       const consumer = engine.activeConsumer
       if (consumer && consumer !== computedNode) {
-        // Проверяем наличие метода add у консьюмера, страхуя граф от стороннего мусора Webpack
         if (typeof consumer.dependencies?.add === 'function') {
           subscribers.add(consumer)
           consumer.dependencies.add(computedNode)
@@ -251,6 +242,10 @@ export function createComputed<T>(
             computedNode._lastSeenInRunId = consumer.activeRunId
           }
         }
+      }
+
+      if (computedNode.verifiedInEpoch !== -1 && computedNode.verifiedInEpoch < engine.epoch) {
+        computedNode.verifiedInEpoch = -1
       }
 
       updateIfNecessary(computedNode)

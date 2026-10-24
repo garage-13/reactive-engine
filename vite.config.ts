@@ -95,6 +95,11 @@ export default defineConfig({
           'Origin': 'https://gdebenzin.app'
         }
       },
+      '/audio-proxy': {
+        target: 'https://pravosleva.pro',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/audio-proxy/, '')
+      }
     }
   },
   test: {

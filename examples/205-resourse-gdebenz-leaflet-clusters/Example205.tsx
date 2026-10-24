@@ -76,18 +76,18 @@ export const MapExample = () => {
               ? `🟢 Найдено АЗС: ${markersCount}`
               : '🔴 Ошибка запроса'}
         </span>
-        {error && <em style={{ color: 'red' }}>{error}</em>}
-        {error && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <em style={{ color: 'red', fontSize: '13px' }}>{error}</em>
-            {totalElapsedMs !== undefined && (
-              <span style={{ color: '#888', fontSize: '11px' }}>
-                ⏱️ Общее время ожидания графа: {(totalElapsedMs / 1000).toFixed(2)} сек.
-              </span>
-            )}
-          </div>
-        )}
       </div>
+      {error && <em style={{ color: 'red' }}>{error}</em>}
+      {error && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <em style={{ color: 'red', fontSize: '13px' }}>{error}</em>
+          {totalElapsedMs !== undefined && (
+            <span style={{ color: '#888', fontSize: '11px' }}>
+                ⏱️ Общее время ожидания графа: {(totalElapsedMs / 1000).toFixed(2)} сек.
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
