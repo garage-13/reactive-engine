@@ -122,7 +122,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       .join(' ')
   }
 
-  // Универсальный движок рендеринга интеллектуального Dashboard
+  // Universal smart rendering engine for Performance Dashboard
   function evaluateAndReportPerformance(config: {
     suiteLabel: string
     suffix: string
@@ -132,12 +132,18 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
     borderStyle: { top: string; bottom: string }
   }) {
     const { suiteLabel, suffix, iterations, fallbackDefaultMs, maxSafeMsPerIter, borderStyle } = config
-    const cacheDir = __dirname
+    const currentFileDir = __dirname
     const HISTORY_LIMIT = 10
     const TOTAL_FILES_LIMIT = 20
 
+    // ⚛️ РЕФАКТОРИНГ: Создание выделенной папки для кэша результатов
+    const cacheDir = path.join(currentFileDir, '.dynamic-test-cache')
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true })
+    }
+
     // 1. Вытягиваем текущую версию из package.json
-    const pkgPath = path.join(cacheDir, '../../package.json')
+    const pkgPath = path.join(currentFileDir, '../../package.json')
     let currentVersion = 'unknown-version'
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
@@ -148,26 +154,25 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       console.error('⚠️ [Dashboard Warning] Не удалось прочитать package.json')
     }
 
-    const filePrefix = `.advanced.dynamic-test-cache.${suffix}@`
-    const currentCacheFileName = `${filePrefix}${currentVersion}.json`
+    // ⚛️ РЕФАКТОРИНГ: Новый чистый формат нейминга файлов версий (например, 2.6.3-express.json)
+    const currentCacheFileName = `${currentVersion}-${suffix}.json`
     const currentCacheFilePath = path.join(cacheDir, currentCacheFileName)
 
-    // 2. Сканируем папку для поиска ВСЕХ файлов кэша этого режима и подсчета общего лимита файлов
+    // 2. Сканируем выделенную папку для поиска ВСЕХ файлов кэша этого режима и подсчета общего лимита файлов
     const otherVersionsSummary: Array<{ version: string; msPerIter: number; duration: number }> = []
     const allCacheFilesFound: string[] = []
 
     try {
       const files = fs.readdirSync(cacheDir)
       for (const file of files) {
-        // Подсчитываем вообще любые файлы кэша (express и die-hard всех версий) для лимита
-        if (file.startsWith('.advanced.dynamic-test-cache.') && file.endsWith('.json')) {
+        // Подсчитываем JSON файлы в выделенной директории
+        if (file.endsWith('.json')) {
           allCacheFilesFound.push(file)
         }
 
-        // Собираем историю именно этого режима (suffix) для матрицы
-        if (file.startsWith(filePrefix) && file.endsWith('.json')) {
-          const safePrefixPattern = filePrefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
-          const matched = file.match(new RegExp(`${safePrefixPattern}(.+?)\\.json$`))
+        // Собираем историю именно текущего режима (suffix) для сравнительной матрицы
+        if (file.endsWith(`-${suffix}.json`)) {
+          const matched = file.match(new RegExp(`^(.+?)-${suffix}\\.json$`))
           if (matched) {
             const vName = matched[1]
             try {
@@ -266,7 +271,7 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
         if (remote.version === currentVersion) continue
         const vDiffPercent = ((currentMsPerIter - remote.msPerIter) / remote.msPerIter) * 100
         const vMarker = vDiffPercent <= 0 ? '⚡ Сверхбыстро' : '🐢 Медленнее'
-        matrixLines.push( ` • Сводка по версии [${remote.version}]: ${vDiffPercent > 0 ? '+' : ''}${vDiffPercent.toFixed(1)}% (${vMarker})`)
+        matrixLines.push(`  • Сводка по версии [${remote.version}]: ${vDiffPercent > 0 ? '+' : ''}${vDiffPercent.toFixed(1)}% (${vMarker})`)
       }
     }
     // 9. Математический вердикт релиза
@@ -301,8 +306,8 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       }
     }
     console.log('----------------------------------------------------------------------')
-    console.log(`📢 ВЕРДИКТ ДЛЯ РЕЛИЗА В БЕНЧМАРК:`)
-    console.log(`${releaseVerdict}`)
+    console.log('📢 ВЕРДИКТ ДЛЯ РЕЛИЗА В БЕНЧМАРК:')
+    console.log(releaseVerdict)
     // 🛑 БЛОК КОНТРОЛЯ ИЗБЫТОЧНЫХ ФАЙЛОВ КЭША (> 20 файлов)
     if (allCacheFilesFound.length > TOTAL_FILES_LIMIT) {
       console.log('----------------------------------------------------------------------')
@@ -311,9 +316,10 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       console.log('\n   reactive-engine/')
       console.log('   └── src/')
       console.log('       └── core/')
+      console.log('           └── .dynamic-test-cache/')
       for (const cacheFile of allCacheFilesFound) {
         const isCurrent = cacheFile === currentCacheFileName || cacheFile === currentCacheFileName.replace(suffix, suffix === 'express' ? 'die-hard' : 'express')
-        console.log(`           ├── ${cacheFile} ${isCurrent ? '👈 [ОСТАВИТЬ]' : '❌ [РЕНДЕР К УДАЛЕНИЮ]'}`)
+        console.log(`               ├── ${cacheFile} ${isCurrent ? '👈 [ОСТАВИТЬ]' : '❌ [РЕНДЕР К УДАЛЕНИЮ]'}`)
       }
       console.log('')
     }
@@ -325,7 +331,6 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
     expect(effectSpy).toHaveBeenCalled()
     expect(checkSum).toBeGreaterThan(0)
   }
-
   test(' Amphibia: 🟢 Экспресс-анализ динамического графа (Быстрый чек перед релизом)', () => {
     evaluateAndReportPerformance({
       suiteLabel: 'Dynamic Graphs (Экспресс-чек)',
@@ -339,7 +344,6 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       }
     })
   })
-
   test(' DieHard: 💀 Полная спецификация Dynamic Graphs (Полный боевой объем из бенчмарка)', () => {
     evaluateAndReportPerformance({
       suiteLabel: 'Dynamic Graphs (Die-Hard Полный Объем)',
@@ -353,6 +357,4 @@ describe('⚛️ Reactive Engine — Локальный Сьют Специфи�
       }
     })
   }, 80000) // 👈 Выставляем таймаут Vitest в 80 секунд, чтобы дать тесту гарантированно завершиться
-
-
 })

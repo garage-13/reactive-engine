@@ -20,6 +20,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 src/core/.advanced.dynamic-test-cache.*.json
+src/core/.dynamic-test-cache/*
 
 # editor directories and files
 .vscode/*
