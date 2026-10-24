@@ -1,6 +1,7 @@
 import { defineConfig, UserConfig } from 'vite'
 import path from 'path'
 import fs from 'fs'
+import zlib from 'zlib'
 import pkg from './package.json'
 
 const bannerText = `/*!
@@ -46,6 +47,19 @@ export default defineConfig({
               fs.writeFileSync(targetUmdPath, bannerText + fileContent, 'utf8')
               console.log('✅ [UMD Banner Injector]: Паспорт бандла успешно вшит в начало файла!')
             }
+
+            // -- Расчет и вывод размера файла
+            const finalBuffer = fs.readFileSync(targetUmdPath)
+            const sizeInKb = (finalBuffer.length / 1024).toFixed(2)
+
+            // Рассчитываем размер со сжатием Gzip
+            const gzipBuffer = zlib.gzipSync(finalBuffer)
+            const gzipSizeInKb = (gzipBuffer.length / 1024).toFixed(2)
+
+            console.log(`\n📊 [Bundle Size Monitor] — ${umdFileName}:`)
+            console.log(`   ├── Физический размер: \x1b[36m${sizeInKb} KB\x1b[0m`)
+            console.log(`   └── Сжатый (Gzip):     \x1b[32m${gzipSizeInKb} KB\x1b[0m\n`)
+            // --
 
             // --- ЭТАП 2: Копирование файлов в документацию VitePress ---
             // Убеждаемся, что целевая папка docs/public/build существует

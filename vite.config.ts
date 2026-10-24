@@ -4,6 +4,8 @@ import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
 import path from 'path'
 import type { PreRenderedChunk } from 'rollup'
+import { visualizer } from 'rollup-plugin-visualizer'
+import pkj from './package.json'
 
 export default defineConfig({
   base: "./",
@@ -22,6 +24,14 @@ export default defineConfig({
     }),
     react(),
     vue(),
+    visualizer({
+      open: false,             // Автоматически открывать отчет в браузере? (true/false)
+      filename: path.resolve(__dirname, 'docs/public/build/stats.html'),  // Имя файла с интерактивным графиком веса зависимостей
+      gzipSize: true,          // Считать и показывать размер с учетом Gzip compression
+      brotliSize: true,        // Считать и показывать размер с учетом Brotli compression
+      title: `ReactiveEngine v${pkj.version}`,
+      template: 'treemap',
+    })
   ],
   resolve: {
     dedupe: ['react', 'react-dom', 'vue'],
