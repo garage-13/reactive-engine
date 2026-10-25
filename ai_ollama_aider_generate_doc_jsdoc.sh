@@ -71,17 +71,23 @@ for file in $CLEANED_FILES; do
 done
 
 # Динамическое формирование ТАСК-задачи для внедрения JSDoc с ручным связыванием импортов
-TASK_JSDOC="КРИТИЧЕСКИ ВАЖНО: Напиши исчерпывающий JSDoc-блок для метода 'createResource' строго на РУССКОМ языке.
-1. Обрати внимание на строку импорта 'ResourceOptions' вверху файла. Найди определение этого интерфейса в файле 'src/core/types.ts', который передан тебе в чат.
-2. Полностью распиши параметр 'optionsOrName' в JSDoc. Не пиши общих фраз. Используй вложенную нотацию для каждого свойства из 'ResourceOptions':
-   - @param optionsOrName.name - Уникальное имя ресурса для отладки
-   - @param optionsOrName.timeout - Таймаут запроса в мс
-   - @param optionsOrName.retryCount - Количество попыток перезапуска
-   - @param optionsOrName.resetDataOnSourceChange - Сброс кэша при смене источника
-   - @param optionsOrName.validateBeforeFetch - Валидация аргументов до запроса
-   - @param optionsOrName.responseValidate - Валидация ответа бэкенда
-3. Внутри тега '@example' сгенерируй ЧЕТЫРЕ мультитехнологичных примера (Чистый TS базовый, Чистый TS с ретраями/AbortSignal, React-компонент, Vue 3 Composition API).
-Не меняй runtime-код. Модифицируй только блок комментариев над функцией."
+# Ультимативное формирование ТАСК-задачи с позиционированием метода класса
+TASK_JSDOC="КРИТИЧЕСКИ ВАЖНО: Напиши исчерпывающий TSDoc-блок для функции 'createResource' строго на РУССКОМ языке, позиционируя её как метод инстанса класса ядра реактивной системы.
+
+1. ОБЯЗАТЕЛЬНО включи в тело комментария контекстные теги:
+   - '@method resource'
+   - '@memberof ReactiveEngine'
+2. Параметры дженериков задокументируй через '@template T' и '@template S' на русском языке.
+3. Полностью распиши параметр 'optionsOrName'. Найди определение интерфейса 'ResourceOptions' в файле 'src/core/types.ts', извлеки ВСЕ его свойства и задокументируй их через вложенную точку:
+   - @param optionsOrName.name - Уникальное имя ресурса для системы логирования и транзакций
+   - @param optionsOrName.timeout - Максимальное время ожидания запроса в мс (по умолчанию 5000)
+   - @param optionsOrName.retryCount - Количество автоматических повторных попыток при сбое сети
+   - @param optionsOrName.resetDataOnSourceChange - Флаг принудительного сброса данных к null при изменении source
+   - @param optionsOrName.validateBeforeFetch - Функция-превалидатор аргументов перед отправкой
+   - @param optionsOrName.responseValidate - Функция-валидатор структуры ответа от бэкенда
+4. Внутри тега '@example' сгенерируй ЧЕТЫРЕ мультитехнологичных примера использования (Pure TS basic, Pure TS advanced с ретраями, React integration, Vue 3 Composition API). Внутри примеров вызывай метод именно как 'engine.resource(...)'.
+
+Не меняй исполняемый runtime-код. Модифицируй только блок комментариев над функцией."
 
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
