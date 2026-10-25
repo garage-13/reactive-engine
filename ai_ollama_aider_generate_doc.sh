@@ -114,9 +114,9 @@ done
 echo -e "${YELLOW}[Сборщик: Шаг 1/2] Запуск Aider для РУССКОЙ локализации (${FILE_PATH_RU})...${RESET}"
 
 HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
+OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE" \
 uv run --python 3.12 --with aider-chat aider \
     --model "$AIDER_MODEL" \
-    --openai-api-base "$AIDER_OLLAMA_API_BASE" \
     --edit-format whole \
     --map-tokens 0 \
     --test-cmd "npx yarn test" \
@@ -137,11 +137,10 @@ fi
 # ==========================================
 echo -e "\n${YELLOW}[Сборщик: Шаг 2/2] Запуск Aider для АНГЛИЙСКОЙ локализации (${FILE_PATH_EN})...${RESET}"
 
-# Важно: НАКОПИТЕЛЬНЫЙ РЕЖИМ. Мы НЕ стираем изменения первого шага, а продолжаем поверх.
 HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
+OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE" \
 uv run --python 3.12 --with aider-chat aider \
     --model "$AIDER_MODEL" \
-    --openai-api-base "$AIDER_OLLAMA_API_BASE" \
     --edit-format whole \
     --map-tokens 0 \
     --test-cmd "npx yarn test" \
@@ -167,7 +166,7 @@ git diff --staged > "$AIDER_OUTPUT_PATCH"
 if [ -s "$AIDER_OUTPUT_PATCH" ]; then
     echo -e "${GREEN}[УСПЕХ] Мульти-язычный патч-файл успешно сформирован:${RESET}"
     echo -e "        ${GREEN}$PWD/$AIDER_OUTPUT_PATCH${RESET}"
-    
+
     # Очищаем рабочую директорию, так как изменения теперь упакованы в patch
     git reset --hard HEAD &>/dev/null
     git clean -fd &>/dev/null
