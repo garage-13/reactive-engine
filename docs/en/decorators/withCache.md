@@ -1,11 +1,11 @@
-# Decorator `withCache`
+# `withCache`
 
-The `withCache` decorator allows creating caching data loaders that automatically update subscribed dependencies when the data changes.
+The `withCache` decorator allows creating caching data loaders that automatically update subscribed dependencies when the data changes. It helps prevent race conditions and duplicate parallel requests by collapsing them into a single request.
 
 ## Syntax
 
-```javascript
-withCache(fetcher, options)
+```typescript
+withCache(fetcher: (source: S, signal: AbortSignal) => Promise<T>, options?: CacheOptions): (source: S, signal: AbortSignal) => Promise<T>
 ```
 
 ## Parameters
@@ -30,7 +30,7 @@ The method returns a wrapped asynchronous function that has the following proper
 
 ## Examples
 
-### Example in plain JavaScript
+### Example on plain JavaScript
 
 ```javascript
 const engine = new ReactiveEngine();
@@ -83,6 +83,55 @@ dataResource.subscribe((state) => {
 counter.value++; // Will trigger resource reload
 ```
 
+### Example with network error fallbacks
+
+```javascript
+const engine = new ReactiveEngine();
+
+const fetchData = async (counterValue, abortSignal) => {
+  const res = await fetch(
+    `https://api.example.com/data?counter=${counterValue}`,
+    { signal: abortSignal }
+  );
+  if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+  return res.json();
+};
+
+const counter = engine.signal(0);
+const cachedFetch = withCache(fetchData, { ttl: 60 * 1000 });
+const dataResource = engine.resource(cachedFetch, counter, 'my-resource');
+
+dataResource.subscribe((state) => {
+  if (state.error) {
+    console.error('Network error occurred:', state.error);
+  } else {
+    console.log('Resource state:', state);
+  }
+});
+
+counter.value++; // Will trigger resource reload
+```
+
+### Example with Proxy-array mutations via .push()
+
+```javascript
+const engine = new ReactiveEngine();
+
+const fetchData = async (arr, abortSignal) => {
+  return `Array length: ${arr.length}`;
+};
+
+const reactiveArray = engine.reactive(['milk']);
+const cachedFetch = withCache(fetchData);
+const dataResource = engine.resource(cachedFetch, reactiveArray, 'my-resource');
+
+dataResource.subscribe((state) => {
+  console.log('Resource state:', state);
+});
+
+reactiveArray.push('eggs'); // Mutates Proxy-array
+```
+
 ## Additional Information
 
-Resources are an important part of the reactive system, allowing automatic updates to UI and other dependencies when data changes.
+The `withCache` decorator is a crucial component of the Reactive Engine library, enabling efficient caching of data requests. It ensures that duplicate parallel requests are collapsed into a single request, reducing network load and improving application performance. The decorator also handles edge cases such as cache warming, network error fallbacks, and reactive array mutations.

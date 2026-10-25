@@ -1,11 +1,11 @@
 # `withCache`
 
-Метод `withCache` позволяет создавать кэширующие загрузчики данных, которые автоматически обновляют подписанные на них зависимости при изменении данных.
+Декоратор `withCache` позволяет создавать кэширующие загрузчики данных, которые автоматически обновляют подписанные зависимости при изменении данных.
 
 ## Синтаксис
 
-```javascript
-withCache(fetcher, options)
+```typescript
+withCache(fetcher: (source: S, signal: AbortSignal) => Promise<T>, options?: CacheOptions): (source: S, signal: AbortSignal) => Promise<T>
 ```
 
 ## Параметры
@@ -49,7 +49,7 @@ const cachedFetch = withCache(fetchData, { ttl: 60 * 1000 });
 const dataResource = engine.resource(cachedFetch, counter, 'my-resource');
 
 dataResource.subscribe((state) => {
-  console.log('Resource state:', state);
+  console.log('Состояние ресурса:', state);
 });
 
 counter.value++; // Запустит перезагрузку ресурса
@@ -77,12 +77,61 @@ const dataResource = engine.resource(cachedFetch, counter, {
 });
 
 dataResource.subscribe((state) => {
-  console.log('Resource state:', state);
+  console.log('Состояние ресурса:', state);
 });
 
 counter.value++; // Запустит перезагрузку ресурса
 ```
 
+### Пример с обработкой ошибок сети
+
+```javascript
+const engine = new ReactiveEngine();
+
+const fetchData = async (counterValue, abortSignal) => {
+  const res = await fetch(
+    `https://api.example.com/data?counter=${counterValue}`,
+    { signal: abortSignal }
+  );
+  if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+  return res.json();
+};
+
+const counter = engine.signal(0);
+const cachedFetch = withCache(fetchData, { ttl: 60 * 1000 });
+const dataResource = engine.resource(cachedFetch, counter, 'my-resource');
+
+dataResource.subscribe((state) => {
+  if (state.error) {
+    console.error('Произошла ошибка при загрузке данных:', state.error);
+  } else {
+    console.log('Состояние ресурса:', state);
+  }
+});
+
+counter.value++; // Запустит перезагрузку ресурса
+```
+
+### Пример с мутацией Proxy-массива
+
+```javascript
+const engine = new ReactiveEngine();
+
+const fetchData = async (arr, abortSignal) => {
+  return `Длина массива: ${arr.length}`;
+};
+
+const reactiveArray = engine.reactive(['milk']);
+const cachedFetch = withCache(fetchData);
+const dataResource = engine.resource(cachedFetch, reactiveArray, 'my-resource');
+
+dataResource.subscribe((state) => {
+  console.log('Состояние ресурса:', state);
+});
+
+reactiveArray.push('eggs'); // Мутация Proxy-массива
+```
+
 ## Дополнительная информация
 
-Ресурсы являются важной частью реактивной системы, позволяя автоматически обновлять UI и другие зависимости при изменении данных.
+Ресурсы являются важной частью реактивной системы, позволяя автоматически обновлять UI и другие зависимости при изменении данных. Декоратор `withCache` обеспечивает эффективное кэширование запросов, предотвращая дублирование параллельных запросов и улучшая производительность приложения.
