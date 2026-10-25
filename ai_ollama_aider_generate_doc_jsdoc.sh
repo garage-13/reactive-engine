@@ -101,29 +101,50 @@ if [ "$DRY_RUN" = true ]; then
     exit 0
 fi
 
-# 6. Подготовка рабочего дерева Git
+# 6. Подготовка рабочего дерева Git перед инъекцией
 echo -e "${YELLOW}[JSDoc Пайплайн] Снимок Git: Сбрасываем старые незакоммиченные диффы...${RESET}"
 git checkout -- . &>/dev/null
 git clean -fd &>/dev/null
 
 echo -e "\n${BLUE}┌────────────────── РАСПРЕДЕЛЕНИЕ КОНТЕКСТА ИИ ──────────────────┐${RESET}"
 
-# Инициализируем CLI аргументы
+# Инициализируем CLI аргументы для ИИ-агента
 AIDER_FILES_ARGS=""
 
-# 1. Формируем файлы для ЗАПИСИ
+# === 1. ОБРАБОТКА ФАЙЛОВ ДЛЯ ЗАПИСИ (MUTABLE) ===
 echo -e "${BLUE}│${RESET} ${GREEN}[РЕЖИМ: ЗАПИСЬ / МОДИФИКАЦИЯ]${RESET}"
-for file in $CLEANED_WRITE; do
-    echo -e "${BLUE}│${RESET}  └── 📝 $file"
+
+# Преобразуем очищенную строку в массив bash для точного подсчета индексов
+write_array=($CLEANED_WRITE)
+write_total=${#write_array[@]}
+
+for i in "${!write_array[@]}"; do
+    file="${write_array[$i]}"
+    # Если элемент последний в списке — ставим └──, иначе ├──
+    if [ $((i + 1)) -eq $write_total ]; then
+        echo -e "${BLUE}│${RESET}  └── 📝 $file"
+    else
+        echo -e "${BLUE}│${RESET}  ├── 📝 $file"
+    fi
     AIDER_FILES_ARGS="$AIDER_FILES_ARGS --file $file"
 done
 
 echo -e "${BLUE}│${RESET}"
 
-# 2. Формируем файлы ТОЛЬКО ДЛЯ ЧТЕНИЯ
+# === 2. ОБРАБОТКА ФАЙЛОВ СТРОГО ДЛЯ ЧТЕНИЯ (READ-ONLY) ===
 echo -e "${BLUE}│${RESET} ${YELLOW}[РЕЖИМ: ТОЛЬКО ЧТЕНИЕ / АНАЛИЗ]${RESET}"
-for file in $CLEANED_READ; do
-    echo -e "${BLUE}│${RESET}  └── 🔍 $file"
+
+read_array=($CLEANED_READ)
+read_total=${#read_array[@]}
+
+for i in "${!read_array[@]}"; do
+    file="${read_array[$i]}"
+    # Если элемент последний в списке — ставим └──, иначе ├──
+    if [ $((i + 1)) -eq $read_total ]; then
+        echo -e "${BLUE}│${RESET}  └── 🔍 $file"
+    else
+        echo -e "${BLUE}│${RESET}  ├── 🔍 $file"
+    fi
     AIDER_FILES_ARGS="$AIDER_FILES_ARGS --read $file"
 done
 
