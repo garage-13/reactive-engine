@@ -41,8 +41,14 @@ if [ -z "$JSDOC_TARGET_METHOD" ]; then
     exit 1
 fi
 
-# Трансформируем список файлов (меняем запятые на пробелы)
-CLEANED_FILES=$(echo "$AIDER_FILES" | sed 's/[[:space:]]*,[[:space:]]*/,/g' | tr ',' ' ')
+if [ -z "$TASK_JSDOC" ]; then
+    echo -e "${RED}[Ошибка] Ультимативная задача TASK_JSDOC в $ENV_FILE отсутствует или пуста!${RESET}"
+    exit 1
+fi
+
+# Устраняем лишние запятые и переносим файлы в массивы POSIX
+CLEANED_WRITE=$(echo "$AIDER_WRITE_FILES" | sed 's/[[:space:]]*,[[:space:]]*/,/g' | tr ',' ' ')
+CLEANED_READ=$(echo "$AIDER_READ_FILES" | sed 's/[[:space:]]*,[[:space:]]*/,/g' | tr ',' ' ')
 
 # Экспортируем параметры в окружение Aider
 export OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE"
@@ -72,29 +78,6 @@ for file in $CLEANED_WRITE $CLEANED_READ; do
         exit 1
     fi
 done
-
-# Динамическое формирование ТАСК-задачи для Русского JSDoc (3 примера, React + DI Container) с защитой от антипаттернов вызова хуков, с требованием физической декларации интерфейсов, с жестким разделением файлов инжекции для точечной инжекции строго в класс ядра core.ts
-TASK_JSDOC="КРИТИЧЕСКИ ВАЖНО: Добавь исчерпывающий, многострочный TSDoc-блок для публичного метода класса 'public resource' строго на РУССКОМ языке непосредственно в файле 'src/core/core.ts'.
-
-1. ТОЧКА ИНЖЕКЦИИ И БЕЗОПАСНОСТЬ GIT:
-   - Найди строку 'public resource<T, S = void>(' внутри класса 'ReactiveEngineCore' в файле 'src/core/core.ts'.
-   - Внедрить JSDoc/TSDoc комментарий строго непосредственно НАД этой строкой.
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО изменять, удалять или перемещать строки импортов (import) в начале файла. Твоя зона ответственности — строго блок над методом.
-
-2. СТРУКТУРА КОММЕНТАРИЯ:
-   - Задокументируй параметры дженериков через '@template T' (тип ответа API) и '@template S' (тип зависимости) на русском языке.
-   - Изучи интерфейс 'ResourceOptions' в сопутствующем контекстном файле 'src/core/types.ts'. Полностью распиши параметр 'optionsOrName', используя вложенную точку (@param optionsOrName.timeout, @param optionsOrName.retryCount, @param optionsOrName.resetDataOnSourceChange и т.д. с подробным русским описанием).
-   - Подробно изучи внутреннюю механику работы с ресурсом в файле 'src/core/core.method.resource.ts' (обработку AbortSignal, таймауты, логику экспоненциальных попыток ретраев) и кратко отрази это в текстовом описании реактивного поведения метода.
-
-3. ТРЕБОВАНИЯ К ПРИМЕРАМ КОДА (@example):
-   - Строго сгенерируй ТРИ мультитехнологичных примера использования (Pure TS basic, Pure TS advanced, React c DI).
-   - ВЕЗДЕ внутри примеров в самом верху каждого блока кода ТЫ ОБЯЗАН физически объявить интерфейсы данных и ответа бэкенда:
-     'interface User { id: number; name: string; }'
-     'interface ApiResponse<T> { ok: boolean; message?: string; data: T; }'
-   - Все асинхронные фетчеры в примерах должны возвращать строго 'Promise<ApiResponse<User>>'. Используй явное приведение типов при вызове res.json().
-   - В Примере 3 (React + DI) ЗАПРЕЩЕНО вызывать хук 'useReactiveValue' внутри методов класса. Класс бизнес-логики должен наследоваться от 'AbstractService' и содержать только свойства и обычные методы. Вызов хука 'const state = useReactiveValue(logic.userResource)' должен находиться СТРОГО на верхнем уровне тела функционального React-компонента. Вызовы инстанса выполняй как 'engine.resource(...)'.
-
-Не меняй исполняемый runtime-код. Модифицируй строго блок комментариев над методом класса."
 
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
