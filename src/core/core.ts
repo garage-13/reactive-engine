@@ -232,6 +232,56 @@ export class ReactiveEngineCore {
     ReactiveDebounceLogger.processLog(this.logger, queueLog, params)
   }
 
+  /**
+   * Создает новый реактивный сигнал с заданным начальным значением и опциями.
+   *
+   * @template T Тип значения сигнала.
+   * @param initialValue Начальное значение сигнала.
+   * @param optionsOrName Конфигурационные параметры сигнала или его имя.
+   * @param optionsOrName.name Уникальное текстовое имя сигнала для отладки и вывода в транзакционный логгер.
+   * @param optionsOrName.validate Пользовательская функция валидации значения, возвращающая true/false или строку ошибки.
+   *
+   * @method signal
+   * @memberof ReactiveEngine
+   *
+   * @example
+   * // Пример 1: Чистый TypeScript (Базовый)
+   * const engine = new ReactiveEngineCore();
+   * const counter = engine.signal(0, { name: 'counter' });
+   * console.log(counter.value); // 0
+   * counter.value = 1;
+   * console.log(counter.value); // 1
+   *
+   * @example
+   * // Пример 2: Чистый TypeScript (Продвинутый с валидацией)
+   * interface User { id: number; name: string; }
+   * const engine = new ReactiveEngineCore();
+   * const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' }, {
+   *   name: 'user',
+   *   validate: (user) => user.id > 0 && typeof user.name === 'string'
+   * });
+   * userSignal.value = { id: -1, name: 'Jane Doe' }; // Ошибка валидации
+   *
+   * @example
+   * // Пример 3: Интеграция с React (через DI контейнер)
+   * interface User { id: number; name: string; }
+   * class UserService {
+   *   constructor(engine: ReactiveEngineCore) {
+   *     this.mySignal = engine.signal<User>({ id: 1, name: 'John Doe' }, { name: 'userSignal' });
+   *   }
+   *
+   *   mySignal: Signal<User>;
+   * }
+   *
+   * const engine = new ReactiveEngineCore();
+   * engine.provide(UserService, UserService);
+   * const logic = engine.inject(UserService);
+   *
+   * function MyComponent() {
+   *   const user = useReactiveValue(logic.mySignal);
+   *   return <div>{user.name}</div>;
+   * }
+   */
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
     return createSignal<T>(this, initialValue, optionsOrName)
   }
