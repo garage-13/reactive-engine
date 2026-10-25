@@ -84,9 +84,9 @@ TASK_JSDOC="КРИТИЧЕСКИ ВАЖНО: Напиши исчерпывающ
    - @param optionsOrName.resetDataOnSourceChange - Флаг принудительного сброса данных к null при изменении source
    - @param optionsOrName.validateBeforeFetch - Функция-превалидатор аргументов перед отправкой
    - @param optionsOrName.responseValidate - Функция-валидатор структуры ответа от бэкенда
-4. Внутри тега '@example' строго сгенерируй ЧЕТЫРЕ мультитехнологичных примера использования (Pure TS basic, Pure TS advanced, React, Vue 3).
+4. Внутри тега '@example' строго сгенерируй ТРИ мультитехнологичных примера использования (Pure TS basic, Pure TS advanced, React).
    - ВЕЗДЕ внутри примеров данные, возвращаемые асинхронным фетчером, ДОЛЖНЫ быть строго типизированы интерфейсом:
-     'interface ApiResponse<T> { ok: boolean; message?: string; data: T; }'
+     'interface ApiResponse<T> { ok: boolean; message?: string; data: T; }' - объяви его в каждом примере, если этот интерфейс там используется.
    - Сам вызов метода инстанса выполняй как 'engine.resource(...)'.
 
 Не меняй исполняемый runtime-код. Модифицируй только блок комментариев над функцией."
