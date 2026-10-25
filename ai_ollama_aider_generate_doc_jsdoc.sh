@@ -70,8 +70,18 @@ for file in $CLEANED_FILES; do
     fi
 done
 
-# Динамическое формирование ТАСК-задачи для внедрения JSDoc
-TASK_JSDOC="Integrate comprehensive, multi-line JSDoc comments for the '${JSDOC_TARGET_METHOD}' method inside the provided source files. Follow the style constraints from .aider.instructions.jsdoc.md strictly. Analyze 'src/core/types.ts' to correctly document generic parameters, interfaces like ResourceOptions, ResourceState, and Resource properties. Detail how the method interacts with the reactive graph (edges registration, dependency tracking, suppression of race conditions). Do not change any working code logic, generate only JSDoc injection blocks."
+# Динамическое формирование ТАСК-задачи для внедрения JSDoc с ручным связыванием импортов
+TASK_JSDOC="КРИТИЧЕСКИ ВАЖНО: Напиши исчерпывающий JSDoc-блок для метода 'createResource' строго на РУССКОМ языке.
+1. Обрати внимание на строку импорта 'ResourceOptions' вверху файла. Найди определение этого интерфейса в файле 'src/core/types.ts', который передан тебе в чат.
+2. Полностью распиши параметр 'optionsOrName' в JSDoc. Не пиши общих фраз. Используй вложенную нотацию для каждого свойства из 'ResourceOptions':
+   - @param optionsOrName.name - Уникальное имя ресурса для отладки
+   - @param optionsOrName.timeout - Таймаут запроса в мс
+   - @param optionsOrName.retryCount - Количество попыток перезапуска
+   - @param optionsOrName.resetDataOnSourceChange - Сброс кэша при смене источника
+   - @param optionsOrName.validateBeforeFetch - Валидация аргументов до запроса
+   - @param optionsOrName.responseValidate - Валидация ответа бэкенда
+3. Внутри тега '@example' сгенерируй ЧЕТЫРЕ мультитехнологичных примера (Чистый TS базовый, Чистый TS с ретраями/AbortSignal, React-компонент, Vue 3 Composition API).
+Не меняй runtime-код. Модифицируй только блок комментариев над функцией."
 
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
