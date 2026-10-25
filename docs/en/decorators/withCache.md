@@ -8,6 +8,14 @@ The `withCache` decorator allows creating caching data loaders that automaticall
 withCache(fetcher: (source: S, signal: AbortSignal) => Promise<T>, options?: CacheOptions): (source: S, signal: AbortSignal) => Promise<T>
 ```
 
+**Type Definitions for `CacheOptions`:**
+
+```typescript
+interface CacheOptions {
+  ttl?: number; // Time-to-live of the cache in milliseconds (default is 5 minutes)
+}
+```
+
 ## Parameters
 
 - **fetcher** (`Function`): Asynchronous function to load data.
@@ -30,7 +38,7 @@ The method returns a wrapped asynchronous function that has the following proper
 
 ## Examples
 
-### Example on plain JavaScript
+### Basic Usage Scenario
 
 ```javascript
 const engine = new ReactiveEngine();
@@ -55,7 +63,7 @@ dataResource.subscribe((state) => {
 counter.value++; // Will trigger resource reload
 ```
 
-### Example with response validation
+### Advanced Scenario with Response Validation
 
 ```javascript
 const engine = new ReactiveEngine();
@@ -83,7 +91,7 @@ dataResource.subscribe((state) => {
 counter.value++; // Will trigger resource reload
 ```
 
-### Example with network error fallbacks
+### Handling Network Errors
 
 ```javascript
 const engine = new ReactiveEngine();
@@ -112,7 +120,7 @@ dataResource.subscribe((state) => {
 counter.value++; // Will trigger resource reload
 ```
 
-### Example with Proxy-array mutations via .push()
+### Proxy-Array Mutations via `.push()`
 
 ```javascript
 const engine = new ReactiveEngine();
@@ -135,3 +143,17 @@ reactiveArray.push('eggs'); // Mutates Proxy-array
 ## Additional Information
 
 The `withCache` decorator is a crucial component of the Reactive Engine library, enabling efficient caching of data requests. It ensures that duplicate parallel requests are collapsed into a single request, reducing network load and improving application performance. The decorator also handles edge cases such as cache warming, network error fallbacks, and reactive array mutations.
+
+**Key Features:**
+
+- **Time-to-live (TTL) Caching**: Cached data automatically invalidates after a specified interval.
+- **Error Handling**: The decorator correctly handles network errors and allows customization of behavior on error occurrence.
+- **Proxy-Array Support**: Cache is automatically invalidated when arrays are mutated via methods like `.push()`, ensuring up-to-date data.
+
+**Edge Cases:**
+
+1. **Cache Warming**: The decorator supports cache warming, allowing preloading and caching of data for future use.
+2. **500 Network Error Fallbacks**: The decorator correctly handles network errors with status code 500 and provides error information in the resource state.
+3. **Proxy-Array Mutations**: The decorator automatically invalidates the cache when arrays are mutated via methods like `.push()`, ensuring data accuracy after changes.
+
+These features make the `withCache` decorator a powerful tool for managing data caching in a reactive system.
