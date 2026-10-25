@@ -286,6 +286,60 @@ export class ReactiveEngineCore {
     return createSignal<T>(this, initialValue, optionsOrName)
   }
 
+  /**
+   * Создает новое вычисляемое свойство (Computed) на основе чистой функции.
+   *
+   * @template T Тип значения, возвращаемого вычисляемым свойством.
+   * @param fn Чистая функция-вычислитель, которая определяет логику вычисления значения.
+   * @param signalName Опциональное имя сигнала для отладки и вывода в транзакционный логгер.
+   *
+   * @method computed
+   * @memberof ReactiveEngine
+   *
+   * @example
+   * // Пример 1: Чистый TypeScript (Базовый)
+   * const engine = new ReactiveEngineCore();
+   * const counter = engine.signal(0, { name: 'counter' });
+   * const doubleCounter = engine.computed(() => counter.value * 2);
+   * console.log(doubleCounter.value); // 0
+   * counter.value = 1;
+   * console.log(doubleCounter.value); // 2
+   *
+   * @example
+   * // Пример 2: Чистый TypeScript (Продвинутый с цепочкой зависимостей)
+   * interface User { id: number; name: string; }
+   * const engine = new ReactiveEngineCore();
+   * const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' }, { name: 'user' });
+   * const userNameLength = engine.computed(() => userSignal.value.name.length);
+   * const hasLongName = engine.computed(() => userNameLength.value > 5);
+   *
+   * console.log(hasLongName.value); // false
+   * userSignal.value = { id: 1, name: 'Johnathan' };
+   * console.log(userNameLength.value); // 9
+   * console.log(hasLongName.value); // true
+   *
+   * @example
+   * // Пример 3: Интеграция с React (через DI контейнер)
+   * interface User { id: number; name: string; }
+   * class UserService {
+   *   constructor(engine: ReactiveEngineCore) {
+   *     this.userSignal = engine.signal<User>({ id: 1, name: 'John Doe' }, { name: 'userSignal' });
+   *     this.userNameLength = engine.computed(() => this.userSignal.value.name.length);
+   *   }
+   *
+   *   userSignal: Signal<User>;
+   *   userNameLength: Computed<number>;
+   * }
+   *
+   * const engine = new ReactiveEngineCore();
+   * engine.provide(UserService, UserService);
+   * const logic = engine.inject(UserService);
+   *
+   * function MyComponent() {
+   *   const hasLongName = engine.use(logic.userNameLength);
+   *   return <div>{hasLongName ? 'Long name' : 'Short name'}</div>;
+   * }
+   */
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
     // Просто делегируем вызов строго изолированной чистой функции
     return createComputed<T>(this, fn, signalName)
