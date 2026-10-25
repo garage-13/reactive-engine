@@ -88,7 +88,12 @@ TASK_JSDOC="КРИТИЧЕСКИ ВАЖНО: Напиши исчерпывающ
    - ВЕЗДЕ внутри примеров данные, возвращаемые асинхронным фетчером, ДОЛЖНЫ быть строго типизированы интерфейсом: 'interface ApiResponse<T> { ok: boolean; message?: string; data: T; }'
    - Пример 1: Чистый TypeScript (Базовый)
    - Пример 2: Чистый TypeScript (Продвинутый с таймаутами и AbortSignal)
-   - Пример 3: Интеграция с React (ОБЯЗАТЕЛЬНО через DI контейнер: оберни логику ресурса в класс `class Logic extends AbstractService`, а внутри функционального React-компонента извлекай его через `const logic = engine.inject(Logic)`, используя `useReactiveValue` для подписки на состояние ресурса).
+   - **Пример 3: Интеграция с React (через DI контейнер)** — Идиоматичное использование ресурса в экосистеме React.
+     * **STRICT RULE FOR HOOKS TOPOLOGY**: You are STRICTLY FORBIDDEN from invoking React hooks (like `useReactiveValue` or `engine.use`) inside class methods or outside the React rendering lifecycle. This violates React's core rules and causes runtime crashes.
+     * **CORRECT PATTERN**:
+       1. The business logic class (inheriting `AbstractService`) must ONLY define properties (like signals or resources) and ordinary methods to mutate them. It must NOT contain hook calls.
+       2. Inside the functional React component, extract the class instance via `const logic = engine.inject(Class)`.
+       3. Extract and subscribe to the reactive state strictly on the top level of the functional component body using `const { data, loading } = useReactiveValue(logic.myResource);`.
 
 Не меняй исполняемый runtime-код. Модифицируй только блок комментариев над функцией."
 
