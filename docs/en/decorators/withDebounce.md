@@ -154,9 +154,3 @@ state.filters.push('ts');
 ## Additional Information
 
 The `withDebounce` decorator is useful for optimizing server requests, especially when handling user input events. It allows delaying the execution of requests until the user stops typing, reducing unnecessary requests and improving performance.
-
-## Example Usage
-
-<<< ../../examples/211-resource-withDebounce/service.SearchLogic.ts{ts}
-
-<<< ../../examples/211-resource-withDebounce/Example211.tsx{tsx}
