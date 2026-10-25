@@ -106,29 +106,32 @@ echo -e "${YELLOW}[JSDoc Пайплайн] Снимок Git: Сбрасывае�
 git checkout -- . &>/dev/null
 git clean -fd &>/dev/null
 
-# 🚀 РАСПРЕДЕЛЕНИЕ ПРАВ ДОСТУПА ДЛЯ AIDER CLI
+echo -e "\n${BLUE}┌────────────────── РАСПРЕДЕЛЕНИЕ КОНТЕКСТА ИИ ──────────────────┐${RESET}"
+
+# Инициализируем CLI аргументы
 AIDER_FILES_ARGS=""
 
-# Файлы для записи (Aider применит SEARCH/REPLACE блоки сюда)
+# 1. Формируем файлы для ЗАПИСИ
+echo -e "${BLUE}│${RESET} ${GREEN}[РЕЖИМ: ЗАПИСЬ / МОДИФИКАЦИЯ]${RESET}"
 for file in $CLEANED_WRITE; do
+    echo -e "${BLUE}│${RESET}  └── 📝 $file"
     AIDER_FILES_ARGS="$AIDER_FILES_ARGS --file $file"
 done
 
-# Файлы только для чтения (Aider увидит код, но не сможет изменить ни одного байта)
+echo -e "${BLUE}│${RESET}"
+
+# 2. Формируем файлы ТОЛЬКО ДЛЯ ЧТЕНИЯ
+echo -e "${BLUE}│${RESET} ${YELLOW}[РЕЖИМ: ТОЛЬКО ЧТЕНИЕ / АНАЛИЗ]${RESET}"
 for file in $CLEANED_READ; do
+    echo -e "${BLUE}│${RESET}  └── 🔍 $file"
     AIDER_FILES_ARGS="$AIDER_FILES_ARGS --read $file"
 done
 
-# Трансформируем список файлов в цепочку индивидуальных CLI флагов --file
-AIDER_FILES_ARGS=""
-for file in $CLEANED_FILES; do
-    AIDER_FILES_ARGS="$AIDER_FILES_ARGS --file $file"
-done
+echo -e "${BLUE}└────────────────────────────────────────────────────────────────┘${RESET}\n"
 
 echo -e "${YELLOW}[JSDoc Пайплайн] Запуск ИИ-агента Aider в неинтерактивном TDD-режиме...${RESET}"
 
-# 7. Запуск одношаговой сессии Aider для модификации кода
-# Отключаем системные прокси, чтобы предотвратить сбои сетевых сокетов локальной Ollama
+# 7. Финальный вызов ИИ-агента (Переменные прокси сброшены для стабильности Ollama)
 HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
 OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE" \
 uv run --python 3.12 --with aider-chat aider \
