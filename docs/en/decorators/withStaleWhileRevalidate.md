@@ -2,13 +2,13 @@
 
 `withStaleWhileRevalidate` is a decorator that implements the "stale-while-revalidate" strategy for data fetching functions. It caches the results of requests and returns stale data from the cache when an error or cancellation occurs during a retry, as long as the TTL (time-to-live) of the cached data is still valid. This helps maintain application continuity and improves performance.
 
-## Syntax / Syntax
+## Syntax
 
 ```typescript
 withStaleWhileRevalidate<T>(fetcher: (source: S, signal: AbortSignal) => Promise<T>, options: StaleOptions<T> = {}): (source: S, signal: AbortSignal) => Promise<T>
 ```
 
-## Parameters / Parameters
+## Parameters
 
 - **fetcher** (`(source: S, signal: AbortSignal) => Promise<T>`): The data fetching function that takes a source and an abort signal.
 - **options** (`StaleOptions<T>`):
@@ -16,14 +16,14 @@ withStaleWhileRevalidate<T>(fetcher: (source: S, signal: AbortSignal) => Promise
   - **isLogsEnabled** (`boolean`): Enables logging of operations. Defaults to `false`.
   - **maxSize** (`number`): The maximum size of the cache. Defaults to no limit.
 
-## Return Value / Return Value
+## Return Value
 
 - **Type**: `(source: S, signal: AbortSignal) => Promise<T>`
 - **Properties**:
   - `data`: Cached data.
   - `savedTime`: Time when the data was saved in the cache.
 
-## Examples / Examples
+## Examples
 
 ### Basic Usage Scenario
 
@@ -110,6 +110,6 @@ const abortSignal = new AbortController().signal;
 })();
 ```
 
-## Additional Information / Additional Information
+## Additional Information
 
 `withStaleWhileRevalidate` integrates with the core of Reactive Engine to provide reactivity and state management. It is particularly useful in scenarios where network resilience and performance optimization through data caching are required.

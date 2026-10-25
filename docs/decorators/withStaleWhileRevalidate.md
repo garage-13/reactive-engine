@@ -2,13 +2,13 @@
 
 `withStaleWhileRevalidate` — это декоратор, который обеспечивает стратегию "stale-while-revalidate" для функций загрузки данных. Он кэширует результаты запросов и возвращает устаревшие данные из кэша при ошибке или отмене повторного вызова, если их TTL (время жизни) еще валиден. Это помогает обеспечить непрерывность работы приложения и улучшить производительность.
 
-## Синтаксис / Syntax
+## Синтаксис
 
 ```typescript
 withStaleWhileRevalidate<T>(fetcher: (source: S, signal: AbortSignal) => Promise<T>, options: StaleOptions<T> = {}): (source: S, signal: AbortSignal) => Promise<T>
 ```
 
-## Параметры / Parameters
+## Параметры
 
 - **fetcher** (`(source: S, signal: AbortSignal) => Promise<T>`): Функция загрузки данных, которая принимает источник и сигнал прерывания.
 - **options** (`StaleOptions<T>`):
@@ -16,16 +16,16 @@ withStaleWhileRevalidate<T>(fetcher: (source: S, signal: AbortSignal) => Promise
   - **isLogsEnabled** (`boolean`): Включает логирование операций. По умолчанию `false`.
   - **maxSize** (`number`): Максимальный размер кэша. По умолчанию нет ограничения.
 
-## Возвращаемое значение / Return Value
+## Возвращаемое значение
 
 - **Type**: `(source: S, signal: AbortSignal) => Promise<T>`
 - **Properties**:
   - `data`: Кэшированные данные.
   - `savedTime`: Время сохранения данных в кэше.
 
-## Примеры / Examples
+## Примеры
 
-### Базовый сценарий использования / Basic Usage Scenario
+### Базовый сценарий использования
 
 ```typescript
 import { withStaleWhileRevalidate } from 'reactive-engine/decorators/withStaleWhileRevalidate';
@@ -48,7 +48,7 @@ const abortSignal = new AbortController().signal;
 })();
 ```
 
-### Сценарий с сетевым сбоем / Network Error Scenario
+### Сценарий с сетевым сбоем
 
 ```typescript
 import { withStaleWhileRevalidate } from 'reactive-engine/decorators/withStaleWhileRevalidate';
@@ -76,7 +76,7 @@ const abortSignal = new AbortController().signal;
 })();
 ```
 
-### Сценарий с мутацией Proxy-массива / Proxy Array Mutation Scenario
+### Сценарий с мутацией Proxy-массива
 
 ```typescript
 import { withStaleWhileRevalidate } from 'reactive-engine/decorators/withStaleWhileRevalidate';
@@ -110,6 +110,6 @@ const abortSignal = new AbortController().signal;
 })();
 ```
 
-## Дополнительная информация / Additional Information
+## Дополнительная информация
 
 `withStaleWhileRevalidate` интегрируется с ядром Reactive Engine для обеспечения реактивности и управления состоянием. Он особенно полезен в сценариях, где требуется устойчивость к сетевым проблемам и оптимизация производительности путем кэширования данных.
