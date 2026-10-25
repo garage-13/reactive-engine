@@ -62,8 +62,11 @@ if [ -f ".aider.instructions.jsdoc.md" ]; then
     AIDER_READ_INSTRUCTIONS_FLAG="--read .aider.instructions.jsdoc.md"
 fi
 
-# 4. Валидация существования базовых файлов
-for file in $CLEANED_FILES; do
+# 4. Валидация существования файлов (обрабатываем оба списка)
+CLEANED_WRITE=$(echo "$AIDER_WRITE_FILES" | sed 's/[[:space:]]*,[[:space:]]*/,/g' | tr ',' ' ')
+CLEANED_READ=$(echo "$AIDER_READ_FILES" | sed 's/[[:space:]]*,[[:space:]]*/,/g' | tr ',' ' ')
+
+for file in $CLEANED_WRITE $CLEANED_READ; do
     if [ ! -f "$file" ]; then
         echo -e "${RED}[Ошибка] Критический файл контекста отсутствует на диске: $file${RESET}"
         exit 1
@@ -98,10 +101,23 @@ if [ "$DRY_RUN" = true ]; then
     exit 0
 fi
 
-# 6. Подготовка рабочего дерева Git перед инъекцией
+# 6. Подготовка рабочего дерева Git
 echo -e "${YELLOW}[JSDoc Пайплайн] Снимок Git: Сбрасываем старые незакоммиченные диффы...${RESET}"
 git checkout -- . &>/dev/null
 git clean -fd &>/dev/null
+
+# 🚀 РАСПРЕДЕЛЕНИЕ ПРАВ ДОСТУПА ДЛЯ AIDER CLI
+AIDER_FILES_ARGS=""
+
+# Файлы для записи (Aider применит SEARCH/REPLACE блоки сюда)
+for file in $CLEANED_WRITE; do
+    AIDER_FILES_ARGS="$AIDER_FILES_ARGS --file $file"
+done
+
+# Файлы только для чтения (Aider увидит код, но не сможет изменить ни одного байта)
+for file in $CLEANED_READ; do
+    AIDER_FILES_ARGS="$AIDER_FILES_ARGS --read $file"
+done
 
 # Трансформируем список файлов в цепочку индивидуальных CLI флагов --file
 AIDER_FILES_ARGS=""
