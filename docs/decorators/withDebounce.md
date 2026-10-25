@@ -4,8 +4,19 @@
 
 ## Синтаксис
 
-```javascript
-withDebounce(fetcher, options)
+```typescript
+withDebounce<S, T>(
+  fetcher: (source: S, signal: AbortSignal) => Promise<T>,
+  options?: DebounceOptions
+): (source: S, signal: AbortSignal) => Promise<T>
+```
+
+**Опции дебаунса (`DebounceOptions`)**
+
+```typescript
+interface DebounceOptions {
+  delay?: number; // Задержка в миллисекундах. По умолчанию 300 мс.
+}
 ```
 
 ## Параметры
@@ -75,6 +86,69 @@ searchResource.subscribe((state) => {
 });
 
 // Обновляем querySignal при вводе пользователя
+```
+
+### Пример с обработкой ошибок сети
+
+```javascript
+const engine = new ReactiveEngine();
+
+const fetchData = async (query, abortSignal) => {
+  const res = await fetch(
+    `https://api.example.com/data?query=${encodeURIComponent(query)}`,
+    { signal: abortSignal }
+  );
+  if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+  return res.json();
+};
+
+const debouncedFetch = withDebounce(fetchData, { delay: 400 });
+
+const querySignal = engine.signal('', 'search:signal:query');
+
+querySignal.subscribe((query) => {
+  debouncedFetch(query, new AbortController().signal).then(data => {
+    console.log('Fetched data:', data);
+  }).catch(error => {
+    console.error('Error fetching data:', error);
+  });
+});
+
+// Обновляем querySignal при вводе пользователя
+```
+
+### Пример с мутациями Proxy-массива через .push()
+
+```javascript
+const engine = new ReactiveEngine();
+
+const fetchData = async (filters, abortSignal) => {
+  const res = await fetch(
+    `https://api.example.com/data?filters=${encodeURIComponent(filters.join(','))}`,
+    { signal: abortSignal }
+  );
+  if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+  return res.json();
+};
+
+const debouncedFetch = withDebounce(fetchData, { delay: 400 });
+
+const state = engine.reactive({
+  filters: ['js']
+});
+
+const querySignal = engine.signal(state.filters, 'search:signal:filters');
+
+querySignal.subscribe((filters) => {
+  debouncedFetch(filters, new AbortController().signal).then(data => {
+    console.log('Fetched data:', data);
+  }).catch(error => {
+    console.error('Error fetching data:', error);
+  });
+});
+
+// Добавляем новый фильтр
+state.filters.push('ts');
 ```
 
 ## Дополнительная информация
