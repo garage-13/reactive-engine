@@ -58,8 +58,8 @@ fi
 
 # Проверяем файл глобальных инструкций
 AIDER_READ_INSTRUCTIONS_FLAG=""
-if [ -f ".aider.instructions.md" ]; then
-    AIDER_READ_INSTRUCTIONS_FLAG="--read .aider.instructions.md"
+if [ -f ".aider.instructions.entity.md" ]; then
+    AIDER_READ_INSTRUCTIONS_FLAG="--read .aider.instructions.entity.md"
 fi
 
 # Динамические пути к результирующим md-файлам
@@ -80,9 +80,9 @@ for file in $CLEANED_FILES; do
 done
 
 # Динамическое формирование ТАСК-задач для Aider на основе целевого декоратора
-TASK_RU="[LANGUAGE: RUSSIAN] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_RU}'. Follow the layout constraints from .aider.instructions.md strictly in Russian language. Inspect edge-cases in the provided test file, explicitly covering cache warming, 500 network error fallbacks, and Proxy-array mutations via .push(). Translate headers and code comments to Russian."
+TASK_RU="[LANGUAGE: RUSSIAN] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_RU}'. Follow the layout constraints from .aider.instructions.entity.md strictly in Russian language. Inspect edge-cases in the provided test file, explicitly covering cache warming, 500 network error fallbacks, and Proxy-array mutations via .push(). Translate headers and code comments to Russian."
 
-TASK_EN="[LANGUAGE: ENGLISH] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_EN}'. Follow the layout constraints from .aider.instructions.md strictly in English language. Inspect edge-cases in the provided test file, explicitly covering cache warming, 500 network error fallbacks, and Proxy-array mutations via .push(). Write headers and code comments in English."
+TASK_EN="[LANGUAGE: ENGLISH] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_EN}'. Follow the layout constraints from .aider.instructions.entity.md strictly in English language. Inspect edge-cases in the provided test file, explicitly covering cache warming, 500 network error fallbacks, and Proxy-array mutations via .push(). Write headers and code comments in English."
 
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
