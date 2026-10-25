@@ -70,7 +70,7 @@ for file in $CLEANED_FILES; do
     fi
 done
 
-# Динамическое формирование ТАСК-задачи для Русского JSDoc (3 примера, React + DI Container)
+# Динамическое формирование ТАСК-задачи для Русского JSDoc (3 примера, React + DI Container) с защитой от антипаттернов вызова хуков
 TASK_JSDOC="КРИТИЧЕСКИ ВАЖНО: Напиши исчерпывающий TSDoc-блок для функции 'createResource' строго на РУССКОМ языке, позиционируя её как метод инстанса класса ядра реактивной системы.
 
 1. ОБЯЗАТЕЛЬНО включи в тело комментария контекстные теги:
@@ -84,19 +84,11 @@ TASK_JSDOC="КРИТИЧЕСКИ ВАЖНО: Напиши исчерпывающ
    - @param optionsOrName.resetDataOnSourceChange - Флаг принудительного сброса данных к null при изменении source
    - @param optionsOrName.validateBeforeFetch - Функция-превалидатор аргументов перед отправкой
    - @param optionsOrName.responseValidate - Функция-валидатор структуры ответа от бэкенда
-4. Внутри тега '@example' строго сгенерируй ТРИ мультитехнологичных примера использования, описанных в .aider.instructions.jsdoc.md:
+4. Внутри тега '@example' строго сгенерируй ТРИ мультитехнологичных примера использования (Pure TS basic, Pure TS advanced, React c DI).
    - ВЕЗДЕ внутри примеров данные, возвращаемые асинхронным фетчером, ДОЛЖНЫ быть строго типизированы интерфейсом: 'interface ApiResponse<T> { ok: boolean; message?: string; data: T; }'
-   - Пример 1: Чистый TypeScript (Базовый)
-   - Пример 2: Чистый TypeScript (Продвинутый с таймаутами и AbortSignal)
-   - **Пример 3: Интеграция с React (через DI контейнер)** — Идиоматичное использование ресурса в экосистеме React.
-     * **STRICT RULE FOR HOOKS TOPOLOGY**: You are STRICTLY FORBIDDEN from invoking React hooks (like `useReactiveValue` or `engine.use`) inside class methods or outside the React rendering lifecycle. This violates React's core rules and causes runtime crashes.
-     * **CORRECT PATTERN**:
-       1. The business logic class (inheriting `AbstractService`) must ONLY define properties (like signals or resources) and ordinary methods to mutate them. It must NOT contain hook calls.
-       2. Inside the functional React component, extract the class instance via `const logic = engine.inject(Class)`.
-       3. Extract and subscribe to the reactive state strictly on the top level of the functional component body using `const { data, loading } = useReactiveValue(logic.myResource);`.
+   - В Примере 3 (React + DI) ЗАПРЕЩЕНО вызывать хук 'useReactiveValue' внутри методов класса. Класс 'class Logic extends AbstractService' должен содержать только свойства и методы мутации. Вызов хука 'const state = useReactiveValue(logic.userResource)' должен находиться СТРОГО на верхнем уровне тела функционального React-компонента.
 
 Не меняй исполняемый runtime-код. Модифицируй только блок комментариев над функцией."
-
 
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
