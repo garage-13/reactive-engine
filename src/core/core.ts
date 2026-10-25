@@ -320,6 +320,62 @@ export class ReactiveEngineCore {
   /**
    * Создает умную реактивную декларативную обертку над асинхронными операциями
    * с автоматическим подавлением Race Conditions и встроенным методом .destroy().
+   *
+   * @template T Тип данных, возвращаемых фетчером после успешного выполнения.
+   * @template S Тип реактивной зависимости (source).
+   * @param fetcher Асинхронная функция, выполняющая запрос и возвращающая данные типа T.
+   * @param source Реактивный сигнал или примитив, предоставляющий источник данных для фетчера.
+   * @param optionsOrName Конфигурационные опции ресурса или его имя.
+   * @param optionsOrName.name Имя ресурса.
+   * @param optionsOrName.resetDataOnSourceChange Флаг, указывающий, следует ли сбрасывать данные при изменении источника.
+   * @param optionsOrName.validateBeforeFetch Функция валидации источника перед выполнением фетча.
+   * @param optionsOrName.responseValidate Функция валидации ответа после выполнения фетча.
+   * @param optionsOrName.timeout Максимальное время ожидания запроса в миллисекундах.
+   * @param optionsOrName.retryCount Количество попыток повторного выполнения запроса в случае ошибки.
+   *
+   * @example
+   * // Пример 1: Чистый TypeScript (Базовый)
+   * interface User { id: number; name: string; }
+   * interface ApiResponse<T> { ok: boolean; message?: string; data: T; }
+   * const engine = new ReactiveEngineCore();
+   * const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' });
+   * const fetchUser = async (source: User, signal: AbortSignal): Promise<ApiResponse<User>> => {
+   *   // Реализация фетча пользователя
+   * };
+   * const userResource = engine.resource(fetchUser, { value: userSignal.value }, { name: 'userResource' });
+   *
+   * @example
+   * // Пример 2: Чистый TypeScript (Продвинутый)
+   * interface User { id: number; name: string; }
+   * interface ApiResponse<T> { ok: boolean; message?: string; data: T; }
+   * const engine = new ReactiveEngineCore();
+   * const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' });
+   * const fetchUser = async (source: User, signal: AbortSignal): Promise<ApiResponse<User>> => {
+   *   // Реализация фетча пользователя с использованием AbortSignal и timeout
+   * };
+   * const userResource = engine.resource(fetchUser, { value: userSignal.value }, {
+   *   name: 'userResource',
+   *   timeout: 5000,
+   *   retryCount: 3,
+   * });
+   *
+   * @example
+   * // Пример 3: Интеграция с React (через DI контейнер)
+   * interface User { id: number; name: string; }
+   * interface ApiResponse<T> { ok: boolean; message?: string; data: T; }
+   * class UserService {
+   *   constructor(engine: ReactiveEngineCore) {
+   *     const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' });
+   *     this.myResource = engine.resource(fetchUser, { value: userSignal.value }, { name: 'userResource' });
+   *   }
+   *
+   *   myResource: Resource<ApiResponse<User>>;
+   * }
+   *
+   * const engine = new ReactiveEngineCore();
+   * engine.provide(UserService, UserService);
+   * const logic = engine.inject(UserService);
+   * const state = useReactiveValue(logic.myResource);
    */
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
