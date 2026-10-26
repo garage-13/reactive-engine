@@ -121,7 +121,7 @@ count.subscribe((newValue) => {
 count.value++; // Выведет: Count is now 1
 ```
 
-### Группировка обновлений через `engine.batch()`
+### Группировка обновлений через `engine.batch()` (old)
 
 Метод `batch` позволяет группировать несколько изменений значений в одну транзакцию, что повышает производительность и предотвращает излишние обновления зависимостей.
 
@@ -135,8 +135,19 @@ engine.batch(() => {
   count2.value++;
 });
 
-console.log(count1.value); // Выведет: 1
-console.log(count2.value); // Выведет: 1
+console.log(`${count1.value}, ${count2.value}`); // Выведет: "1, 1"
+```
+
+### Пример с автобатчингом обновлений
+
+```typescript
+const count1 = engine.signal(0, 'one');
+const count2 = engine.signal(0, 'two');
+
+count1.value++;
+count2.value++;
+
+console.log(`${count1.value}, ${count2.value}`); // Выведет: "1, 1"
 ```
 
 ### Отслеживание зависимостей

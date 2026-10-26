@@ -87,7 +87,7 @@ interface UserState {
 class UserService extends AbstractService {
   // Pure class field initialization with strict typing
   public userSignal: Signal<UserState> = this.engine.signal<UserState>(
-    { id: 1, name: 'John Doe' }, 
+    { id: 1, name: 'John Doe' },
     { name: 'userSignal' }
   );
 
@@ -160,7 +160,7 @@ count.subscribe((newValue) => {
 count.value++; // Outputs: Count is now 1
 ```
 
-### Batching Updates via `engine.batch()`
+### Batching Updates via `engine.batch()` (old)
 
 The `batch` method allows grouping multiple value changes into a single transaction, improving performance and preventing unnecessary updates to dependencies.
 
@@ -174,8 +174,19 @@ engine.batch(() => {
   count2.value++;
 });
 
-console.log(count1.value); // Outputs: 1
-console.log(count2.value); // Outputs: 1
+console.log(`${count1.value)}, ${count2.value}`; // Outputs: "1, 1"
+```
+
+### Atobatching updates
+
+```typescript
+const count1 = engine.signal(0, 'one');
+const count2 = engine.signal(0, 'two');
+
+count1.value++;
+count2.value++;
+
+console.log(`${count1.value}, ${count2.value}`); // Outputs: "1, 1"
 ```
 
 ### Dependency Tracking

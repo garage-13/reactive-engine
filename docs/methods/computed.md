@@ -154,22 +154,6 @@ const doubledCount = engine.computed(() => count.value * 2, { name: 'doubledCoun
 count.value++; // Выведет логи о транзакции
 ```
 
-### Пример с батчингом обновлений
-
-```typescript
-const engine = new ReactiveEngineCore();
-const count1 = engine.signal(0);
-const count2 = engine.signal(0);
-
-engine.batch(() => {
-  count1.value++;
-  count2.value++;
-});
-
-console.log(count1.value); // Выведет: 1
-console.log(count2.value); // Выведет: 1
-```
-
 ### Пример с отслеживанием зависимостей
 
 ```typescript
