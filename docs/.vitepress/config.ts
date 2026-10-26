@@ -303,6 +303,7 @@ export default withPwa(defineConfig({
                 { text: 'withCache', link: '/en/decorators/withCache' },
                 { text: 'withDebounce', link: '/en/decorators/withDebounce' },
                 { text: 'withThrottle', link: '/en/decorators/withThrottle' },
+                { text: 'withThrottleComputed', link: '/en/decorators/withThrottleComputed' },
                 { text: 'withThrottleAndCache', link: '/en/decorators/withThrottleAndCache' },
                 { text: 'withLongPolling', link: '/en/decorators/withLongPolling' },
                 { text: 'withStaleWhileRevalidate', link: '/en/decorators/withStaleWhileRevalidate' },
