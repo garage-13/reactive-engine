@@ -156,7 +156,7 @@ fi
 
 # Переопределяем аргументы Aider для использования стабильного формата diff
 # Это защитит пайплайн от падений лимита вывода токенов локальной LLM
-AIDER_EDIT_FORMAT="diff"
+AIDER_EDIT_FORMAT="create"
 
 run_aider_session() {
     local target_file="$1"
