@@ -144,30 +144,6 @@ for file in $CLEANED_FILES; do
     AIDER_FILES_ARGS="$AIDER_FILES_ARGS --file $file"
 done
 
-# Функция для безопасного запуска Aider сессии
-run_aider_session() {
-    local target_file="$1"
-    local message="$2"
-
-    # Добавляем конкретный файл вывода в аргументы текущей сессии
-    local local_args="$AIDER_FILES_ARGS --file $target_file"
-
-    HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
-    OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE" \
-    uv run --offline --python 3.12 --with aider-chat aider \
-        --model "$AIDER_MODEL" \
-        --edit-format whole \
-        --map-tokens 0 \
-        --test-cmd "npx yarn test" \
-        $AIDER_READ_INSTRUCTIONS_FLAG \
-        "$AIDER_COMMIT_FLAG" \
-        --yes-always \
-        --no-show-release-notes \
-        --message "$message" \
-        $local_args
-    return $?
-}
-
 # =========================================================================
 # СЕССИИ ГЕНЕРАЦИИ (ТОЛЬКО SSR ДОКУМЕНТАЦИЯ)
 # =========================================================================
