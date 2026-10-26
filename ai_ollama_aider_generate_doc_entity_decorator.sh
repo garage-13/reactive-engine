@@ -84,6 +84,69 @@ TASK_RU="[LANGUAGE: RUSSIAN] Write the complete documentation page for '${DOC_TA
 
 TASK_EN="[LANGUAGE: ENGLISH] Write the complete documentation page for '${DOC_TARGET_ENTITY_DECORATOR}' decorator into '${FILE_PATH_EN}'. Follow the layout constraints from .aider.instructions.entity.md strictly in English language. Inspect edge-cases in the provided test file (cache warming, network error fallbacks, and Proxy-array mutations via .push()). CRITICAL: Convert test cases logic into clean production-ready TypeScript code. Never use Vitest utilities like 'vi.fn()', 'expect()' or mock timers. Show real behavior using console.log() and async/await. Write headers and code comments in English."
 
+# =========================================================================
+# 4.5. ДИНАМИЧЕСКИЙ РАСЧЕТ ТОКЕНОВ И ИНТЕРАКТИВНЫЙ АНАЛИЗ РИСКОВ
+# =========================================================================
+if [ "$DRY_RUN" = false ]; then
+    echo -e "${BLUE}[Валидатор] Анализируем плотность контекста и лимиты модели для декораторов...${RESET}"
+
+    # 1. Извлекаем чистый заголовок модели для Ollama API (убираем префикс ollama/)
+    PURE_MODEL_NAME=$(echo "$AIDER_MODEL" | sed 's|^ollama/||')
+
+    # 2. Запрашиваем инфо о модели у локальной Ollama
+    OLLAMA_INFO_URL="${AIDER_OLLAMA_API_BASE:-http://localhost:11434}/api/show"
+    MODEL_INFO_JSON=$(curl -s -X POST "$OLLAMA_INFO_URL" -d "{\"name\": \"$PURE_MODEL_NAME\"}")
+
+    # Извлекаем размер контекстного окна (num_ctx). Если пустой, ставим безопасный дефолт 32768
+    MODEL_CTX_LIMIT=$(echo "$MODEL_INFO_JSON" | grep -o '"num_ctx":[0-9]*' | head -n1 | cut -d':' -f2)
+    if [ -z "$MODEL_CTX_LIMIT" ] || [ "$MODEL_CTX_LIMIT" -eq 0 ]; then
+        MODEL_CTX_LIMIT=32768
+    fi
+
+    # 3. Считаем суммарный объем контекста (Размер всех файлов + инструкции + промпты в байтах)
+    TOTAL_BYTES=0
+    for file in $CLEANED_FILES; do
+        if [ -f "$file" ]; then
+            FILE_SIZE=$(wc -c < "$file")
+            TOTAL_BYTES=$((TOTAL_BYTES + FILE_SIZE))
+        fi
+    done
+
+    # Учитываем файл глобальных инструкций декораторов, если он подключен
+    if [ -f ".aider.instructions.entity.decorator.md" ]; then
+        INSTR_SIZE=$(wc -c < ".aider.instructions.entity.decorator.md")
+        TOTAL_BYTES=$((TOTAL_BYTES + INSTR_SIZE))
+    fi
+
+    # Добавляем длину строк промптов для русской и английской сессий декораторов
+    TOTAL_BYTES=$((TOTAL_BYTES + ${#TASK_RU} + ${#TASK_EN}))
+
+    # Консервативный перевод байтов в токены (для смешанного кода и кириллицы: 1 токен ≈ 3 байта)
+    ESTIMATED_TOKENS=$((TOTAL_BYTES / 3))
+
+    # Безопасный порог удержания внимания модели — 70% от num_ctx
+    SAFE_THRESHOLD=$((MODEL_CTX_LIMIT * 70 / 100))
+
+    echo -e "  - Выбранная модель: ${GREEN}$PURE_MODEL_NAME${RESET}"
+    echo -e "  - Лимит контекста модели (num_ctx): ${GREEN}$MODEL_CTX_LIMIT токенов${RESET}"
+    echo -e "  - Ожидаемый вес сессии декоратора: ~${YELLOW}$ESTIMATED_TOKENS токенов${RESET}"
+
+    if [ "$ESTIMATED_TOKENS" -gt "$SAFE_THRESHOLD" ]; then
+        echo -e "\n${RED}[ВНИМАНИЕ / РИСК КОНТЕКСТА] Объем файлов декоратора и промптов слишком велик!${RESET}"
+        echo -e "${YELLOW}Модель может потерять контекст, обрезать примеры кода или аварийно сбросить соединение.${RESET}"
+        echo -e "${YELLOW}Рекомендуется временно исключить тяжелые тесты из AIDER_FILES или оптимизировать инструкции.${RESET}"
+
+        read -p "Вы хотите продолжить генерацию на свой страх и риск? (y/N): " CONFIRMATION
+        if [[ ! "$CONFIRMATION" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}[Отмена] Пайплайн остановлен пользователем для снижения объема контекста.${RESET}"
+            exit 1
+        fi
+        echo -e "${GREEN}[Риск принят] Запуск генерации вопреки лимитам...${RESET}\n"
+    else
+        echo -e "${GREEN}[Успех] Контекст декоратора в безопасной зоне (~$((ESTIMATED_TOKENS * 100 / MODEL_CTX_LIMIT))% от num_ctx).${RESET}\n"
+    fi
+fi
+
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
     echo -e "\n${BLUE}======================= ОТЛАДОЧНЫЙ СНИМОК DOC DRY-RUN =======================${RESET}"

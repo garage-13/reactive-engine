@@ -85,6 +85,66 @@ TASK_RU="[LANGUAGE: RUSSIAN] Write the complete documentation page for '${DOC_TA
 
 TASK_EN="[LANGUAGE: ENGLISH] Write the complete documentation page for '${DOC_TARGET_ENTITY_METHOD}' core method into '${FILE_PATH_EN}'. Follow the style constraints from $INSTRUCTIONS_FILE strictly in English language. Inspect its real implementation signature in 'src/core/core.ts' and underlying methods. Focus on edge cases: initial value assignment, custom validation execution, transactional log logging behavior, batching updates via engine.batch(), and dependency tracking. CRITICAL: Convert implementation and test ideas into clean production-ready TypeScript code without test utilities. Show real behavior using console.log() and async/await. Write headers and code comments in English."
 
+# =========================================================================
+# 4.5. ДИНАМИЧЕСКИЙ РАСЧЕТ ТОКЕНОВ И ИНТЕРАКТИВНЫЙ АНАЛИЗ РИСКОВ
+# =========================================================================
+if [ "$DRY_RUN" = false ]; then
+    echo -e "${BLUE}[Валидатор] Анализируем плотность контекста и лимиты модели...${RESET}"
+
+    # 1. Извлекаем чистый заголовок модели для Ollama API (например, из ollama/qwen2.5-coder-long берем qwen2.5-coder-long)
+    PURE_MODEL_NAME=$(echo "$AIDER_MODEL" | sed 's|^ollama/||')
+
+    # 2. Запрашиваем инфо о модели у Ollama
+    OLLAMA_INFO_URL="${AIDER_OLLAMA_API_BASE:-http://localhost:11434}/api/show"
+    MODEL_INFO_JSON=$(curl -s -X POST "$OLLAMA_INFO_URL" -d "{\"name\": \"$PURE_MODEL_NAME\"}")
+
+    # Пытаемся вытащить размер контекстного окна (num_ctx). Если не задан, берем стандартные 32k для Qwen
+    MODEL_CTX_LIMIT=$(echo "$MODEL_INFO_JSON" | grep -o '"num_ctx":[0-9]*' | head -n1 | cut -d':' -f2)
+    if [ -z "$MODEL_CTX_LIMIT" ] || [ "$MODEL_CTX_LIMIT" -eq 0 ]; then
+        MODEL_CTX_LIMIT=32768
+    fi
+
+    # 3. Считаем примерный вес контекста (Размер всех файлов + размер промптов и инструкций в байтах)
+    TOTAL_BYTES=0
+    for file in $CLEANED_FILES; do
+        if [ -f "$file" ]; then
+            FILE_SIZE=$(wc -c < "$file")
+            TOTAL_BYTES=$((TOTAL_BYTES + FILE_SIZE))
+        fi
+    done
+    if [ -f "$INSTRUCTIONS_FILE" ]; then
+        INSTR_SIZE=$(wc -c < "$INSTRUCTIONS_FILE")
+        TOTAL_BYTES=$((TOTAL_BYTES + INSTR_SIZE))
+    fi
+    # Добавляем примерный вес системных промптов задач
+    TOTAL_BYTES=$((TOTAL_BYTES + ${#TASK_RU} + ${#TASK_EN}))
+
+    # Переводим байты в токены (Консервативный коэффициент для кода/кириллицы: 1 токен ≈ 3.5 символа/байта)
+    ESTIMATED_TOKENS=$((TOTAL_BYTES / 3))
+
+    # Безопасный порог — 70% от максимального окна модели
+    SAFE_THRESHOLD=$((MODEL_CTX_LIMIT * 70 / 100))
+
+    echo -e "  - Выбранная модель: ${GREEN}$PURE_MODEL_NAME${RESET}"
+    echo -e "  - Лимит контекста модели (num_ctx): ${GREEN}$MODEL_CTX_LIMIT токенов${RESET}"
+    echo -e "  - Ожидаемый вес вашей сессии: ~${YELLOW}$ESTIMATED_TOKENS токенов${RESET}"
+
+    if [ "$ESTIMATED_TOKENS" -gt "$SAFE_THRESHOLD" ]; then
+        echo -e "\n${RED}[ВНИМАНИЕ / РИСК КОНТЕКСТА] Объем отправляемых файлов и промптов слишком велик!${RESET}"
+        echo -e "${YELLOW}Модель может потерять фокус, выдать неполный Markdown код или упасть по таймауту.${RESET}"
+        echo -e "${YELLOW}Рекомендуется сократить список файлов в AIDER_FILES или урезать текст инструкций.${RESET}"
+
+        read -p "Вы хотите продолжить генерацию на свой страх и деградацию? (y/N): " CONFIRMATION
+        if [[ ! "$CONFIRMATION" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}[Отмена] Генерация прервана пользователем для оптимизации контекста.${RESET}"
+            exit 1
+        fi
+        echo -e "${GREEN}[Риск принят] Запуск вопреки лимитам...${RESET}\n"
+    else
+        echo -e "${GREEN}[Успех] Контекст находится в безопасной зоне (~$((ESTIMATED_TOKENS * 100 / MODEL_CTX_LIMIT))% от num_ctx).${RESET}\n"
+    fi
+fi
+
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
     echo -e "\n${BLUE}======================= ОТЛАДОЧНЫЙ СНИМОК METHODS DRY-RUN =======================${RESET}"

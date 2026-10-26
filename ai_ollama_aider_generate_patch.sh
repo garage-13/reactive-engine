@@ -65,6 +65,69 @@ for file in $CLEANED_FILES; do
     fi
 done
 
+# =========================================================================
+# 4.5. ДИНАМИЧЕСКИЙ РАСЧЕТ ТОКЕНОВ И ИНТЕРАКТИВНЫЙ АНАЛИЗ РИСКОВ
+# =========================================================================
+if [ "$DRY_RUN" = false ]; then
+    echo -e "${BLUE}[Валидатор] Анализируем плотность контекста и лимиты модели для генератора патчей...${RESET}"
+
+    # 1. Извлекаем чистый заголовок модели для Ollama API (убираем префикс ollama/)
+    PURE_MODEL_NAME=$(echo "$AIDER_MODEL" | sed 's|^ollama/||')
+
+    # 2. Запрашиваем инфо о модели у локальной Ollama
+    OLLAMA_INFO_URL="${AIDER_OLLAMA_API_BASE:-http://localhost:11434}/api/show"
+    MODEL_INFO_JSON=$(curl -s -X POST "$OLLAMA_INFO_URL" -d "{\"name\": \"$PURE_MODEL_NAME\"}")
+
+    # Извлекаем размер контекстного окна (num_ctx). Если пустой, ставим безопасный дефолт 32768
+    MODEL_CTX_LIMIT=$(echo "$MODEL_INFO_JSON" | grep -o '"num_ctx":[0-9]*' | head -n1 | cut -d':' -f2)
+    if [ -z "$MODEL_CTX_LIMIT" ] || [ "$MODEL_CTX_LIMIT" -eq 0 ]; then
+        MODEL_CTX_LIMIT=32768
+    fi
+
+    # 3. Считаем суммарный объем контекста (Размер всех файлов + инструкции + промпты в байтах)
+    TOTAL_BYTES=0
+    for file in $CLEANED_FILES; do
+        if [ -f "$file" ]; then
+            FILE_SIZE=$(wc -c < "$file")
+            TOTAL_BYTES=$((TOTAL_BYTES + FILE_SIZE))
+        fi
+    done
+
+    # Учитываем файл глобальных инструкций общего патча, если он задан и существует на диске
+    if [ -f ".aider.instructions.md" ]; then
+        INSTR_SIZE=$(wc -c < ".aider.instructions.md")
+        TOTAL_BYTES=$((TOTAL_BYTES + INSTR_SIZE))
+    fi
+
+    # Добавляем длину строки основной задачи (AIDER_TASK)
+    TOTAL_BYTES=$((TOTAL_BYTES + ${#AIDER_TASK}))
+
+    # Консервативный перевод байтов в токены (для смешанного кода и кириллицы: 1 токен ≈ 3 байта)
+    ESTIMATED_TOKENS=$((TOTAL_BYTES / 3))
+
+    # Безопасный порог удержания внимания модели — 70% от num_ctx
+    SAFE_THRESHOLD=$((MODEL_CTX_LIMIT * 70 / 100))
+
+    echo -e "  - Выбранная модель: ${GREEN}$PURE_MODEL_NAME${RESET}"
+    echo -e "  - Лимит контекста модели (num_ctx): ${GREEN}$MODEL_CTX_LIMIT токенов${RESET}"
+    echo -e "  - Ожидаемый вес сессии разработки: ~${YELLOW}$ESTIMATED_TOKENS токенов${RESET}"
+
+    if [ "$ESTIMATED_TOKENS" -gt "$SAFE_THRESHOLD" ]; then
+        echo -e "\n${RED}[ВНИМАНИЕ / РИСК КОНТЕКСТА] Объем передаваемых файлов разработки и промпта слишком велик!${RESET}"
+        echo -e "${YELLOW}Модель может потерять фокус, выдать неполный или сломанный код, либо сбросить соединение.${RESET}"
+        echo -e "${YELLOW}Рекомендуется временно сократить список файлов в AIDER_FILES (убрать лишние модули).${RESET}"
+
+        read -p "Вы хотите продолжить генерацию изменений вопреки лимитам? (y/N): " CONFIRMATION
+        if [[ ! "$CONFIRMATION" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}[Отмена] Пайплайн разработки остановлен пользователем для оптимизации контекста.${RESET}"
+            exit 1
+        fi
+        echo -e "${GREEN}[Риск принят] Запуск генерации изменений кода...${RESET}\n"
+    else
+        echo -e "${GREEN}[Успех] Контекст сессии в безопасной зоне (~$((ESTIMATED_TOKENS * 100 / MODEL_CTX_LIMIT))% от num_ctx).${RESET}\n"
+    fi
+fi
+
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
     echo -e "\n${BLUE}======================= ОТЛАДОЧНЫЙ СНИМОК DRY-RUN =======================${RESET}"
