@@ -79,10 +79,10 @@ for file in $CLEANED_FILES; do
     fi
 done
 
-# Динамическое формирование ТАСК-задач для Aider на основе целевого декоратора
-TASK_RU="[LANGUAGE: RUSSIAN] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_RU}'. Follow the layout constraints from .aider.instructions.entity.md strictly in Russian language. Inspect edge-cases in the provided test file, explicitly covering cache warming, 500 network error fallbacks, and Proxy-array mutations via .push(). Translate headers and code comments to Russian."
+# Динамическое формирование ТАСК-задач для Aider на основе целевого декоратора без тестового мусора
+TASK_RU="[LANGUAGE: RUSSIAN] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_RU}'. Follow the layout constraints from .aider.instructions.entity.md strictly in Russian language. Inspect edge-cases in the provided test file (cache warming, network error fallbacks, and Proxy-array mutations via .push()). CRITICAL: Convert test cases logic into clean production-ready TypeScript code. Never use Vitest utilities like 'vi.fn()', 'expect()' or mock timers. Show real behavior using console.log() and async/await. Translate headers and code comments to Russian."
 
-TASK_EN="[LANGUAGE: ENGLISH] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_EN}'. Follow the layout constraints from .aider.instructions.entity.md strictly in English language. Inspect edge-cases in the provided test file, explicitly covering cache warming, 500 network error fallbacks, and Proxy-array mutations via .push(). Write headers and code comments in English."
+TASK_EN="[LANGUAGE: ENGLISH] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_EN}'. Follow the layout constraints from .aider.instructions.entity.md strictly in English language. Inspect edge-cases in the provided test file (cache warming, network error fallbacks, and Proxy-array mutations via .push()). CRITICAL: Convert test cases logic into clean production-ready TypeScript code. Never use Vitest utilities like 'vi.fn()', 'expect()' or mock timers. Show real behavior using console.log() and async/await. Write headers and code comments in English."
 
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
