@@ -77,7 +77,7 @@ for file in $CLEANED_FILES $ALL_OUTPUT_FILES; do
         if [ "$DRY_RUN" = true ]; then
             echo -e "${YELLOW}[DRY-RUN] Симуляция: Файл отсутствует на диске: $file${RESET}"
         else
-            echo -p "${YELLOW}[Сборщик] Создаем заглушку для файла: $file...${RESET}"
+            echo -e "${YELLOW}[Сборщик] Создаем заглушку для файла: $file...${RESET}"
             mkdir -p "$(dirname "$file")"
             touch "$file"
         fi
@@ -109,14 +109,14 @@ if [ "$DRY_RUN" = false ]; then
 
     if [ -f "./ai_ollama_aider_token_limits_check.sh" ]; then
         chmod +x ./ai_ollama_aider_token_limits_check.sh
-        
+
         # Вызов с именованными параметрами в любом порядке
         ./ai_ollama_aider_token_limits_check.sh \
             --base-url "$AIDER_OLLAMA_API_BASE" \
             --model "$AIDER_MODEL" \
             --prompts-length "$PROMPTS_WEIGHT" \
             --files "$CLEANED_FILES"
-            
+
         if [ $? -ne 0 ]; then
             exit 1
         fi
@@ -158,7 +158,7 @@ done
 run_aider_session() {
     local target_file="$1"
     local message="$2"
-    
+
     # Добавляем конкретный файл вывода в аргументы текущей сессии
     local local_args="$AIDER_FILES_ARGS --file $target_file"
 
