@@ -7,7 +7,7 @@ YELLOW='\033[33m'
 RED='\033[31m'
 RESET='\033[0m'
 
-ENV_FILE=".env.doc.entity"
+ENV_FILE=".env.doc.entity.decorator"
 DRY_RUN=false
 
 echo -e "${BLUE}[Параллельный конвейер] Запуск специализированного генератора документации...${RESET}"
