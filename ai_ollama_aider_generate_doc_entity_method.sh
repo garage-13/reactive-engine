@@ -116,7 +116,7 @@ echo -e "${YELLOW}[Сборщик: Шаг 1/2] Запуск Aider для РУС�
 
 HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
 OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE" \
-uv run --python 3.12 --with aider-chat aider \
+uv run --offline --python 3.12 --with aider-chat aider \
     --model "$AIDER_MODEL" \
     --edit-format whole \
     --map-tokens 0 \
@@ -139,7 +139,7 @@ echo -e "\n${YELLOW}[Сборщик: Шаг 2/2] Запуск Aider для АН�
 
 HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
 OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE" \
-uv run --python 3.12 --with aider-chat aider \
+uv run --offline --python 3.12 --with aider-chat aider \
     --model "$AIDER_MODEL" \
     --edit-format whole \
     --map-tokens 0 \
