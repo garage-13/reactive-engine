@@ -1,3 +1,9 @@
+# Etc.
+```bash
+chmod +x ai_ollama_aider_token_limits_check.sh
+chmod +x ai_ollama_aider_generate_doc_framework_adapter.sh
+```
+
 # Работа с `uv`
 Основная вкладка:
 ```bash
