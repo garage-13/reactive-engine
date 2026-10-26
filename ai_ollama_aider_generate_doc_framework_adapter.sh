@@ -148,15 +148,13 @@ done
 # СЕССИИ ГЕНЕРАЦИИ (ТОЛЬКО SSR ДОКУМЕНТАЦИЯ)
 # =========================================================================
 
-# Проверяем, включен ли SSR в конфигурации
 if [ "$GENERATE_SSR" = false ]; then
     echo -e "${RED}[Ошибка] Переменная SSR_BASED_ON не задана, а генерация Quick Start отключена.${RESET}"
     exit 1
 fi
 
-# Переопределяем аргументы Aider для использования стабильного формата diff
-# Это защитит пайплайн от падений лимита вывода токенов локальной LLM
-AIDER_EDIT_FORMAT="create"
+# Использованием формат 'whole', так как файлы создаются с нуля
+AIDER_EDIT_FORMAT="whole"
 
 run_aider_session() {
     local target_file="$1"
@@ -170,6 +168,7 @@ run_aider_session() {
         --edit-format "$AIDER_EDIT_FORMAT" \
         --map-tokens 0 \
         --test-cmd "npx yarn test" \
+        --no-suggest-shell-commands \
         $AIDER_READ_INSTRUCTIONS_FLAG \
         "$AIDER_COMMIT_FLAG" \
         --yes-always \
