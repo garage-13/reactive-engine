@@ -71,9 +71,11 @@ const logic = engine.inject(CounterService);
 
 console.log(logic.countSignal.value) // Out: 0
 
+// -- Single REACTIVE TRANSACTION
 logic.increment()
 logic.increment()
 logic.increment()
+// --
 
 console.log(logic.countSignal.value) // Out: 3
 ```

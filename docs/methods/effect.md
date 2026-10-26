@@ -70,9 +70,11 @@ const logic = engine.inject(CounterService);
 
 console.log(logic.countSignal.value) // Out: 0
 
+// -- Будет упаковано в транзакцию
 logic.increment()
 logic.increment()
 logic.increment()
+// --
 
 console.log(logic.countSignal.value) // Out: 3
 ```
