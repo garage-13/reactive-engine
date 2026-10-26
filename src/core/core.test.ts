@@ -134,4 +134,60 @@ describe('⚛️ Reactive Engine — Продвинутая спецификац
     const compNode = (comp as any)._node || comp
     expect(compNode.observers?.size || 0).toBe(0)
   })
+
+  // =========================================================================
+  // 6. ТЕСТЫ НА DEPENDENCY INJECTION (DI) И МЕТОД INJECT
+  // =========================================================================
+  test('inject должен автоматически инстанцировать класс и прокидывать экземпляр ядра в конструктор', () => {
+    const engine = new ReactiveEngineCore()
+
+    // Объявляем тестовый сервис, принимающий ядро по спецификации inject
+    class MockUserService {
+      public engineInstance: ReactiveEngineCore
+      public userSignal: any
+
+      constructor(core: ReactiveEngineCore) {
+        this.engineInstance = core
+        // Проверяем, что внутри конструктора уже можно легально порождать сигналы
+        this.userSignal = core.signal({ id: 1, name: 'Test' })
+      }
+    }
+
+    // Извлекаем сервис БЕЗ предварительного вызова provide (Auto-instantiation)
+    const userService = engine.inject(MockUserService)
+
+    // Ассерты на консистентность инстанса и синглтон-кэширование
+    expect(userService).toBeInstanceOf(MockUserService)
+    expect(userService.engineInstance).toBe(engine)
+    expect(userService.userSignal.value.name).toBe('Test')
+
+    // Повторный inject должен вернуть тот же самый инстанс из diCache
+    const secondCall = engine.inject(MockUserService)
+    expect(secondCall).toBe(userService)
+  })
+
+  test('inject должен выбрасывать исключение при обнаружении циклических зависимостей', () => {
+    const engine = new ReactiveEngineCore()
+
+    // Создаем два класса, ссылающихся друг на друга через инжекты в конструкторах
+    class ClassA {
+      constructor(core: ReactiveEngineCore) {
+        // ClassA неявно триггерит создание ClassB
+        core.inject(ClassB)
+      }
+    }
+
+    class ClassB {
+      constructor(core: ReactiveEngineCore) {
+        // ClassB пытается разрешить ClassA, замыкая рекурсивный цикл
+        core.inject(ClassA)
+      }
+    }
+
+    // Запуск inject должен гарантированно упасть на проверке cycleDetectionStack
+    expect(() => {
+      engine.inject(ClassA)
+    }).toThrow('[DI Error] Cyclic dependency detected')
+  })
+
 })
