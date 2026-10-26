@@ -76,22 +76,40 @@ tagsSignal.value = tagsSignal.value;
 ### Dependency Injection & React Integration
 
 ```typescript
-interface User { id: number; name: string; }
-class UserService {
-  constructor(engine: ReactiveEngineCore) {
-    this.mySignal = engine.signal<User>({ id: 1, name: 'John Doe' }, { name: 'userSignal' });
-  }
+import React from 'react';
+import { AbstractService, ReactiveEngine, Signal } from '@pravosleva/reactive-engine';
 
-  mySignal: Signal<User>;
+interface UserState {
+  id: number;
+  name: string;
 }
 
-const engine = new ReactiveEngineCore();
-engine.provide(UserService, UserService);
-const logic = engine.inject(UserService);
+class UserService extends AbstractService {
+  // Pure class field initialization with strict typing
+  public userSignal: Signal<UserState> = this.engine.signal<UserState>(
+    { id: 1, name: 'John Doe' }, 
+    { name: 'userSignal' }
+  );
 
-function MyComponent() {
-  const user = useReactiveValue(logic.mySignal);
-  return <div>{user.name}</div>;
+  public incId = (): void => {
+    this.userSignal.value.id += 1;
+    this.userSignal.value = this.userSignal.value; // Ping setter for object mutations
+  };
+}
+
+const engine: ReactiveEngine = new ReactiveEngine();
+const logic: UserService = engine.inject(UserService); // Autowired singleton instance
+
+export function MyComponent(): React.JSX.Element {
+  // Correctly use engine.use() hook to bind reactive nodes to React lifecycle
+  const user: UserState = engine.use<UserState>(logic.userSignal);
+
+  return (
+    <div>
+      <p>ID: {user.id} | Name: {user.name}</p>
+      <button onClick={logic.incId}>Increment ID</button>
+    </div>
+  );
 }
 ```
 
