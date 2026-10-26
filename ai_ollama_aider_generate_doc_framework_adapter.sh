@@ -54,10 +54,6 @@ if [ -f "$INSTRUCTIONS_FILE" ]; then
     AIDER_READ_INSTRUCTIONS_FLAG="--read $INSTRUCTIONS_FILE"
 fi
 
-# Динамические пути для Quick Start документов
-FILE_PATH_QS_RU="docs/guides/quick-start/${DOC_TARGET_FRAMEWORK_ADAPTER}.md"
-FILE_PATH_QS_EN="docs/en/guides/quick-start/${DOC_TARGET_FRAMEWORK_ADAPTER}.md"
-
 # Динамические пути для SSR документов (если задан фреймворк)
 GENERATE_SSR=false
 if [ -n "$SSR_BASED_ON" ]; then
@@ -67,7 +63,7 @@ if [ -n "$SSR_BASED_ON" ]; then
 fi
 
 # 4. Валидация существования базовых файлов и создание заглушек
-ALL_OUTPUT_FILES="$FILE_PATH_QS_RU $FILE_PATH_QS_EN"
+ALL_OUTPUT_FILES=""
 if [ "$GENERATE_SSR" = true ]; then
     ALL_OUTPUT_FILES="$ALL_OUTPUT_FILES $FILE_PATH_SSR_RU $FILE_PATH_SSR_EN"
 fi
@@ -83,10 +79,6 @@ for file in $CLEANED_FILES $ALL_OUTPUT_FILES; do
         fi
     fi
 done
-
-# Динамическое формирование ТАСК-задач для Aider
-TASK_QS_RU="[LANGUAGE: RUSSIAN] Write an expanded Quick Start guide for '${DOC_TARGET_FRAMEWORK_ADAPTER}' adapter into '${FILE_PATH_QS_RU}'. Follow $INSTRUCTIONS_FILE layout constraints strictly in Russian language. Document installation, core concepts, and provide detailed Client-Side Rendering (CSR) patterns with strict types. Analyze provided adapter source files and hooks to explain how useSyncExternalStore connects the engine to UI. Show production-ready code with console.log."
-TASK_QS_EN="[LANGUAGE: ENGLISH] Write an expanded Quick Start guide for '${DOC_TARGET_FRAMEWORK_ADAPTER}' adapter into '${FILE_PATH_QS_EN}'. Follow $INSTRUCTIONS_FILE layout constraints strictly in English language. Document installation, core concepts, and provide detailed Client-Side Rendering (CSR) patterns with strict types. Analyze provided adapter source files and hooks to explain how useSyncExternalStore connects the engine to UI. Show production-ready code with console.log."
 
 if [ "$GENERATE_SSR" = true ]; then
     TASK_SSR_RU="[LANGUAGE: RUSSIAN] Write a comprehensive Server-Side Rendering (SSR) integration guide for '${DOC_TARGET_FRAMEWORK_ADAPTER}' based on '${SSR_BASED_ON}' framework into '${FILE_PATH_SSR_RU}'. Follow style guidelines from $INSTRUCTIONS_FILE strictly in Russian language. Explain how untrack blocks and store snapshot isolation prevent memory leaks and hydration mismatches on server environment. Show strict TypeScript examples."
@@ -132,8 +124,6 @@ if [ "$DRY_RUN" = true ]; then
     echo -e "${GREEN}Фреймворк SSR:${RESET}         ${SSR_BASED_ON:-Нет}"
     echo -e "${GREEN}Файл патча:${RESET}            $AIDER_OUTPUT_PATCH"
     echo -e "${GREEN}Список файлов CLI:${RESET}     $CLEANED_FILES"
-    echo -e "${GREEN}Промпт QS RU:${RESET}          $TASK_QS_RU"
-    echo -e "${GREEN}Промпт QS EN:${RESET}          $TASK_QS_EN"
     if [ "$GENERATE_SSR" = true ]; then
         echo -e "${GREEN}Промпт SSR RU:${RESET}         $TASK_SSR_RU"
         echo -e "${GREEN}Промпт SSR EN:${RESET}         $TASK_SSR_EN"
@@ -178,36 +168,60 @@ run_aider_session() {
     return $?
 }
 
-# Шаг 1: Quick Start RU
-echo -e "${YELLOW}[Конвейер: Шаг 1] Формируем Руководство Quick Start (RU) -> ${FILE_PATH_QS_RU}...${RESET}"
-run_aider_session "$FILE_PATH_QS_RU" "$TASK_QS_RU"
-if [ $? -ne 0 ]; then echo -e "${RED}[Ошибка] Сбой на Шаге 1.${RESET}"; exit 1; fi
+# =========================================================================
+# СЕССИИ ГЕНЕРАЦИИ (ТОЛЬКО SSR ДОКУМЕНТАЦИЯ)
+# =========================================================================
 
-# Шаг 2: Quick Start EN
-echo -e "\n${YELLOW}[Конвейер: Шаг 2] Формируем Руководство Quick Start (EN) -> ${FILE_PATH_QS_EN}...${RESET}"
-run_aider_session "$FILE_PATH_QS_EN" "$TASK_QS_EN"
-if [ $? -ne 0 ]; then echo -e "${RED}[Ошибка] Сбой на Шаге 2.${RESET}"; exit 1; fi
-
-# Шаги 3 и 4: SSR Документация (опционально)
-if [ "$GENERATE_SSR" = true ]; then
-    echo -e "\n${YELLOW}[Конвейер: Шаг 3] Формируем руководство SSR для ${SSR_BASED_ON} (RU) -> ${FILE_PATH_SSR_RU}...${RESET}"
-    run_aider_session "$FILE_PATH_SSR_RU" "$TASK_SSR_RU"
-    if [ $? -ne 0 ]; then echo -e "${RED}[Ошибка] Сбой на Шаге 3.${RESET}"; exit 1; fi
-
-    echo -e "\n${YELLOW}[Конвейер: Шаг 4] Формируем руководство SSR для ${SSR_BASED_ON} (EN) -> ${FILE_PATH_SSR_EN}...${RESET}"
-    run_aider_session "$FILE_PATH_SSR_EN" "$TASK_SSR_EN"
-    if [ $? -ne 0 ]; then echo -e "${RED}[Ошибка] Сбой на Шаге 4.${RESET}"; exit 1; fi
+# Проверяем, включен ли SSR в конфигурации
+if [ "$GENERATE_SSR" = false ]; then
+    echo -e "${RED}[Ошибка] Переменная SSR_BASED_ON не задана, а генерация Quick Start отключена.${RESET}"
+    exit 1
 fi
+
+# Переопределяем аргументы Aider для использования стабильного формата diff
+# Это защитит пайплайн от падений лимита вывода токенов локальной LLM
+AIDER_EDIT_FORMAT="diff"
+
+run_aider_session() {
+    local target_file="$1"
+    local message="$2"
+    local local_args="$AIDER_FILES_ARGS --file $target_file"
+
+    HTTP_PROXY="" HTTPS_PROXY="" ALL_PROXY="" http_proxy="" https_proxy="" all_proxy="" \
+    OLLAMA_API_BASE="$AIDER_OLLAMA_API_BASE" \
+    uv run --offline --python 3.12 --with aider-chat aider \
+        --model "$AIDER_MODEL" \
+        --edit-format "$AIDER_EDIT_FORMAT" \
+        --map-tokens 0 \
+        --test-cmd "npx yarn test" \
+        $AIDER_READ_INSTRUCTIONS_FLAG \
+        "$AIDER_COMMIT_FLAG" \
+        --yes-always \
+        --no-show-release-notes \
+        --message "$message" \
+        $local_args
+    return $?
+}
+
+# Шаг 1: SSR Документация (RU)
+echo -e "${YELLOW}[Конвейер: Шаг 1/2] Формируем руководство SSR для ${SSR_BASED_ON} (RU) -> ${FILE_PATH_SSR_RU}...${RESET}"
+run_aider_session "$FILE_PATH_SSR_RU" "$TASK_SSR_RU"
+if [ $? -ne 0 ]; then echo -e "${RED}[Ошибка] Сбой на этапе генерации русской версии.${RESET}"; exit 1; fi
+
+# Шаг 2: SSR Документация (EN)
+echo -e "\n${YELLOW}[Конвейер: Шаг 2/2] Формируем руководство SSR для ${SSR_BASED_ON} (EN) -> ${FILE_PATH_SSR_EN}...${RESET}"
+run_aider_session "$FILE_PATH_SSR_EN" "$TASK_SSR_EN"
+if [ $? -ne 0 ]; then echo -e "${RED}[Ошибка] Сбой на этапе генерации английской версии.${RESET}"; exit 1; fi
 
 # ==========================================
 # СБОРКА ЕДИНОГО АРТЕФАКТА ПАТЧА
 # ==========================================
-echo -e "\n${YELLOW}[Сборщик] Все локализации успешно сформированы. Сборка общего патча...${RESET}"
+echo -e "\n${YELLOW}[Сборщик] Обе локализации успешно сформированы. Сборка общего патча...${RESET}"
 git add -A &>/dev/null
 git diff --staged > "$AIDER_OUTPUT_PATCH"
 
 if [ -s "$AIDER_OUTPUT_PATCH" ]; then
-    echo -e "${GREEN}[УСПЕХ] Мульти-язычный патч адаптеров фреймворка успешно сформирован:${RESET}"
+    echo -e "${GREEN}[УСПЕХ] Мульти-язычный патч SSR-адаптеров успешно сформирован:${RESET}"
     echo -e "        ${GREEN}$PWD/$AIDER_OUTPUT_PATCH${RESET}"
     git reset --hard HEAD &>/dev/null
     git clean -fd &>/dev/null
