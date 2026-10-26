@@ -170,6 +170,7 @@ export default withPwa(defineConfig({
                 { text: 'withThrottleAndCache', link: '/decorators/withThrottleAndCache' },
                 { text: 'withLongPolling', link: '/decorators/withLongPolling' },
                 { text: 'withStaleWhileRevalidate', link: '/decorators/withStaleWhileRevalidate' },
+                { text: 'withValidation', link: '/decorators/withValidation' },
               ]
             }
           ],
@@ -307,6 +308,7 @@ export default withPwa(defineConfig({
                 { text: 'withThrottleAndCache', link: '/en/decorators/withThrottleAndCache' },
                 { text: 'withLongPolling', link: '/en/decorators/withLongPolling' },
                 { text: 'withStaleWhileRevalidate', link: '/en/decorators/withStaleWhileRevalidate' },
+                { text: 'withValidation', link: '/en/decorators/withValidation' },
               ]
             }
           ],

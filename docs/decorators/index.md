@@ -14,18 +14,6 @@ features:
     title: withDebounce
     details: Группирует частые вызовы функции и откладывает их выполнение на заданное время. Идеально для инпутов поиска.
     link: /decorators/withDebounce
-  - icon: ⏱️
-    title: withThrottle
-    details: Применяется в сценариях с высокой частотой генерации событий, когда нам важен непрерывный процесс изменений в динамике, но с жестким ограничением максимальной частоты вызовов.
-    link: /decorators/withThrottle
-  - icon: 🛡️
-    title: withThrottleComputed
-    details: Применяется на входе в реактивный граф для изоляции сырого спама данных.
-    link: /decorators/withThrottleComputed
-  - icon: 🎛️
-    title: withThrottleAndCache
-    details: Комбинированный продвинутый инструмент оптимизации (декоратор), который применяется в сценариях с высокой частотой генерации событий, когда запрашиваемые данные при этом могут повторяться или дублироваться.
-    link: /decorators/withThrottleAndCache
   - icon: 📡
     title: withLongPolling
     details: Автоматически организует периодические запросы к серверу для обновления ресурсов в реальном времени.
@@ -34,4 +22,20 @@ features:
     title: withStaleWhileRevalidate
     details: Эта утилита перехватывает вызовы `fetcher`, сохраняя последнее успешное состояние данных для возврата в случае сетевых сбоев или отмены запросов.
     link: /decorators/withStaleWhileRevalidate
+  - icon: ⏱️
+    title: withThrottle
+    details: Применяется в сценариях с высокой частотой генерации событий, когда нам важен непрерывный процесс изменений в динамике, но с жестким ограничением максимальной частоты вызовов.
+    link: /decorators/withThrottle
+  - icon: 🎛️
+    title: withThrottleAndCache
+    details: Комбинированный продвинутый инструмент оптимизации (декоратор), который применяется в сценариях с высокой частотой генерации событий, когда запрашиваемые данные при этом могут повторяться или дублироваться.
+    link: /decorators/withThrottleAndCache
+  - icon: 🛡️
+    title: withThrottleComputed
+    details: Применяется на входе в реактивный граф для изоляции сырого спама данных.
+    link: /decorators/withThrottleComputed
+  - icon: ✅
+    title: withValidation(Sync|Async)
+    details: Предоставляет механизм валидации для синхронных экшенов и асинхронных фетчеров в реактивной системе. Он позволяет проверять состояние перед выполнением действия или запроса данных, обеспечивая корректность операций.
+    link: /decorators/withValidation
 ---
