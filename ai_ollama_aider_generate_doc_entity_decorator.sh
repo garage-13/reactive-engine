@@ -36,8 +36,8 @@ fi
 # 3. Загрузка параметров конфигурации
 source "$ENV_FILE"
 
-if [ -z "$DOC_TARGET_ENTITY" ]; then
-    echo -e "${RED}[Ошибка] Переменная DOC_TARGET_ENTITY в $ENV_FILE не задана!${RESET}"
+if [ -z "$DOC_TARGET_ENTITY_DECORATOR" ]; then
+    echo -e "${RED}[Ошибка] Переменная DOC_TARGET_ENTITY_DECORATOR в $ENV_FILE не задана!${RESET}"
     exit 1
 fi
 
@@ -58,13 +58,13 @@ fi
 
 # Проверяем файл глобальных инструкций
 AIDER_READ_INSTRUCTIONS_FLAG=""
-if [ -f ".aider.instructions.entity.md" ]; then
-    AIDER_READ_INSTRUCTIONS_FLAG="--read .aider.instructions.entity.md"
+if [ -f ".aider.instructions.entity.decorator.md" ]; then
+    AIDER_READ_INSTRUCTIONS_FLAG="--read .aider.instructions.entity.decorator.md"
 fi
 
 # Динамические пути к результирующим md-файлам
-FILE_PATH_RU="docs/decorators/${DOC_TARGET_ENTITY}.md"
-FILE_PATH_EN="docs/en/decorators/${DOC_TARGET_ENTITY}.md"
+FILE_PATH_RU="docs/decorators/${DOC_TARGET_ENTITY_DECORATOR}.md"
+FILE_PATH_EN="docs/en/decorators/${DOC_TARGET_ENTITY_DECORATOR}.md"
 
 # 4. Валидация существования базовых файлов и создание заглушек
 for file in $CLEANED_FILES; do
@@ -80,14 +80,14 @@ for file in $CLEANED_FILES; do
 done
 
 # Динамическое формирование ТАСК-задач для Aider на основе целевого декоратора без тестового мусора
-TASK_RU="[LANGUAGE: RUSSIAN] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_RU}'. Follow the layout constraints from .aider.instructions.entity.md strictly in Russian language. Inspect edge-cases in the provided test file (cache warming, network error fallbacks, and Proxy-array mutations via .push()). CRITICAL: Convert test cases logic into clean production-ready TypeScript code. Never use Vitest utilities like 'vi.fn()', 'expect()' or mock timers. Show real behavior using console.log() and async/await. Translate headers and code comments to Russian."
+TASK_RU="[LANGUAGE: RUSSIAN] Write the complete documentation page for '${DOC_TARGET_ENTITY_DECORATOR}' decorator into '${FILE_PATH_RU}'. Follow the layout constraints from .aider.instructions.entity.md strictly in Russian language. Inspect edge-cases in the provided test file (cache warming, network error fallbacks, and Proxy-array mutations via .push()). CRITICAL: Convert test cases logic into clean production-ready TypeScript code. Never use Vitest utilities like 'vi.fn()', 'expect()' or mock timers. Show real behavior using console.log() and async/await. Translate headers and code comments to Russian."
 
-TASK_EN="[LANGUAGE: ENGLISH] Write the complete documentation page for '${DOC_TARGET_ENTITY}' decorator into '${FILE_PATH_EN}'. Follow the layout constraints from .aider.instructions.entity.md strictly in English language. Inspect edge-cases in the provided test file (cache warming, network error fallbacks, and Proxy-array mutations via .push()). CRITICAL: Convert test cases logic into clean production-ready TypeScript code. Never use Vitest utilities like 'vi.fn()', 'expect()' or mock timers. Show real behavior using console.log() and async/await. Write headers and code comments in English."
+TASK_EN="[LANGUAGE: ENGLISH] Write the complete documentation page for '${DOC_TARGET_ENTITY_DECORATOR}' decorator into '${FILE_PATH_EN}'. Follow the layout constraints from .aider.instructions.entity.md strictly in English language. Inspect edge-cases in the provided test file (cache warming, network error fallbacks, and Proxy-array mutations via .push()). CRITICAL: Convert test cases logic into clean production-ready TypeScript code. Never use Vitest utilities like 'vi.fn()', 'expect()' or mock timers. Show real behavior using console.log() and async/await. Write headers and code comments in English."
 
 # 5. ОБРАБОТКА РЕЖИМА ХОЛОСТОГО ПРОГОНА
 if [ "$DRY_RUN" = true ]; then
     echo -e "\n${BLUE}======================= ОТЛАДОЧНЫЙ СНИМОК DOC DRY-RUN =======================${RESET}"
-    echo -e "${GREEN}Сущность для описания:${RESET} $DOC_TARGET_ENTITY"
+    echo -e "${GREEN}Сущность для описания:${RESET} $DOC_TARGET_ENTITY_DECORATOR"
     echo -e "${GREEN}Файл патча:${RESET}            $AIDER_OUTPUT_PATCH"
     echo -e "${GREEN}Список файлов CLI:${RESET}     $CLEANED_FILES"
     echo -e "${GREEN}Промпт RU:${RESET}             $TASK_RU"
