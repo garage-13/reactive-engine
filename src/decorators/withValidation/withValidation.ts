@@ -12,7 +12,7 @@ export interface ValidationOptions<T> {
 /**
  * Декоратор для синхронных экшенов (например, переключение шагов)
  */
-export const withValidation = <T, Args extends any[], R>(
+export const withValidationSync = <T, Args extends any[], R>(
   targetAction: (...args: Args) => R,
   options: ValidationOptions<T>
 ) => {
@@ -43,11 +43,10 @@ export const withValidation = <T, Args extends any[], R>(
  * Декоратор СТРОГО для асинхронных фетчеров engine.resource.
  * Прозрачно сохраняет типы входных и выходных данных оригинального fetcher.
  */
-export const withResourceValidation = <S, T>(
+export const withValidationAsync = <S, T>(
   fetcher: (source: S, signal: AbortSignal) => Promise<T>,
   options: ValidationOptions<S>
 ) => {
-  // 🟢 ИСПРАВЛЕНО: Явно указываем Promise<T>, возвращая исходный тип ответа фетчера
   return async (sourceValue: S, abortSignal: AbortSignal): Promise<T> => {
     const { schema, errorsSignal } = options
     const nextErrors: Record<string, string> = {}
@@ -65,7 +64,7 @@ export const withResourceValidation = <S, T>(
     }
 
     errorsSignal.value = nextErrors
-    
+
     if (hasErrors) {
       throw new Error('Core validation stopper')
     }

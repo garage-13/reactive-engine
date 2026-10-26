@@ -228,7 +228,7 @@ export function createResource<T, S = void>(
 
           const logReason = isTimeout ? 'таймауту' : 'ошибке сети'
           // Исправлен счетчик: пишем честный индекс текущего упавшего запроса из общего пула
-          console.warn(`[Resource Retry] "${resourceSignalName}" сбой по ${logReason}. Запрос ${attempt + 1} из ${retryCount + 1} не удался. Ожидание повтора: ${Math.round(currentDelay)}ms`)
+          if (engine.logger.isEnabled) console.warn(`[Resource Retry] "${resourceSignalName}" сбой по ${logReason}. Запрос ${attempt + 1} из ${retryCount + 1} не удался. Ожидание повтора: ${Math.round(currentDelay)}ms`)
 
           try {
             // Спим перед следующим циклом, уважая отмену внешнего графа

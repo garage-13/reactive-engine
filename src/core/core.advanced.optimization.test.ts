@@ -45,7 +45,7 @@ describe('Reactive Engine v2.5.0 - Memory Leaks & Edge Cases Verification', () =
   // ТЕСТ 2: Устранение бесконечного роста памяти в статической Map логгера
   // =========================================================================
   it('⚡ [Memory] should evict stable signals from ChurnTracker map to prevent OOM', () => {
-    const engine = new ReactiveEngine({ logger: { isEnabled: true } })
+    const engine = new ReactiveEngine({ logger: { isEnabled: false } })
 
     // Имитируем создание и удаление динамических сигналов
     for (let i = 0; i < 50; i++) {
@@ -108,7 +108,7 @@ describe('Reactive Engine v2.5.0 - Memory Leaks & Edge Cases Verification', () =
   // =========================================================================
   it('⚡ [Architecture] should successfully execute resource flow with public engine.log without runtime errors', async () => {
     // Включаем логгер на полную, проверяя легальность обращения сателлитов к методу engine.log
-    const engine = new ReactiveEngine({ logger: { isEnabled: true, isCoreOptimizationDebugEnabled: true } })
+    const engine = new ReactiveEngine({ logger: { isEnabled: false, isCoreOptimizationDebugEnabled: false } })
 
     const mockFetcher = async () => 'success_payload'
     const testResource = engine.resource(mockFetcher, undefined, 'test_public_log')

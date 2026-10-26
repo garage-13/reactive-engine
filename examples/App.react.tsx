@@ -281,7 +281,7 @@ export const App = () => {
           </CardModalWrapper>
           <CardModalWrapper
             title='Example 254'
-            description='Form wizard validation DI (& withValidation decorator)'
+            description='Form wizard validation DI (& withValidationSync decorator)'
           >
             <Example254 />
           </CardModalWrapper>

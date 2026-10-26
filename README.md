@@ -213,7 +213,7 @@ Copying external async state directly into local mutable signals introduces sync
 // ❌ Mirroring Trap (Causes redundant pushes & recursion)
 engine.effect(() => {
   const data = apiResource.data
-  if (data) localSignal.value = data 
+  if (data) localSignal.value = data
 })
 
 // 🟢 Canonical Pattern (Pure Lazy Derivation)
@@ -229,7 +229,7 @@ To eliminate parent re-renders in deep form trees, push state subscriptions down
 ## Architecture-Grade Form Wizard (Example 254)
 This enterprise-ready multi-step form implementation demonstrates absolute separation of concerns: state, cross-step validation schemas, and API fetch mechanics are completely decoupled from React.
 
-1. Action Validation Decorators (`withValidation.ts`)
+1. Action Validation Decorators (`withValidationSync.ts`)
 ```ts
 import { Signal } from '@pravosleva/reactive-engine'
 
@@ -242,7 +242,7 @@ export interface ValidationOptions<T> {
   errorsSignal: Signal<Record<string, string>>
 }
 
-export const withValidation = <T, Args extends any[], R>(
+export const withValidationSync = <T, Args extends any[], R>(
   targetAction: (...args: Args) => R,
   options: ValidationOptions<T>
 ) => {
@@ -269,7 +269,7 @@ export const withValidation = <T, Args extends any[], R>(
   }
 }
 
-export const withResourceValidation = <S, T>(
+export const withValidationAsync = <S, T>(
   fetcher: (source: S, signal: AbortSignal) => Promise<T>,
   options: ValidationOptions<S>
 ) => {
@@ -299,7 +299,7 @@ export const withResourceValidation = <S, T>(
 2. Domain & Validation Service (`FormWizardLogic.ts`)
 ```tsx
 import { AbstractService } from '@pravosleva/reactive-engine'
-import { withValidation, withResourceValidation, ValidationSchema } from './withValidation'
+import { withValidationSync, withValidationAsync, ValidationSchema } from './withValidation'
 
 export interface WizardState {
   step: number
@@ -345,15 +345,15 @@ export class FormWizardLogic extends AbstractService {
   private profileSource = this.engine.computed(() => this.formData.profile)
 
   public nextToProfileStep = () => {
-    const action = withValidation(() => {
+    const action = withValidationSync(() => {
       this.currentStep.value = 2
     }, { schema: this.accountSchema, errorsSignal: this.errors })
-    
+
     action(this.formData.account)
   }
 
   public submitWizardForm = this.engine.resource(
-    withResourceValidation(
+    withValidationAsync(
       async (profileData, abortSignal) => {
         return this.api.submitWizard(profileData)
       },

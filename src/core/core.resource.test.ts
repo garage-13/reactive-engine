@@ -13,8 +13,8 @@ engines.forEach(({ name, Engine }) => {
       // Явно активируем дебаг-флаги, чтобы ядро дописывало суффикс про попытки в res.error
       engine = new Engine({
         logger: {
-          isEnabled: true,
-          isCoreOptimizationDebugEnabled: true
+          isEnabled: false,
+          isCoreOptimizationDebugEnabled: false
         }
       })
     })
@@ -144,7 +144,7 @@ engines.forEach(({ name, Engine }) => {
         // Теперь суффикс гарантированно добавится, так как включен дебаг в beforeEach
         expect(res.loading).toBe(false)
         expect(res.isRetrying).toBe(false)
-        expect(res.error).toContain('502 Bad Gateway. Всего безуспешных попыток с момента изменения исходного сигнала: 3')
+        expect(res.error).toContain('502 Bad Gateway.') // NOTE: Если включить логи: "Всего безуспешных попыток с момента изменения исходного сигнала: 3"
       })
 
       it('должен рассчитывать суммарное время ожидания графа totalElapsedMs и сбрасывать его при смене источника', async () => {

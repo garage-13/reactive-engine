@@ -1,5 +1,5 @@
 import { AbstractService } from '../../src/core'
-import { withValidation, withResourceValidation, ValidationSchema } from '../../src/decorators'
+import { withValidationSync, withValidationAsync, ValidationSchema } from '../../src/decorators'
 
 export interface WizardState {
   step: number
@@ -49,15 +49,15 @@ export class FormWizardLogic extends AbstractService {
   private profileSource = this.engine.computed(() => this.formData.profile)
 
   public nextToProfileStep = () => {
-    const action = withValidation(() => {
+    const action = withValidationSync(() => {
       this.currentStep.value = 2
     }, { schema: this.accountSchema, errorsSignal: this.errors })
-    
+
     action(this.formData.account)
   }
 
   public submitWizardForm = this.engine.resource(
-    withResourceValidation(
+    withValidationAsync(
       async (profileData, abortSignal) => {
         return this.api.submitWizard(profileData) as Promise<{ success: boolean }>
       },
