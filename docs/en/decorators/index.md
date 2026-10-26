@@ -36,6 +36,6 @@ features:
     link: /decorators/withThrottleComputed
   - icon: ✅
     title: withValidation(Sync|Async)
-    details: Provides a validation mechanism for synchronous actions and asynchronous fetchers within a reactive system. It allows checking the state before executing an action or fetching data, ensuring the correctness of operations.
+    details: Provides a validation mechanism for synchronous actions and asynchronous fetchers within a reactive system (could be combined with `resource` method). It allows checking the state before executing an action or fetching data, ensuring the correctness of operations.
     link: /decorators/withValidation
 ---
