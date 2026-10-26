@@ -143,9 +143,12 @@ const notificationResource = engine.resource(
 import { withLongPolling, ReactiveEngine } from '@pravosleva/reactive-engine';
 
 const engine = new ReactiveEngine();
-const mockFetcher = vi.fn().mockImplementation(async (arr: string[]) => `fetched_${arr.join('_')}`);
-const mockNextTick = vi.fn();
-const mockOnError = vi.fn();
+const mockFetcher = async (arr: string[]) => `fetched_${arr.join('_')}`;
+const mockNextTick = () => console.log('Next tick');
+const mockOnError = (delay, increaseDelay) => {
+  console.warn(`Ошибка сети. Следующая попытка через ${delay}мс`);
+  increaseDelay(); // Удваиваем интервал до следующего тика
+};
 const controller = new AbortController();
 
 const pollingFetcher = withLongPolling(mockFetcher, {
@@ -159,25 +162,24 @@ const state = engine.reactive({
 });
 
 const promise1 = pollingFetcher(state.roomIds, controller.signal);
-await vi.advanceTimersByTimeAsync(0);
+await new Promise(r => setTimeout(r, 0));
 
 const res1 = await promise1;
-expect(res1).toBe('fetched_room_101');
-expect(mockFetcher).toHaveBeenCalledWith(['room_101'], controller.signal);
+console.log(res1); // fetched_room_101
+console.log(mockFetcher(state.roomIds, controller.signal)); // fetched_room_101
 
 // Императивно мутируем массив — синхронный Proxy мгновенно обновляет свое состояние
 state.roomIds.push('room_102');
 
 // Запускаем вторую сессию опроса. Больше никаких искусственных микрозадач!
 const promise2 = pollingFetcher(state.roomIds, controller.signal);
-await vi.advanceTimersByTimeAsync(0);
+await new Promise(r => setTimeout(r, 0));
 
 const res2 = await promise2;
 
 // Декоратор нативно считывает изменившийся Proxy-массив и отправляет свежие данные по сети
-expect(res2).toBe('fetched_room_101_room_102');
-expect(mockFetcher).toHaveBeenCalledTimes(2);
-expect(mockFetcher).toHaveBeenLastCalledWith(['room_101', 'room_102'], controller.signal);
+console.log(res2); // fetched_room_101_room_102
+console.log(mockFetcher(state.roomIds, controller.signal)); // fetched_room_101_room_102
 ```
 
 ## Дополнительная информация
