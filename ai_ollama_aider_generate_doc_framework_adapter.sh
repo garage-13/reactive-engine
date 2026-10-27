@@ -154,7 +154,7 @@ if [ "$GENERATE_SSR" = false ]; then
 fi
 
 # Использованием формат 'whole', так как файлы создаются с нуля
-AIDER_EDIT_FORMAT="code"
+AIDER_EDIT_FORMAT="whole"
 
 run_aider_session() {
     local target_file="$1"
