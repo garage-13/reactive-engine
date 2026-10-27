@@ -145,7 +145,7 @@ for file in $CLEANED_FILES; do
 done
 
 # =========================================================================
-# СЕССИИ ГЕНЕРАЦИИ (ТОЛЬКО SSR ДОКУМЕНТАЦИЯ)
+# СЕССИИ ГЕНЕРАЦИИ (БЕЗОПАСНЫЙ ARCHITECT РЕЖИМ ДЛЯ ЛОКАЛЬНЫХ LLM)
 # =========================================================================
 
 if [ "$GENERATE_SSR" = false ]; then
@@ -153,8 +153,8 @@ if [ "$GENERATE_SSR" = false ]; then
     exit 1
 fi
 
-# Использованием формат 'whole', так как файлы создаются с нуля
-AIDER_EDIT_FORMAT="whole"
+# Переходим на индустриальный формат architect, исключающий сбои разметки у локальных моделей
+AIDER_EDIT_FORMAT="architect"
 
 run_aider_session() {
     local target_file="$1"
@@ -166,6 +166,7 @@ run_aider_session() {
     uv run --offline --python 3.12 --with aider-chat aider \
         --model "$AIDER_MODEL" \
         --edit-format "$AIDER_EDIT_FORMAT" \
+        --auto-accept-architect \
         --map-tokens 0 \
         --test-cmd "npx yarn test" \
         --no-suggest-shell-commands \
