@@ -83,6 +83,7 @@ console.log(uiBridge.value); // Log: {name: 'John', age: 150}
 ```
 
 ### 3. Mutation & Loop Protection Example
+
 This example clearly demonstrates three key architectural capabilities of proxied objects and the transactional logger implementation within the `@pravosleva/reactive-engine` library:
 - Deep Reactivity & Imperative Mutations of Nested Structures
 - Native Batching for Object and Array Mutations

@@ -54,14 +54,14 @@ console.log(uiBridge.value); // { name: 'Иван', age: 26 }
 // Инициализация в сервисе бизнес-логики:
 const engine = new ReactiveEngineCore();
 const form = engine.reactive({
-  user: { name: 'Иван', age: 25 }
+  user: { name: 'Иван', age: 149 }
 }, 'profile-form');
 
 // Прямая мутация с валидацией:
 function updateAge() {
   const newValue = form.user.age + 1;
-  if (newValue > 100) {
-    console.error('Возраст не может быть больше 100');
+  if (newValue > 150) {
+    console.error('Возраст не может быть больше 150');
   } else {
     form.user.age = newValue; // Автоматический лог: SIGNAL [profile-form.user.age]
   }
@@ -73,10 +73,10 @@ const uiBridge = engine.computed(() => ({
   age: form.user.age
 }));
 
-console.log(uiBridge.value); // { name: 'Иван', age: 25 }
+console.log(uiBridge.value); // { name: 'Иван', age: 149 }
 updateAge();
-console.log(uiBridge.value); // { name: 'Иван', age: 26 }
-updateAge(); // Ошибка: Возраст не может быть больше 100
+console.log(uiBridge.value); // { name: 'Иван', age: 150 }
+updateAge(); // Ошибка: Возраст не может быть больше 150
 ```
 
 ### 3. Интеграция с React через DI контейнер
