@@ -1,11 +1,11 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "2.7.0-beta.2",
+  "version": "2.7.0",
   "engines": {
     "node": ">=22.20.0"
   },
   "description": "Reactive Engine",
-  "author": "Den Pol <selection4test@gmail.com> (https://pravosleva.pro/blog)",
+  "author": "Den Pol <selection4test@gmail.com> (https://t.me/pravosleva)",
   "homepage": "https://github.com/garage-13/reactive-engine",
   "repository": {
     "type": "git",
