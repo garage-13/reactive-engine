@@ -1,11 +1,37 @@
 import { defineConfig } from 'vitest/config'
+import type { UserConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
 import path from 'path'
-import type { PreRenderedChunk } from 'rollup'
 import { visualizer } from 'rollup-plugin-visualizer'
 import pkj from './package.json'
+
+type TViteOutputObject = Exclude<
+  Required<Required<UserConfig>['build']>['rolldownOptions']['output'],
+  undefined | unknown[]
+>
+
+type TEntityFileNamesFn = Exclude<TViteOutputObject['entryFileNames'], string | undefined>
+
+type TViteChunkInfo = Parameters<TEntityFileNamesFn>[0]
+
+const rollupOptions: TViteOutputObject[] = [
+  {
+    format: 'es',
+    exports: "named",
+    preserveModules: true,
+    // Базовая папка, относительно которой строятся пути (чтобы в dist не было лишней вложенности src/)
+    preserveModulesRoot: 'src',
+    entryFileNames: (chunkInfo: TViteChunkInfo) => {
+      // Если файл изначально из core/, убираем эту вложенность для сохранения обратной совместимости корневого импорта
+      if (chunkInfo.name.startsWith('core/')) {
+        return `${chunkInfo.name.replace('core/', '')}.mjs`
+      }
+      return `${chunkInfo.name}.mjs`
+    }
+  }
+]
 
 export default defineConfig({
   base: "./",
@@ -61,34 +87,7 @@ export default defineConfig({
       // 1. чтобы не дублировать код
       // 2. чтобы клиент брал это из своих node_modules
       external: ['react', 'react-dom', 'vue', '@angular/core'],
-      output: [
-        {
-          format: 'es',
-          exports: "named",
-          preserveModules: true,
-          // Базовая папка, относительно которой строятся пути (чтобы в dist не было лишней вложенности src/)
-          preserveModulesRoot: 'src',
-          entryFileNames: (chunkInfo: PreRenderedChunk) => {
-            // Если файл изначально из core/, убираем эту вложенность для сохранения обратной совместимости корневого импорта
-            if (chunkInfo.name.startsWith('core/')) {
-              return `${chunkInfo.name.replace('core/', '')}.mjs`
-            }
-            return `${chunkInfo.name}.mjs`
-          }
-        },
-        {
-          format: 'cjs',
-          exports: "named",
-          preserveModules: true,
-          preserveModulesRoot: 'src',
-          entryFileNames: (chunkInfo: PreRenderedChunk) => {
-            if (chunkInfo.name.startsWith('core/')) {
-              return `${chunkInfo.name.replace('core/', '')}.cjs`
-            }
-            return `${chunkInfo.name}.cjs`
-          }
-        }
-      ] as any
+      output: rollupOptions,
     },
   },
   server: {

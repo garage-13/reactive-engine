@@ -1,11 +1,11 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "2.6.3",
+  "version": "2.6.5",
   "engines": {
     "node": ">=22.20.0"
   },
   "description": "Reactive Engine",
-  "author": "Den Pol <selection4test@gmail.com> (https://pravosleva.pro)",
+  "author": "Den Pol <selection4test@gmail.com> (https://pravosleva.pro/blog)",
   "homepage": "https://github.com/garage-13/reactive-engine",
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
     "state",
     "manager"
   ],
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "unpkg": "./dist/reactive-engine.umd.js",
@@ -29,23 +29,19 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.mjs"
     },
     "./react": {
       "types": "./dist/react/index.d.ts",
-      "import": "./dist/react/index.mjs",
-      "require": "./dist/react/index.cjs"
+      "import": "./dist/react/index.mjs"
     },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
-      "import": "./dist/vue/index.mjs",
-      "require": "./dist/vue/index.cjs"
+      "import": "./dist/vue/index.mjs"
     },
     "./angular": {
       "types": "./dist/angular/index.d.ts",
-      "import": "./dist/angular/index.mjs",
-      "require": "./dist/angular/index.cjs"
+      "import": "./dist/angular/index.mjs"
     }
   },
   "files": [
