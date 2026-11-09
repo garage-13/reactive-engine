@@ -45,17 +45,21 @@ export function createSignal<T>(
 
   const signalInstance: Signal<T> = {
     get value() {
-      // ⚡ ЭТАЛОННАЯ ИЗОЛЯЦИЯ ЗНАЧЕНИЙ В ДЕСТРУКТОРАХ:
-      // Если чтение вызвано внутри runCleanupPhase, отдаем исторический снимок ноды
+      const consumer = engine.activeConsumer
       const cleanupNode = engine.activeCleanupNode
-      if (cleanupNode && cleanupNode._snapshotValues) {
+
+      // ⚡ УЛЬТИМАТИВНЫЙ ФИКС TDD #229:
+      // Мы отдаем старый снимок (снапшот) исключительно тогда, когда чтение сигнала
+      // происходит НАПРЯМУЮ в теле деструктора (cleanupNode активен И сбор зависимостей
+      // заморожен в untracked, то есть consumer === null).
+      // Если же consumer !== null (например, идет pull-вычисление computed внутри очистки),
+      // мы ОБЯЗАНЫ вернуть новое актуальное значение!
+      if (cleanupNode && consumer === null && cleanupNode._snapshotValues) {
         if (cleanupNode._snapshotValues.has(signalInstance)) {
           return cleanupNode._snapshotValues.get(signalInstance)
         }
-        return value
       }
 
-      const consumer = engine.activeConsumer
       if (consumer) {
         if (consumer.dependencies && typeof consumer.dependencies.add === 'function') {
           subscribers.add(consumer)

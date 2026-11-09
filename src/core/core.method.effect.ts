@@ -27,7 +27,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     if (isCleaning) return
     isCleaning = true
 
-    // Активируем контекст чтения исторических снапшотов
+    // Активируем контекст чтения исторических снапшотов сигналов
     const prevCleanupNode = engine.activeCleanupNode
     engine.activeCleanupNode = effectNode
 
@@ -48,10 +48,13 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
         engine.activeOwner = prevOwner
       }
 
-      // 2. Вызов деструкторов пользователя в режиме untracked
+      // 2. Вызов деструкторов пользователя в режиме полной изоляции контекстов tracking/ownership
       if (effectNode.cleanups.size > 0) {
         const prevConsumer = engine.activeConsumer
+        const prevOwner = engine.activeOwner // ⚡ ФИКС TDD #222: Запоминаем текущего владельца
+
         engine.activeConsumer = null
+        engine.activeOwner = null // ⚡ ФИКС TDD #222: Изолируем контекст создания для новых эффектов в cleanup
 
         let firstError: unknown = null
         const cleanupsArray = Array.from(effectNode.cleanups)
@@ -61,9 +64,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
           try {
             cleanup()
           } catch (err) {
-            // ❌ УДАЛЕНО: console.error(err) — ранер сьюта больше не будет перехватывать логи в stderr
-
-            // Запоминаем только самую первую ошибку каскада для честного проброса
+            // Ошибки не логируем в console.error по спецификации Suite #17, чтобы не засорять stderr
             if (!firstError) {
               firstError = err
             }
@@ -71,8 +72,8 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
         }
 
         engine.activeConsumer = prevConsumer
+        engine.activeOwner = prevOwner // Восстанавливаем контекст владельца
 
-        // Выбрасываем ошибку наверх — планировщик ядра в core.ts атомарно погасит грязную очередь
         if (firstError) {
           throw firstError
         }

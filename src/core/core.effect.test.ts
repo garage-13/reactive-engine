@@ -238,5 +238,87 @@ engines.forEach(({ name, Engine }) => {
       consoleErrorSpy.mockRestore()
     })
 
+    it('TDD #222: эффект, созданный внутри функции очистки другого эффекта, должен корректно отслеживать свои зависимости', () => {
+      const sourceA = engine.signal(0)
+      const sourceB = engine.signal(100)
+
+      let innerEvaluations = 0
+
+      // Имитируем паттерн дебаунсинга из тест-суита
+      engine.effect(() => {
+        sourceA.value // Подписываемся на А
+
+        return () => {
+          // Внутри очистки создаем новый изолированный эффект
+          engine.effect(() => {
+            innerEvaluations++
+            sourceB.value // Он зависит строго от В
+          })
+        }
+      })
+
+      expect(innerEvaluations).toBe(0) // На старте внутренний эффект еще не создан
+
+      // 1. Провоцируем вызов очистки верхнего уровня
+      sourceA.value = 1
+      expect(innerEvaluations).toBe(1) // Внутренний эффект создался и сработал 1 раз
+
+      // 2. КРИТИЧЕСКАЯ ПРОВЕРКА: Изменяем зависимость внутреннего эффекта
+      sourceB.value = 200
+      expect(innerEvaluations).toBe(2) // Внутренний эффект обязан отреагировать!
+    })
+
+    it('TDD #229: функция очистки эффекта должна видеть актуальное значение computed при изменении общего корня', () => {
+      const source = engine.signal(1)
+      const comp = engine.computed(() => source.value * 10)
+
+      const cleanupValues: number[] = []
+
+      engine.effect(() => {
+        source.value // Подписка на корень
+
+        return () => {
+          // Читаем компьютед внутри деструктора
+          cleanupValues.push(comp.value)
+        }
+      })
+
+      // Изменяем корень. comp должен пересчитаться, а cleanup должен увидеть новое значение
+      source.value = 2
+
+      // Согласно каноничной семантике, компьютед должен вернуть свежее 20, а не застрять на 10
+      expect(cleanupValues).toEqual([20])
+    })
+
+    it('TDD #120: запись в сигнал из функции очистки внутри batch должна атомарно распространяться после flush', () => {
+      const trigger = engine.signal(0)
+      const sideSignal = engine.signal(10)
+
+      let downstreamRuns = 0
+
+      engine.effect(() => {
+        trigger.value
+        return () => {
+          sideSignal.value = 20 // Побочная запись из деструктора
+        }
+      })
+
+      engine.effect(() => {
+        sideSignal.value // Зависимый эффект
+        downstreamRuns++
+      })
+
+      downstreamRuns = 0 // Сброс прогрева
+
+      // Запускаем транзакцию
+      engine.batch(() => {
+        trigger.value = 1
+      })
+
+      // На выходе из батча downstream эффект обязан зафиксировать изменение sideSignal
+      expect(downstreamRuns).toBe(1)
+      expect(sideSignal.value).toBe(20)
+    })
+
   })
 })
