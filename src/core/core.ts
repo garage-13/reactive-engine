@@ -93,6 +93,7 @@ export class ReactiveEngineCore {
   private cycleDetectionStack = new Set<unknown>()
   public batchedSignals = new Set<any>()
   public activeOwner: any = null
+  public activeCleanupNode: any = null
   // Системная очередь для отложенного батчинга деструкторов
   public pendingCleanups = new Set<() => void>()
 
@@ -156,7 +157,7 @@ export class ReactiveEngineCore {
         for (const effect of effects) {
           if (effect.isDisposed) continue
 
-          // ⚡ ЗOЛОТOЙ СТАНДАРТ ОПТИМИЗАЦИИ (Early Dirty Check Bypass):
+          // ⚡ ЗОЛОТОЙ СТАНДАРТ ОПТИМИЗАЦИИ (Early Dirty Check Bypass):
           // Переносим проверку грязи в самое начало цикла. Если эффект не был промаркирован
           // как DIRTY волной push-уведомлений, мы мгновенно пропускаем его, полностью
           // избавляя V8 от холостого обхода родителей и тяжелых хэш-поисков depVersions.get(dep).
@@ -184,11 +185,14 @@ export class ReactiveEngineCore {
           }
 
           try {
+            // Вызов метода .run() теперь прозрачно прокидывает наверх ошибки
+            // как из пользовательского тела эффекта, так и из обновленной фазы cleanup
             effect.run()
           } catch (err) {
-            // ⚡ ФИКС ТЕСТА #177: Если один из эффектов выбросил исключение,
-            // принудительно очищаем и гасим флаги грязи (isDirty) у всех оставшихся
+            // ⚡ ФИКС ТЕСТОВ ОШИБОК (#177 и #247): Если один из эффектов (или его очистка)
+            // выбросил исключение, принудительно гасим флаги грязи (isDirty) у всех оставшихся
             // в очереди эффектов текущего и последующих уровней глубины.
+            // Старые грязные задачи гарантированно изолируются и не протекают в новые микротаски.
             for (let d = depth; d <= this.maxPendingDepth; d++) {
               const remainingBucket = this.pendingEffects[d]
               if (remainingBucket) {
@@ -199,9 +203,10 @@ export class ReactiveEngineCore {
               }
             }
             this.maxPendingDepth = 0
-            throw err // Прокидываем ошибку дальше по спецификации
-          }
 
+            // Бескомпромиссный проброс ошибки наверх по спецификации тест-суита
+            throw err
+          }
         }
 
         if (depth > 0) {

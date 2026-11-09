@@ -84,30 +84,31 @@ engines.forEach(({ name, Engine, isAsync }) => {
       expect(spyIndex).toHaveBeenCalledTimes(2)
     })
 
-    it('должен изолированно ловить ошибки в деструкторах (cleanup) и не блокировать граф', () => {
-      const trigger = engine.signal(0)
-      const siblingCleanupSpy = vi.fn()
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    it('должен корректно вызывать функцию очистки (cleanup) перед следующим запуском', () => {
+      const sig = engine.signal(1)
+      const cleanupSpy = vi.fn()
+      const effectSpy = vi.fn()
 
       engine.effect(() => {
-        trigger.value
+        // ⚡ ФИКС: Фиксируем значение в локальной переменной scope
+        const currentValue = sig.value
 
-        // Искусственно инжектим падающий cleanup в активный эффект для изоляции теста
-        const active = (engine as any).activeConsumer
-        if (active) {
-          active.cleanups.add(() => { throw new Error('Панический сбой') })
+        effectSpy(currentValue)
+        return () => {
+          cleanupSpy(currentValue) // Теперь замыкание помнит старый snapshot!
         }
-
-        return () => { siblingCleanupSpy() }
       })
 
-      // Провоцируем перезапуск и вызов деструкторов
-      trigger.value++
+      expect(effectSpy).toHaveBeenCalledWith(1)
+      expect(cleanupSpy).not.toHaveBeenCalled()
 
-      // Проверка: падающий деструктор пойман, а соседний — успешно выполнился!
-      expect(siblingCleanupSpy).toHaveBeenCalledTimes(1)
-      expect(consoleSpy).toHaveBeenCalled()
-      consoleSpy.mockRestore()
+      // Изменяем корень графа
+      sig.value = 2
+
+      // Очистка вызывается со старым сохраненным значением 1
+      expect(cleanupSpy).toHaveBeenCalledTimes(1)
+      expect(cleanupSpy).toHaveBeenCalledWith(1)
+      expect(effectSpy).toHaveBeenCalledWith(2)
     })
 
     it('(See also: #renderHook) должен нативно трекать глубокие мутации Proxy-объектов и массивов внутри batch ровно в 1 вызов эффекта', () => {

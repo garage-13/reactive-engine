@@ -45,12 +45,26 @@ export function createSignal<T>(
 
   const signalInstance: Signal<T> = {
     get value() {
-      // 🛡️ АТОМАРНАЯ ЗАЩИТА: Работаем строго с локально зафиксированной константой consumer
+      // ⚡ ЭТАЛОННАЯ ИЗОЛЯЦИЯ ЗНАЧЕНИЙ В ДЕСТРУКТОРАХ:
+      // Если чтение вызвано внутри runCleanupPhase, отдаем исторический снимок ноды
+      const cleanupNode = engine.activeCleanupNode
+      if (cleanupNode && cleanupNode._snapshotValues) {
+        if (cleanupNode._snapshotValues.has(signalInstance)) {
+          return cleanupNode._snapshotValues.get(signalInstance)
+        }
+        return value
+      }
+
       const consumer = engine.activeConsumer
       if (consumer) {
         if (consumer.dependencies && typeof consumer.dependencies.add === 'function') {
           subscribers.add(consumer)
           consumer.dependencies.add(signalInstance)
+
+          // Сохраняем слепок текущего значения для будущей очистки этого консьюмера
+          if (consumer._snapshotValues) {
+            consumer._snapshotValues.set(signalInstance, value)
+          }
 
           if (consumer.activeRunId !== undefined) {
             (signalInstance as any)._lastSeenInRunId = consumer.activeRunId

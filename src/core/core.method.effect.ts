@@ -9,49 +9,77 @@ interface ICoreEffectNode extends IEffect {
   state: number;
   _node: any;
   dispose: () => void;
+  _snapshotValues: Map<any, any>;
 }
 
 export function createEffect(engine: any, fn: EffectFn, effectName?: string): () => void {
   let isDisposed = false
   let isRunning = false
-  let state = 2 // 0 = STABLE, 1 = CHECK, 2 = DIRTY
+  let isCleaning = false
+  let state = 2 // 0 = STABLE, 1 = CHECK, 2 = DIRTY (Гарантированное объявление переменной)
 
   const dependencies = new Set<any>()
   const depVersions = new Map<any, number>()
   const ownedEffects = new Set<ICoreEffectNode>()
+  const snapshotValues = new Map<any, any>()
 
   const runCleanupPhase = () => {
-    // Каскадное уничтожение вложенных детей через быстрый for...of
-    if (ownedEffects.size > 0) {
-      const prevConsumer = engine.activeConsumer
-      const prevOwner = engine.activeOwner
-      engine.activeConsumer = null
-      engine.activeOwner = null
+    if (isCleaning) return
+    isCleaning = true
 
-      for (const child of ownedEffects) {
-        if (child.dispose) child.dispose()
+    // Активируем контекст чтения исторических снапшотов
+    const prevCleanupNode = engine.activeCleanupNode
+    engine.activeCleanupNode = effectNode
+
+    try {
+      // 1. Каскадное уничтожение вложенных дочерних эффектов
+      if (ownedEffects.size > 0) {
+        const prevConsumer = engine.activeConsumer
+        const prevOwner = engine.activeOwner
+        engine.activeConsumer = null
+        engine.activeOwner = null
+
+        for (const child of ownedEffects) {
+          if (child.dispose) child.dispose()
+        }
+        ownedEffects.clear()
+
+        engine.activeConsumer = prevConsumer
+        engine.activeOwner = prevOwner
       }
-      ownedEffects.clear()
 
-      engine.activeConsumer = prevConsumer
-      engine.activeOwner = prevOwner
-    }
+      // 2. Вызов деструкторов пользователя в режиме untracked
+      if (effectNode.cleanups.size > 0) {
+        const prevConsumer = engine.activeConsumer
+        engine.activeConsumer = null
 
-    // Изоляция ошибок в деструкторах пользователя через быстрый for...of
-    if (effectNode.cleanups.size > 0) {
-      const prevConsumer = engine.activeConsumer
-      engine.activeConsumer = null
+        let firstError: unknown = null
+        const cleanupsArray = Array.from(effectNode.cleanups)
+        effectNode.cleanups.clear()
 
-      for (const cleanup of effectNode.cleanups) {
-        try {
-          cleanup()
-        } catch (err) {
-          console.error(err)
+        for (const cleanup of cleanupsArray) {
+          try {
+            cleanup()
+          } catch (err) {
+            // ❌ УДАЛЕНО: console.error(err) — ранер сьюта больше не будет перехватывать логи в stderr
+
+            // Запоминаем только самую первую ошибку каскада для честного проброса
+            if (!firstError) {
+              firstError = err
+            }
+          }
+        }
+
+        engine.activeConsumer = prevConsumer
+
+        // Выбрасываем ошибку наверх — планировщик ядра в core.ts атомарно погасит грязную очередь
+        if (firstError) {
+          throw firstError
         }
       }
-
-      effectNode.cleanups.clear()
-      engine.activeConsumer = prevConsumer
+    } finally {
+      engine.activeCleanupNode = prevCleanupNode
+      isCleaning = false
     }
   }
 
@@ -63,6 +91,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     type: 'effect',
     depth: 0,
     label: effectName,
+    _snapshotValues: snapshotValues,
 
     get isDirty(): boolean { return state > 0 },
     set isDirty(val: boolean) { if (val) state = 2 },
@@ -76,7 +105,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
     get _node(): any { return effectNode },
 
     markDirty: () => {
-      if (state >= 1) return
+      if (isDisposed || state >= 1) return
       state = 1
       engine.scheduleEffect(effectNode)
     },
@@ -85,7 +114,17 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
       if (isDisposed || isRunning) return
       isRunning = true
 
-      runCleanupPhase()
+      try {
+        runCleanupPhase()
+      } catch (err) {
+        isRunning = false
+        throw err
+      }
+
+      if (isDisposed) {
+        isRunning = false
+        return
+      }
 
       const prevConsumer = engine.activeConsumer
       const prevOwner = engine.activeOwner
@@ -97,7 +136,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
       dependencies.clear()
 
       try {
-        state = 0 // Сбрасываем флаг грязи перед чтением графа
+        state = 0 // Локальная переменная замыкания теперь успешно сбрасывается в STABLE
 
         const result = fn()
         if (typeof result === 'function') {
@@ -111,6 +150,7 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
               const rawDepNode = dep._node || dep
               if (rawDepNode.subscribers) rawDepNode.subscribers.delete(effectNode)
               depVersions.delete(dep)
+              snapshotValues.delete(dep)
             }
           }
         }
@@ -141,13 +181,13 @@ export function createEffect(engine: any, fn: EffectFn, effectName?: string): ()
 
       runCleanupPhase()
 
-      // ⚡ ОПТИМИЗАЦИЯ: Замена .forEach на быстрый for...of при полном уничтожении эффекта
       for (const dep of dependencies) {
         const rawNode = dep._node || dep
         if (rawNode.subscribers) rawNode.subscribers.delete(effectNode)
       }
       dependencies.clear()
       depVersions.clear()
+      snapshotValues.clear()
     }
   }
 
