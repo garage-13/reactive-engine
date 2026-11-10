@@ -1,282 +1,210 @@
-import { getExtractedValues } from '../utils/getExtractedValues'
-import { EngineLoggerOptions, Resource, ResourceOptions, ResourceState, Signal } from './types'
+import type { ReactiveEngineCore } from './core'
+import type { Resource, ResourceOptions, ResourceState, CleanupFn } from './types'
 
-// Контракт ядра движка для безопасных вызовов методов с дженериками
-interface IReactiveEngine {
-  signal<V>(initialValue: V, optionsOrName?: any): Signal<V>;
-  effect(fn: () => any, name?: string): () => void;
-  untrack<V>(fn: () => V): V;
-  log(params: any): void;
-  delay(ms: number, signal: AbortSignal): Promise<void>;
-  logger: EngineLoggerOptions
-}
-
+/**
+ * Фабрика умных реактивных декларативных ресурсов с автоматическим
+ * подавлением Race Conditions, встроенным методом .destroy() и транзакционным логированием.
+ */
 export function createResource<T, S = void>(
-  engine: IReactiveEngine,
+  engine: ReactiveEngineCore,
   fetcher: (source: S, signal: AbortSignal) => Promise<T>,
   source?: { value: S },
   optionsOrName?: string | ResourceOptions<T, S>
 ): Resource<T> {
-  const isOptionsObject = optionsOrName && typeof optionsOrName === 'object'
-  const resourceSignalName = isOptionsObject
-    ? ((optionsOrName as ResourceOptions<T, S>).name || 'unnamed_resource')
-    : (optionsOrName as string) || 'unnamed_resource'
+  const name = typeof optionsOrName === 'string' ? optionsOrName : (optionsOrName?.name || 'resource')
+  const options = typeof optionsOrName === 'object' ? optionsOrName : {}
 
-  const options: Partial<ResourceOptions<T, S>> = isOptionsObject
-    ? (optionsOrName as ResourceOptions<T, S>)
-    : {}
-
-  const resetDataOnSourceChange = options.resetDataOnSourceChange ?? true
-  const responseValidate = options.responseValidate
+  const resetDataOnSourceChange = options.resetDataOnSourceChange ?? false
+  const timeoutMs = options.timeout
+  const maxRetryCount = options.retryCount ?? 0
   const validateBeforeFetch = options.validateBeforeFetch
-  const baseDelay = 1000
-  const useExponential = true
-  const maxRetryDelay = 1000 * 60 * 5
+  const responseValidate = options.responseValidate
 
-  const retryCount = options.retryCount ?? 0
-  const timeoutMs = options.timeout ?? 5000
-  // Запоминаем точное время старта ВСЕЙ цепочки (включая ретраи и паузы)
-  let startTime = Date.now()
+  // Инициализируем реактивное состояние ресурса через атомарные сигналы
+  const dataSignal = engine.signal<T | null>(null, `${name}_data`)
+  const loadingSignal = engine.signal<boolean>(false, `${name}_loading`)
+  const errorSignal = engine.signal<string | null>(null, `${name}_error`)
+  const attemptIndexSignal = engine.signal<number>(0, `${name}_attemptIndex`)
 
-  const state = engine.signal<ResourceState<T>>(
-    {
-      data: null,
-      loading: true,
-      error: null,
-      isRetrying: false,
-      attemptIndex: 0,
-      retryCount,
-      totalElapsedMs: undefined // Сбрасываем старый таймер
-    },
-    `[CORE_INTERNAL_SIGNAL=1]:resource:state:${resourceSignalName}`
-  )
+  let activeAbortController: AbortController | null = null
+  let isDestroyed = false
 
-  const updateResourceState = (nextState: ResourceState<T>) => {
-    engine.log({
-      type: 'resource',
-      label: resourceSignalName,
-      details: { to: nextState, from: state.value },
-    })
-    state.value = nextState
+  // Хелпер для фиксации текущего слепка состояния для логгера
+  function snapshotState(): ResourceState<T> {
+    return {
+      data: dataSignal.value,
+      loading: loadingSignal.value,
+      error: errorSignal.value,
+      attemptIndex: attemptIndexSignal.value,
+      retryCount: maxRetryCount
+    }
   }
 
-  const load = async (sValue: S, effectSignal: AbortSignal, isSourceChange = false) => {
-    if (effectSignal.aborted) return
+  async function executeFetch(sourceValue: S): Promise<void> {
+    const prevState = snapshotState()
 
-    // Фиксируем время старта бизнес-процесса в самом начале метода load
-    startTime = Date.now()
-
+    // 1. Валидация источника перед фетчем
     if (validateBeforeFetch) {
-      const preValidationResult = validateBeforeFetch(sValue)
-      if (preValidationResult === false || typeof preValidationResult === 'string') {
-        if (effectSignal.aborted) return
-        const errorMsg = typeof preValidationResult === 'string'
-          ? preValidationResult
-          : 'Pre-fetch validation failed for resource'
+      const validationResult = validateBeforeFetch(sourceValue)
+      if (validationResult === false || typeof validationResult === 'string') {
+        const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed'
+        errorSignal.value = errorMsg
+        loadingSignal.value = false
 
-        const currentData = isSourceChange ? null : engine.untrack(() => state.value.data)
-        // Явно зачищаем следы старого таймера при ошибке валидации аргументов
-        updateResourceState({
-          data: currentData,
-          loading: false,
-          error: errorMsg,
-          isRetrying: false,
-          attemptIndex: 0,
-          retryCount,
-          totalElapsedMs: undefined
+        engine.log({
+          type: 'resource',
+          label: name,
+          details: { from: prevState, to: snapshotState() }
         })
         return
       }
     }
 
-    const shouldClear = isSourceChange && resetDataOnSourceChange
-    const currentData = shouldClear ? null : engine.untrack(() => state.value.data)
+    let attempt = 0
+    attemptIndexSignal.value = attempt
 
-    // Принудительно сбрасываем таймер в undefined перед входом в цикл ретраев
-    updateResourceState({
-      data: currentData,
-      loading: true,
-      error: null,
-      isRetrying: false,
-      attemptIndex: 0,
-      retryCount,
-      totalElapsedMs: undefined
-    })
+    while (attempt <= maxRetryCount && !isDestroyed) {
+      if (activeAbortController) {
+        activeAbortController.abort()
+      }
 
-    // 🔄 Контур циклического выполнения попыток (от 0 до retryCount)
-    for (let attempt = 0; attempt <= retryCount; attempt++) {
-      if (effectSignal.aborted) return
+      activeAbortController = new AbortController()
+      const currentSignal = activeAbortController.signal
 
-      // Создаем персональный сигнал таймаута на эту конкретную попытку
-      const timeoutSignal = AbortSignal.timeout(timeoutMs)
+      const stateBeforeFetch = snapshotState()
+      loadingSignal.value = true
+      if (attempt === 0 && resetDataOnSourceChange) {
+        dataSignal.value = null
+      }
 
-      // Объединяем управляющий сигнал графа и наш таймаут
-      const combinedSignal = AbortSignal.any([effectSignal, timeoutSignal])
+      engine.log({
+        type: 'resource',
+        label: name,
+        details: { from: stateBeforeFetch, to: snapshotState() }
+      })
 
       try {
-        const data = await fetcher(sValue, combinedSignal)
+        let fetchPromise = fetcher(sourceValue, currentSignal)
 
-        if (effectSignal.aborted) return
-
-        // Если фетчер вернул управление, но таймаут успел отработать раньше
-        if (timeoutSignal.aborted) {
-          throw new DOMException('The operation timed out.', 'TimeoutError')
+        if (timeoutMs !== undefined && timeoutMs > 0) {
+          const timeoutPromise = engine.delay(timeoutMs, currentSignal).then(() => {
+            throw new DOMException('Timeout exceeded', 'TimeoutError')
+          })
+          fetchPromise = Promise.race([fetchPromise, timeoutPromise])
         }
 
+        const payload = await fetchPromise
+
+        if (currentSignal.aborted || isDestroyed) return
+
         if (responseValidate) {
-          const validationResult = responseValidate(data)
-          if (validationResult === false || typeof validationResult === 'string') {
-            if (effectSignal.aborted) return
-            const errorMsg = typeof validationResult === 'string' ? validationResult : 'Validation failed'
-            updateResourceState({
-              data: null,
-              loading: false,
-              error: errorMsg,
-              isRetrying: false,
-              attemptIndex: 0,
-              retryCount,
-              totalElapsedMs: undefined
-            })
-            return
+          const resValidation = responseValidate(payload)
+          if (resValidation === false || typeof resValidation === 'string') {
+            throw new Error(typeof resValidation === 'string' ? resValidation : 'Response validation failed')
           }
         }
 
-        if (effectSignal.aborted) return
-        // Успех: сохраняем данные, полностью очищаем ошибки и сквозной таймер
-        updateResourceState({
-          data,
-          loading: false,
-          error: null,
-          isRetrying: false,
-          attemptIndex: 0,
-          retryCount,
-          totalElapsedMs: undefined
+        const stateBeforeSuccess = snapshotState()
+        dataSignal.value = payload
+        errorSignal.value = null
+        loadingSignal.value = false
+
+        engine.log({
+          type: 'resource',
+          label: name,
+          details: { from: stateBeforeSuccess, to: snapshotState() }
         })
         return
 
-      } catch (e: unknown) {
-        // 1. Выявляем, произошел ли сбой по таймауту
-        const isTimeout = timeoutSignal.aborted ||
-          (e as Error).name === 'TimeoutError' ||
-          (e as Error).message?.includes('timeout')
+      } catch (err: any) {
+        if (currentSignal.aborted || isDestroyed) return
 
-        // Если это обычная отмена дебаунсом из внешнего контура, мгновенно прекращаем работу
-        if (effectSignal.aborted && !isTimeout) return
+        const stateBeforeError = snapshotState()
 
-        // 2. Безопасно извлекаем валидационные маркеры до их использования в условиях
-        const isCustomValidationError = getExtractedValues({
-          tested: [(e as Error).message], expectedKey: 'THROW_CUSTOM_VALIDATION_ERROR_NO_RETRY', valueType: 'number',
-        })?.[0] === '1' || false
-
-        const __defaultCustomValidationErrorMessage = 'Custom validation error'
-        const customValidationErrorMessage: string = isCustomValidationError
-          ? (getExtractedValues({
-            tested: [(e as Error).message], expectedKey: 'MESSAGE', valueType: 'string',
-          })?.[0] || __defaultCustomValidationErrorMessage)
-          : __defaultCustomValidationErrorMessage
-
-        const isFetchBodyValidationError = isCustomValidationError || (e as Error).name === 'ValidationError'
-
-        // Если попытки исчерпаны ИЛИ это валидационная ошибка тела, которая не подлежит повтору
-        if (attempt === retryCount || isFetchBodyValidationError) {
-          if (effectSignal.aborted) return
-
-          // Считаем суммарное время от первого клика/сдвига карты до текущего момента
-          const totalElapsedMs = Date.now() - startTime
-
-          // Переменная customValidationErrorMessage теперь гарантированно определена выше!
-          const baseErrorMsg = isTimeout
-            ? `Request timed out after ${timeoutMs}ms (attempt ${attempt + 1}/${retryCount + 1})`
-            : isCustomValidationError
-              ? customValidationErrorMessage
-              : e instanceof Error ? e.message : String(e)
-
-          // Формируем детальное сообщение для вывода в UI
-          const finalErrorMessage = `${baseErrorMsg}.${engine.logger.isCoreOptimizationDebugEnabled ? ` Всего безуспешных попыток с момента изменения исходного сигнала: ${retryCount + 1}.` : ''}`
-
-          updateResourceState({
-            data: null,
-            loading: false,
-            error: finalErrorMessage,
-            isRetrying: false,
-            attemptIndex: attempt + 1, // Выводим финальное число сделанных попыток
-            retryCount,
-            totalElapsedMs,
-          })
-          return
-        } else {
-          // Инициализируем планирование следующей попытки (Retry Backoff Phase)
-          if (effectSignal.aborted) return
-
-          let currentDelay = useExponential ? baseDelay * Math.pow(2, attempt) : baseDelay
-          currentDelay = Math.min(currentDelay, maxRetryDelay) + Math.random() * 200
-
-          updateResourceState({
-            data: state.value.data,
-            loading: true,
-            error: null,
-            isRetrying: true,
-            attemptIndex: attempt + 1, // Индекс следующей накатываемой попытки для UI (1, 2, 3...)
-            retryCount
-          })
+        if (attempt < maxRetryCount) {
+          attempt++
+          attemptIndexSignal.value = attempt
 
           engine.log({
             type: 'resource',
-            label: `${resourceSignalName}:retry_scheduled`,
-            details: { payload: { attempt: attempt + 1, total: retryCount, nextDelayMs: Math.round(currentDelay) } }
+            label: name,
+            details: { from: stateBeforeError, to: snapshotState() }
           })
 
-          const logReason = isTimeout ? 'таймауту' : 'ошибке сети'
-          // Исправлен счетчик: пишем честный индекс текущего упавшего запроса из общего пула
-          if (engine.logger.isEnabled) console.warn(`[Resource Retry] "${resourceSignalName}" сбой по ${logReason}. Запрос ${attempt + 1} из ${retryCount + 1} не удался. Ожидание повтора: ${Math.round(currentDelay)}ms`)
-
           try {
-            // Спим перед следующим циклом, уважая отмену внешнего графа
-            await engine.delay(currentDelay, effectSignal)
-            if (effectSignal.aborted) return
-          } catch (delayError) {
+            await engine.delay(100 * attempt, currentSignal)
+          } catch (e) {
             return
           }
+        } else {
+          errorSignal.value = err?.message || String(err)
+          loadingSignal.value = false
+
+          engine.log({
+            type: 'resource',
+            label: name,
+            details: { from: stateBeforeError, to: snapshotState() }
+          })
+          return
         }
       }
     }
   }
 
-  let activeEffectController: AbortController | null = null
-
-  const disposeInternalEffect = engine.effect(() => {
-    const sValue = source ? source.value : undefined as S
-    const effectController = new AbortController()
-    activeEffectController = effectController
-
-    engine.untrack(() => {
-      load(sValue as S, effectController.signal, true)
-    })
-
-    return () => effectController.abort()
-  }, '[CORE_INTERNAL_SIGNAL=1]:effect')
-
-  return {
-    get data() { return state.value.data },
-    get loading() { return state.value.loading },
-    get error() { return state.value.error },
-    get isRetrying() { return state.value.isRetrying },
-    get value() { return state.value },
-    refetch: () => {
-      activeEffectController?.abort()
-      activeEffectController = new AbortController()
-      load(source ? source.value : undefined as S, activeEffectController.signal, false)
-    },
-    subscribe: (cb: (val: ResourceState<T>) => void) => state.subscribe(cb),
-    destroy: () => {
-      activeEffectController?.abort()
-      activeEffectController = null
-      if (typeof disposeInternalEffect === 'function') {
-        disposeInternalEffect()
-      }
-      if ((state as any).destroy) {
-        (state as any).destroy()
-      }
+  const unsubscribeEffect = engine.effect(() => {
+    if (source) {
+      const currentSourceValue = source.value
+      engine.untrack(() => {
+        executeFetch(currentSourceValue)
+      })
+    } else {
+      engine.untrack(() => {
+        executeFetch(undefined as unknown as S)
+      })
     }
-  } as any
+  }, `${name}_effect`)
+
+  const publicResource: Resource<T> = {
+    get data(): T | null { return dataSignal.value },
+    get loading(): boolean { return loadingSignal.value },
+    get error(): string | null { return errorSignal.value },
+    get attemptIndex(): number { return attemptIndexSignal.value },
+    get retryCount(): number { return maxRetryCount },
+
+    refetch(): void {
+      if (isDestroyed) return
+      engine.untrack(() => {
+        if (source) {
+          executeFetch(source.value)
+        } else {
+          executeFetch(undefined as unknown as S)
+        }
+      })
+    },
+
+    subscribe(cb: (val: ResourceState<T>) => void): CleanupFn {
+      return engine.effect(() => {
+        cb(publicResource.value)
+      })
+    },
+
+    get value(): ResourceState<T> {
+      return snapshotState()
+    },
+
+    destroy(): void {
+      isDestroyed = true
+      if (activeAbortController) {
+        activeAbortController.abort()
+        activeAbortController = null
+      }
+      unsubscribeEffect()
+      dataSignal.destroy()
+      loadingSignal.destroy()
+      errorSignal.destroy()
+      attemptIndexSignal.destroy()
+    }
+  }
+
+  return publicResource
 }

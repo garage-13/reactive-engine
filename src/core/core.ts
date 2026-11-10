@@ -1,138 +1,409 @@
-// import { getExtractedValues } from '../utils/getExtractedValues'
-import { Signal, Computed, IEffect, EngineLoggerOptions, LogEventType, CleanupFn, TransactionContext, LogRecord, SignalOptions, ResourceOptions, ResourceState, Resource } from './types'
-import { createComputed } from './core.method.computed'
-import { createSignal } from './core.method.signal'
-// import { executeBatch } from './core.method.batch'
-import { executeUntrack } from './core.method.untrack'
+import type {
+  CleanupFn,
+  EffectFn,
+  Signal,
+  Computed,
+  IEffect,
+  SignalOptions,
+  EngineLoggerOptions,
+  LogEventType,
+  Token,
+  Factory,
+  Resource,
+  ResourceOptions
+} from './types'
+import { ReactiveDebounceLogger, queueLog } from './core.logger'
 import { createReactive } from './core.method.reactive'
-import { createEffect } from './core.method.effect'
-import { ReactiveDebounceLogger } from './core.logger'
 import { createResource } from './core.method.resource'
 
-// Тип для конструктора класса
-type Constructor<T> = new (...args: any[]) => T
-// Тип для фабричной функции зависимостей
-type Factory<T> = (engine: any) => T
-// Универсальный тип токена DI
-type InjectionToken<T> = Constructor<T> | Factory<T> | symbol | string
+export type NodeState = 0 | 1 | 2;
 
-const badgeColors: Record<LogEventType, string> = {
-  signal: 'background: #007acc; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  computed: 'background: #42b883; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  effect: 'background: #e01e5a; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  batch: 'background: #7952b3; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  resource: 'background: #d97706; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-  reactive: 'background: #007acc; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;'
+/**
+ * Высокопроизводительное ребро графа
+ */
+export class NodeLink {
+  public source: ReactiveNode | null = null
+  public target: ReactiveNode | null = null
+  public nextSubscriber: NodeLink | null = null
+  public prevSubscriber: NodeLink | null = null
+  public nextDependency: NodeLink | null = null
+  public prevDependency: NodeLink | null = null
+  public version: number = 0
+
+  public clear(): void {
+    this.source = null
+    this.target = null
+    this.nextSubscriber = null
+    this.prevSubscriber = null
+    this.nextDependency = null
+    this.prevDependency = null
+    this.version = 0
+  }
 }
-let currentTransaction: TransactionContext | null = null
-function safeValueToString(value: unknown): string {
-  if (value === null) return 'null'
-  if (value === undefined) return 'undefined'
-  if (typeof value === 'object') {
+
+/**
+ * Глобальный статический пул ребер (GC-Free)
+ */
+export class LinkPool {
+  private static pool: NodeLink[] = []
+  private static size = 0
+  private static maxPoolSize = 100000
+
+  public static acquire(source: ReactiveNode, target: ReactiveNode): NodeLink {
+    if (this.size > 0) {
+      this.size--
+      const link = this.pool[this.size]
+      this.pool[this.size] = null as unknown as NodeLink
+      link.source = source
+      link.target = target
+      return link
+    }
+    const link = new NodeLink()
+    link.source = source
+    link.target = target
+    return link
+  }
+
+  public static release(link: NodeLink): void {
+    if (this.size < this.maxPoolSize) {
+      link.clear()
+      this.pool[this.size] = link
+      this.size++
+    }
+  }
+}
+
+/**
+ * Единый унифицированный узел реактивного графа
+ */
+export class ReactiveNode {
+  public id: string
+  public type: 'signal' | 'computed' | 'effect'
+  public version: number = 0
+  public state: NodeState = 0
+  public depth: number = 0
+  public subscribersHead: NodeLink | null = null
+  public dependenciesHead: NodeLink | null = null
+  public _value: any
+  public fn: (() => any) | null = null
+  public cleanup: CleanupFn | null = null
+  public isDisposed: boolean = false
+  public ownedEffects: ReactiveNode[] | null = null
+  public wrapper: any = null
+
+  constructor(type: 'signal' | 'computed' | 'effect', id: string, initialValue?: any) {
+    this.type = type
+    this.id = id
+    this._value = initialValue
+  }
+}
+
+/**
+ * Оптимизированный планировщик задач на базе Bucket-Queue.
+ * ИСПРАВЛЕН: Теперь детерминированно обрабатывает re-entry мутации на любых уровнях глубины (включая 0).
+ */
+export class EffectScheduler {
+  private buckets: ReactiveNode[][] = []
+  private maxDepth = -1
+
+  public schedule(node: ReactiveNode): void {
+    const d = node.depth
+    if (!this.buckets[d]) {
+      this.buckets[d] = []
+    }
+    if (!this.buckets[d].includes(node)) {
+      this.buckets[d].push(node)
+      if (d > this.maxDepth) this.maxDepth = d
+    }
+  }
+
+  public flush(engine: ReactiveEngineCore): void {
+    const prevConsumer = engine.activeConsumer
     try {
-      return JSON.stringify(value)
-    } catch (e) {
-      return '[Cyclic Object or Layer]'
-    }
-  }
-  return String(value)
-}
-export function queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
-  if (!currentTransaction) {
-    currentTransaction = { id: Math.random().toString(36).substring(2, 9), pendingLogQueue: [], isFlushing: false }
-    queueMicrotask(() => flushLogs())
-  }
-  currentTransaction.pendingLogQueue.push({ type, label, from: details?.from, to: details?.to, payload: details?.payload, timestamp: Date.now() })
-}
-export function flushLogs(): void {
-  if (!currentTransaction || currentTransaction.isFlushing) return
-  currentTransaction.isFlushing = true
-  const queue = currentTransaction.pendingLogQueue
-  if (queue.length === 0) {
-    currentTransaction = null
-    return
-  }
-  console.groupCollapsed(`%cREACTIVE TRANSACTION%c [id: ${currentTransaction.id}] (${queue.length} operations)`, 'background: #7952b3; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;', 'color: #888; font-weight: normal;')
-  for (const record of queue) {
-    const colorStyle = badgeColors[record.type]
-    const hasTransition = record.from !== undefined || record.to !== undefined
-    let logMessage = `%c${record.type.toUpperCase()}%c ${record.label}`
+      let d = 0
+      while (d <= this.maxDepth) {
+        const bucket = this.buckets[d]
+        if (!bucket || bucket.length === 0) {
+          d++
+          continue
+        }
 
-    if (hasTransition) {
-      if (!!record.from)
-        logMessage += ` ${safeValueToString(record.from)} → ${safeValueToString(record.to)}`
-      else logMessage += ` (${safeValueToString(record.to)})`
-    }
+        this.buckets[d] = []
+        bucket.sort((a, b) => b.depth - a.depth)
 
-    if (record.payload !== undefined) {
-      console.groupCollapsed(logMessage, colorStyle, 'color: inherit;')
-      console.log('Payload:', record.payload)
-      console.groupEnd()
-    } else {
-      console.log(logMessage, colorStyle, 'color: inherit;')
+        for (const node of bucket) {
+          if (node.isDisposed || node.state === 0) continue
+
+          if (node.state === 1) {
+            if (engine.checkNeedsUpdate(node)) {
+              node.state = 2
+            } else {
+              node.state = 0
+            }
+          }
+
+          if (node.state === 2) {
+            engine.runEffectNode(node)
+          }
+        }
+
+        let hasTasks = false
+        for (let i = 0; i <= this.maxDepth; i++) {
+          if (this.buckets[i] && this.buckets[i].length > 0) {
+            d = i
+            hasTasks = true
+            break
+          }
+        }
+        if (!hasTasks) d++
+      }
+    } finally {
+      // ГАРАНТИРУЕТ полный сброс активных потребителей при падении эффектов
+      engine.activeConsumer = prevConsumer
+      this.maxDepth = -1
     }
   }
-  console.groupEnd()
-  currentTransaction = null
 }
+
 export class ReactiveEngineCore {
-  protected frameworkPrefix = 'core'
-  public logger: EngineLoggerOptions
-  public epoch = 0
-  public activeConsumer: any = null
+  public activeConsumer: ReactiveNode | null = null
   public batchDepth = 0
-  public subscriberId = 0
-  public pendingEffects: Array<Set<any> | undefined> = []
-  public maxPendingDepth = 0
-  public computedCache = new WeakMap<Function, any>()
+  public batchedSignals: ReactiveNode[] = []
+  public logger: EngineLoggerOptions
+
+  public proxyCache = new WeakMap<object, any>()
+  public proxyTargets = new WeakSet<object>()
+  public reactiveSignals = new WeakMap<object, Map<string | symbol, any>>()
+
+  private scheduler = new EffectScheduler()
+  private currentOwner: ReactiveNode | null = null
+  private effectIdCounter = 0
+
   private diRegistry = new Map<unknown, unknown>()
   private diCache = new Map<unknown, unknown>()
-  private proxyCache = new WeakMap<object, any>()
-  private proxyTargets = new WeakSet<object>()
-  private reactiveSignals = new WeakMap<object, Map<string | symbol, any>>()
   private cycleDetectionStack = new Set<unknown>()
-  public batchedSignals = new Set<any>()
-  public activeOwner: any = null
-  public activeCleanupNode: any = null
-  // Системная очередь для отложенного батчинга деструкторов
-  public pendingCleanups = new Set<() => void>()
-
-  // Метод для регистрации отложенной очистки
-  public queueCleanup(cleanup: () => void): void {
-    this.pendingCleanups.add(cleanup)
-  }
 
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
   }
 
-  public scheduleEffect(effect: any): void {
-    const depth = effect.depth || 0
-    if (!this.pendingEffects[depth]) {
-      this.pendingEffects[depth] = new Set()
+  public log(params: { type: LogEventType; label: string; details?: { from?: unknown; to?: unknown; payload?: unknown }; isInternalCoreSignal?: boolean }): void {
+    if (!this.logger || !this.logger.isEnabled) return
+    ReactiveDebounceLogger.processLog(this.logger, queueLog, params)
+  }
+
+  // ИСПРАВЛЕН: Поддержка Object.is bypass для объектов, тихой валидации с выгрузкой в console.error
+  public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
+    const name = typeof optionsOrName === 'string' ? optionsOrName : (optionsOrName?.name || 'signal')
+    const validate = typeof optionsOrName === 'object' ? optionsOrName?.validate : undefined
+    const node = new ReactiveNode('signal', name, initialValue)
+    const self = this // Гарантируем лексическую привязку к инстансу класса
+
+    const publicSignal: Signal<T> = {
+      get value(): T {
+        if (self.activeConsumer) {
+          self.trackNode(node, self.activeConsumer)
+        }
+        return node._value
+      },
+      set value(newValue: T) {
+        if (validate) {
+          const validationResult = validate(newValue)
+          if (validationResult === false || typeof validationResult === 'string') {
+            console.error(`[Validation Error] Invalid value supplied to signal "${name}": ${validationResult}`)
+            return
+          }
+        }
+
+        const isObj = newValue !== null && typeof newValue === 'object'
+        if (Object.is(node._value, newValue) && !isObj) return
+
+        const oldVal = node._value
+        node._value = newValue
+        node.version++
+
+        self.log({ type: 'signal', label: name, details: { from: oldVal, to: newValue } })
+
+        if (self.batchDepth > 0) {
+          if (!self.batchedSignals.includes(node)) {
+            self.batchedSignals.push(node)
+          }
+        } else {
+          self.notifySubscribers(node, 2)
+          self.flushEffects()
+        }
+      },
+      get valueWithoutTracking(): T {
+        return node._value
+      },
+      subscribe(cb: (v: T) => void): CleanupFn {
+        return self.effect(() => {
+          cb(publicSignal.value)
+        })
+      },
+      destroy(): void {
+        self.disposeNode(node)
+      }
     }
-    this.pendingEffects[depth]!.add(effect)
-    if (depth > this.maxPendingDepth) {
-      this.maxPendingDepth = depth
+
+    node.wrapper = publicSignal
+    return publicSignal
+  }
+
+  // ИСПРАВЛЕН: Добавлена циклическая защита от записи внутри эффекта (activeConsumer barrier)
+  public notifySubscribers(node: ReactiveNode, state: NodeState): void {
+    let link = node.subscribersHead
+    while (link !== null) {
+      const target = link.target!
+
+      // 3. ФИКС ЦИКЛОВ: Если эффект пытается мутировать сигнал, от которого сам зависит,
+      // мы блокируем пуш-уведомление вверх по этой же ветке во избежание бесконечной рекурсии
+      if (target === this.activeConsumer) {
+        link = link.nextSubscriber
+        continue
+      }
+
+      if (target.state < state) {
+        target.state = state
+        if (target.type === 'effect') {
+          this.scheduler.schedule(target)
+        } else {
+          this.notifySubscribers(target, 1)
+        }
+      }
+      link = link.nextSubscriber
     }
   }
 
-  public queueLog(type: LogEventType, label: string, details?: { from?: unknown; to?: unknown; payload?: unknown }): void {
-    queueLog(type, label, details)
+  public computed<T>(fn: () => T, signalName?: string): Computed<T> {
+    const name = signalName || 'computed'
+    const node = new ReactiveNode('computed', name)
+    node.fn = fn
+    node.state = 2
+    const self = this
+
+    const publicComputed: Computed<T> = {
+      get value(): T {
+        if (node.state === 1) {
+          if (self.checkNeedsUpdate(node)) {
+            node.state = 2
+          } else {
+            node.state = 0
+          }
+        }
+        if (node.state === 2) {
+          const oldVal = node._value
+          self.evaluateComputed(node)
+          self.log({ type: 'computed', label: name, details: { from: oldVal, to: node._value } })
+        }
+        if (self.activeConsumer) {
+          self.trackNode(node, self.activeConsumer)
+        }
+        return node._value
+      },
+      get valueWithoutTracking(): T {
+        return node._value
+      },
+      subscribe(cb: (v: T) => void): CleanupFn {
+        return self.effect(() => {
+          cb(publicComputed.value)
+        })
+      },
+      destroy(): void {
+        self.disposeNode(node)
+      },
+      _isDirty(): boolean {
+        return node.state === 2
+      },
+      // ФИКС КОНТРАКТА v2.x ДЛЯ ПОДДЕРЖКИ ТЕСТА #161 (КАСКАДНОЕ УНИЧТОЖЕНИЕ СВЯЗЕЙ)
+      get dependencies(): Set<any> {
+        const depsSet = new Set<any>()
+        let link = node.dependenciesHead
+        while (link !== null) {
+          if (link.source && link.source.wrapper) {
+            depsSet.add(link.source.wrapper)
+          }
+          link = link.nextDependency
+        }
+        return depsSet
+      }
+    }
+
+    node.wrapper = publicComputed
+    return publicComputed
   }
 
+  public effect(fn: EffectFn, effectName?: string): () => void {
+    const name = effectName || 'effect'
+    const node = new ReactiveNode('effect', name)
+    node.state = 2
+    node.depth = this.currentOwner ? this.currentOwner.depth + 1 : 0
+
+    const publicEffect: IEffect = {
+      id: ++this.effectIdCounter,
+      run: () => {
+        this.runEffectNode(node)
+      },
+      markDirty: () => {
+        node.state = 2
+        this.scheduler.schedule(node)
+      },
+      cleanups: new Set<CleanupFn>(),
+      label: name,
+      get isDirty(): boolean { return node.state === 2 },
+      get isDisposed(): boolean { return node.isDisposed },
+      _node: node
+    }
+
+    node.wrapper = publicEffect
+    node.fn = () => {
+      this.log({ type: 'effect', label: name })
+      const res = fn()
+      if (typeof res === 'function') {
+        publicEffect.cleanups.add(res)
+        node.cleanup = () => {
+          res()
+          publicEffect.cleanups.delete(res)
+        }
+      }
+    }
+
+    if (this.currentOwner) {
+      if (!this.currentOwner.ownedEffects) this.currentOwner.ownedEffects = []
+      this.currentOwner.ownedEffects.push(node)
+    }
+
+    this.runEffectNode(node)
+
+    const disposeFn = () => {
+      this.disposeNode(node)
+    }
+    return disposeFn.bind(this)
+  }
+
+  // 6. ИЗМЕНЕН: Интеграция фабричного метода создания асинхронных ресурсов
+  public resource<T, S = void>(
+    fetcher: (source: S, signal: AbortSignal) => Promise<T>,
+    source?: { value: S },
+    optionsOrName?: string | ResourceOptions<T, S>
+  ): Resource<T> {
+    return createResource<T, S>(this, fetcher, source, optionsOrName)
+  }
+
+  // ИСПРАВЛЕН: Атомарный flush накопленных батч-сигналов на выходе из макро-транзакции
   public batch<T>(fn: () => T): T {
     this.batchDepth++
     try {
       return fn()
-    } finally {
+    } // Любые ошибки из пользовательского тела батча прозрачно летят наверх по спецификации
+    finally {
       this.batchDepth--
       if (this.batchDepth === 0) {
-        if (this.batchedSignals.size > 0) {
-          for (const sig of this.batchedSignals) {
-            if (sig._flushBatch) sig._flushBatch()
-          }
-          this.batchedSignals.clear()
+        const signalsToFlush = this.batchedSignals
+        this.batchedSignals = []
+
+        for (const sig of signalsToFlush) {
+          this.notifySubscribers(sig, 2)
         }
 
         this.flushEffects()
@@ -140,272 +411,165 @@ export class ReactiveEngineCore {
     }
   }
 
-  public flushEffects(): void {
-    if (this.batchDepth > 0) return
-
+  public untrack<T>(fn: () => T): T {
     const prevConsumer = this.activeConsumer
-
+    this.activeConsumer = null
     try {
-      for (let depth = 0; depth <= this.maxPendingDepth; depth++) {
-        const bucket = this.pendingEffects[depth]
-
-        if (!bucket || bucket.size === 0) continue
-
-        const effects = Array.from(bucket)
-        bucket.clear()
-
-        for (const effect of effects) {
-          if (effect.isDisposed) continue
-
-          // ⚡ ЗОЛОТОЙ СТАНДАРТ ОПТИМИЗАЦИИ (Early Dirty Check Bypass):
-          // Переносим проверку грязи в самое начало цикла. Если эффект не был промаркирован
-          // как DIRTY волной push-уведомлений, мы мгновенно пропускаем его, полностью
-          // избавляя V8 от холостого обхода родителей и тяжелых хэш-поисков depVersions.get(dep).
-          if (!effect.isDirty) continue
-
-          if (effect.dependencies && effect.dependencies.size > 0) {
-            let parentChanged = false
-
-            for (const dep of effect.dependencies) {
-              const rawNode = dep._node || dep
-
-              if (rawNode.type === 'computed' && rawNode.state > 0) {
-                if (rawNode.update) rawNode.update()
-              }
-
-              if (effect.depVersions && effect.depVersions.get(dep) !== rawNode.version) {
-                parentChanged = true
-              }
-            }
-
-            if (!parentChanged && effect.dependencies.size > 0) {
-              effect.isDirty = false
-              continue
-            }
-          }
-
-          try {
-            // Вызов метода .run() теперь прозрачно прокидывает наверх ошибки
-            // как из пользовательского тела эффекта, так и из обновленной фазы cleanup
-            effect.run()
-          } catch (err) {
-            // ⚡ ФИКС ТЕСТОВ ОШИБОК (#177 и #247): Если один из эффектов (или его очистка)
-            // выбросил исключение, принудительно гасим флаги грязи (isDirty) у всех оставшихся
-            // в очереди эффектов текущего и последующих уровней глубины.
-            // Старые грязные задачи гарантированно изолируются и не протекают в новые микротаски.
-            for (let d = depth; d <= this.maxPendingDepth; d++) {
-              const remainingBucket = this.pendingEffects[d]
-              if (remainingBucket) {
-                for (const remEffect of remainingBucket) {
-                  remEffect.isDirty = false
-                }
-                remainingBucket.clear()
-              }
-            }
-            this.maxPendingDepth = 0
-
-            // Бескомпромиссный проброс ошибки наверх по спецификации тест-суита
-            throw err
-          }
-        }
-
-        if (depth > 0) {
-          let hasEarlierEffects = false
-          for (let i = 0; i < depth; i++) {
-            if (this.pendingEffects[i] && this.pendingEffects[i]!.size > 0) {
-              hasEarlierEffects = true
-              break
-            }
-          }
-          if (hasEarlierEffects) depth = -1
-        }
-      }
-      this.maxPendingDepth = 0
+      return fn()
     } finally {
       this.activeConsumer = prevConsumer
     }
   }
 
-  // public batch<T>(fn: () => T): T {
-  //   return executeBatch<T>(this, fn)
-  // }
-
-  // ⚛️ ФИКС ДЛЯ РЕЛИЗА 2.5.0: Меняем private на public,
-  // чтобы изолированные функции-методы имели легальный доступ к регистратору логов
-  public log(params: any) {
-    if (!this.logger || !this.logger.isEnabled) return
-    ReactiveDebounceLogger.processLog(this.logger, queueLog, params)
+  public flushEffects(): void {
+    if (this.batchDepth === 0) {
+      this.scheduler.flush(this)
+    }
   }
-
-  /**
-   * Создает новый реактивный сигнал с заданным начальным значением и опциями.
-   *
-   * @template T Тип значения сигнала.
-   * @param initialValue Начальное значение сигнала.
-   * @param optionsOrName Конфигурационные параметры сигнала или его имя.
-   * @param optionsOrName.name Уникальное текстовое имя сигнала для отладки и вывода в транзакционный логгер.
-   * @param optionsOrName.validate Пользовательская функция валидации значения, возвращающая true/false или строку ошибки.
-   *
-   * @method signal
-   * @memberof ReactiveEngine
-   *
-   * @example
-   * // Пример 1: Чистый TypeScript (Базовый)
-   * const engine = new ReactiveEngineCore();
-   * const counter = engine.signal(0, { name: 'counter' });
-   * console.log(counter.value); // 0
-   * counter.value = 1;
-   * console.log(counter.value); // 1
-   *
-   * @example
-   * // Пример 2: Чистый TypeScript (Продвинутый с валидацией)
-   * interface User { id: number; name: string; }
-   * const engine = new ReactiveEngineCore();
-   * const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' }, {
-   *   name: 'user',
-   *   validate: (user) => user.id > 0 && typeof user.name === 'string'
-   * });
-   * userSignal.value = { id: -1, name: 'Jane Doe' }; // Ошибка валидации
-   *
-   * @example
-   * // Пример 3: Интеграция с React (через DI контейнер)
-   * interface User { id: number; name: string; }
-   * class UserService {
-   *   constructor(engine: ReactiveEngineCore) {
-   *     this.mySignal = engine.signal<User>({ id: 1, name: 'John Doe' }, { name: 'userSignal' });
-   *   }
-   *
-   *   mySignal: Signal<User>;
-   * }
-   *
-   * const engine = new ReactiveEngineCore();
-   * engine.provide(UserService, UserService);
-   * const logic = engine.inject(UserService);
-   *
-   * function MyComponent() {
-   *   const user = useReactiveValue(logic.mySignal);
-   *   return <div>{user.name}</div>;
-   * }
-   */
-  public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
-    return createSignal<T>(this, initialValue, optionsOrName)
-  }
-
-  /**
-   * Создает новое вычисляемое свойство (Computed) на основе чистой функции.
-   *
-   * @template T Тип значения, возвращаемого вычисляемым свойством.
-   * @param fn Чистая функция-вычислитель, которая определяет логику вычисления значения.
-   * @param signalName Опциональное имя сигнала для отладки и вывода в транзакционный логгер.
-   *
-   * @method computed
-   * @memberof ReactiveEngine
-   *
-   * @example
-   * // Пример 1: Чистый TypeScript (Базовый)
-   * const engine = new ReactiveEngineCore();
-   * const counter = engine.signal(0, { name: 'counter' });
-   * const doubleCounter = engine.computed(() => counter.value * 2);
-   * console.log(doubleCounter.value); // 0
-   * counter.value = 1;
-   * console.log(doubleCounter.value); // 2
-   *
-   * @example
-   * // Пример 2: Чистый TypeScript (Продвинутый с цепочкой зависимостей)
-   * interface User { id: number; name: string; }
-   * const engine = new ReactiveEngineCore();
-   * const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' }, { name: 'user' });
-   * const userNameLength = engine.computed(() => userSignal.value.name.length);
-   * const hasLongName = engine.computed(() => userNameLength.value > 5);
-   *
-   * console.log(hasLongName.value); // false
-   * userSignal.value = { id: 1, name: 'Johnathan' };
-   * console.log(userNameLength.value); // 9
-   * console.log(hasLongName.value); // true
-   *
-   * @example
-   * // Пример 3: Интеграция с React (через DI контейнер)
-   * interface User { id: number; name: string; }
-   * class UserService {
-   *   constructor(engine: ReactiveEngineCore) {
-   *     this.userSignal = engine.signal<User>({ id: 1, name: 'John Doe' }, { name: 'userSignal' });
-   *     this.userNameLength = engine.computed(() => this.userSignal.value.name.length);
-   *   }
-   *
-   *   userSignal: Signal<User>;
-   *   userNameLength: Computed<number>;
-   * }
-   *
-   * const engine = new ReactiveEngineCore();
-   * engine.provide(UserService, UserService);
-   * const logic = engine.inject(UserService);
-   *
-   * function MyComponent() {
-   *   const hasLongName = engine.use(logic.userNameLength);
-   *   return <div>{hasLongName ? 'Long name' : 'Short name'}</div>;
-   * }
-   */
-  public computed<T>(fn: () => T, signalName?: string): Computed<T> {
-    // Просто делегируем вызов строго изолированной чистой функции
-    return createComputed<T>(this, fn, signalName)
-  }
-
-  public effect(fn: () => void | CleanupFn, effectName?: string): () => void {
-    return createEffect(this, fn, effectName)
-  }
-
-  public untrack<T>(fn: () => T): T {
-    return executeUntrack<T>(this, fn)
-  }
-
-  public reactive<T extends object>(target: T, name?: string): T {
-    return createReactive<T>(this, target, name)
-  }
-
-  public provide<T>(token: InjectionToken<T>, valueOrFactory: T | Factory<T>): void {
-    this.diRegistry.set(token, valueOrFactory)
-    this.diCache.delete(token)
-  }
-
-  public inject<T>(token: InjectionToken<T>): T {
-    if (token === undefined || token === null) throw new Error('[DI Error] Token is empty')
-    if (this.diCache.has(token)) return this.diCache.get(token) as T
-    if (this.cycleDetectionStack.has(token)) throw new Error('[DI Error] Cyclic dependency detected')
-    this.cycleDetectionStack.add(token)
-    try {
-      if (this.diRegistry.has(token)) {
-        const entry = this.diRegistry.get(token)
-        if (typeof entry === 'function') {
-          if ((entry as any)._isMockFunction) {
-            const mockRes = (entry as Function)(this)
-            if (mockRes !== undefined) {
-              this.diCache.set(token, mockRes)
-              return mockRes as T
-            }
-            return entry as unknown as T
-          }
-          const str = entry.toString()
-          const isClass = str.startsWith('class ') || str.startsWith('class{') || (entry.prototype && entry.prototype.constructor === entry && !str.startsWith('function') && !str.includes('=>'))
-          if (!isClass) {
-            const resolved = (entry as Factory<T>)(this)
-            this.diCache.set(token, resolved)
-            return resolved
-          }
-          return entry as unknown as T
-        }
-        return entry as T
+  /* Внутренние Core методы NodeLink */
+  public trackNode(source: ReactiveNode, target: ReactiveNode): void {
+    let link = target.dependenciesHead
+    while (link !== null) {
+      if (link.source === source) {
+        link.version = source.version
+        return
       }
-      if (typeof token === 'function') {
-        const resolved = new (token as Constructor<T>)(this)
-        this.diCache.set(token, resolved)
-        return resolved
+      link = link.nextDependency
+    }
+    const newLink = LinkPool.acquire(source, target)
+    newLink.version = source.version
+    if (target.depth <= source.depth) {
+      target.depth = source.depth + 1
+    }
+    if (source.subscribersHead !== null) {
+      source.subscribersHead.prevSubscriber = newLink
+      newLink.nextSubscriber = source.subscribersHead
+    }
+    source.subscribersHead = newLink
+    if (target.dependenciesHead !== null) {
+      target.dependenciesHead.prevDependency = newLink
+      newLink.nextDependency = target.dependenciesHead
+    }
+    target.dependenciesHead = newLink
+  }
+  public unlinkDependencies(target: ReactiveNode): void {
+    let link = target.dependenciesHead
+    target.dependenciesHead = null
+    while (link !== null) {
+      const next = link.nextDependency
+      const source = link.source!
+      if (link.prevSubscriber !== null) {
+        link.prevSubscriber.nextSubscriber = link.nextSubscriber
+      } else {
+        source.subscribersHead = link.nextSubscriber
       }
-      throw new Error('[DI Error] Token not found')
-    } finally {
-      this.cycleDetectionStack.delete(token)
+      if (link.nextSubscriber !== null) {
+        link.nextSubscriber.prevSubscriber = link.prevSubscriber
+      }
+      LinkPool.release(link)
+      link = next
     }
   }
 
+  // ИСПРАВЛЕН: Валидация версий рёбер (Hot-fix для Value-Equality Cut и Domino-эффекта)
+  public checkNeedsUpdate(node: ReactiveNode): boolean {
+    let link = node.dependenciesHead
+    while (link !== null) {
+      const source = link.source!
+      if (source.state === 1) {
+        if (this.checkNeedsUpdate(source)) {
+          source.state = 2
+        } else {
+          source.state = 0
+        }
+      }
+      if (source.state === 2) {
+        this.evaluateComputed(source)
+      }
+      // Синхронизируем локальный снимок ребра с актуальной версией источника
+      if (link.version !== source.version) {
+        link.version = source.version
+        return true
+      }
+      link = link.nextDependency
+    }
+    return false
+  }
+  public evaluateComputed(node: ReactiveNode): void {
+    this.unlinkDependencies(node)
+    const prevConsumer = this.activeConsumer
+    this.activeConsumer = node
+    try {
+      const newValue = node.fn!()
+      if (!Object.is(node._value, newValue)) {
+        node._value = newValue
+        node.version++
+      }
+      node.state = 0
+    } finally {
+      this.activeConsumer = prevConsumer
+    }
+  }
+  public runEffectNode(node: ReactiveNode): void {
+    if (node.cleanup) {
+      try {
+        this.untrack(() => node.cleanup!())
+      } catch (e) {
+        node.state = 0
+        throw e
+      }
+      node.cleanup = null
+    }
+    if (node.ownedEffects) {
+      const copy = [...node.ownedEffects]
+      node.ownedEffects = null
+      for (const eff of copy) {
+        this.disposeNode(eff)
+      }
+    }
+    this.unlinkDependencies(node)
+    const prevConsumer = this.activeConsumer
+    const prevOwner = this.currentOwner
+    this.activeConsumer = node
+    this.currentOwner = node
+    try {
+node.fn!()
+node.state = 0
+    } finally {
+      this.activeConsumer = prevConsumer
+      this.currentOwner = prevOwner
+    }
+  }
+  public disposeNode(node: ReactiveNode): void {
+    node.isDisposed = true
+    node.state = 0
+    if (node.cleanup) {
+      try {
+        node.cleanup()
+      } catch (e) {}
+      node.cleanup = null
+    }
+    if (node.ownedEffects) {
+      for (const eff of node.ownedEffects) {
+        this.disposeNode(eff)
+      }
+      node.ownedEffects = null
+    }
+    this.unlinkDependencies(node)
+    let link = node.subscribersHead
+    node.subscribersHead = null
+    while (link !== null) {
+      const next = link.nextSubscriber
+      LinkPool.release(link)
+      link = next
+    }
+  }
+  public reactive<T extends object>(target: T, name?: string): T {
+    return createReactive<T>(this, target, name)
+  }
+  /**
+   * Утилита для асинхронной задержки, чувствительная к AbortSignal.
+   */
   public delay(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) {
@@ -425,75 +589,70 @@ export class ReactiveEngineCore {
       signal.addEventListener('abort', onAbort, { once: true })
     })
   }
+  public provide<T>(token: Token<T>, valueOrFactory: T | Factory<T>): void {
+    this.diRegistry.set(token, valueOrFactory)
+    this.diCache.delete(token)
+  }
 
-  /**
-   * Создает умную реактивную декларативную обертку над асинхронными операциями
-   * с автоматическим подавлением Race Conditions и встроенным методом .destroy().
-   *
-   * @template T Тип данных, возвращаемых фетчером после успешного выполнения.
-   * @template S Тип реактивной зависимости (source).
-   * @param fetcher Асинхронная функция, выполняющая запрос и возвращающая данные типа T.
-   * @param source Реактивный сигнал или примитив, предоставляющий источник данных для фетчера.
-   * @param optionsOrName Конфигурационные опции ресурса или его имя.
-   * @param optionsOrName.name Имя ресурса.
-   * @param optionsOrName.resetDataOnSourceChange Флаг, указывающий, следует ли сбрасывать данные при изменении источника.
-   * @param optionsOrName.validateBeforeFetch Функция валидации источника перед выполнением фетча.
-   * @param optionsOrName.responseValidate Функция валидации ответа после выполнения фетча.
-   * @param optionsOrName.timeout Максимальное время ожидания запроса в миллисекундах.
-   * @param optionsOrName.retryCount Количество попыток повторного выполнения запроса в случае ошибки.
-   *
-   * @example
-   * // Пример 1: Чистый TypeScript (Базовый)
-   * interface User { id: number; name: string; }
-   * interface ApiResponse<T> { ok: boolean; message?: string; data: T; }
-   * const engine = new ReactiveEngineCore();
-   * const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' });
-   * const fetchUser = async (source: User, signal: AbortSignal): Promise<ApiResponse<User>> => {
-   *   // Реализация фетча пользователя
-   * };
-   * const userResource = engine.resource(fetchUser, { value: userSignal.value }, { name: 'userResource' });
-   *
-   * @example
-   * // Пример 2: Чистый TypeScript (Продвинутый)
-   * interface User { id: number; name: string; }
-   * interface ApiResponse<T> { ok: boolean; message?: string; data: T; }
-   * const engine = new ReactiveEngineCore();
-   * const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' });
-   * const fetchUser = async (source: User, signal: AbortSignal): Promise<ApiResponse<User>> => {
-   *   // Реализация фетча пользователя с использованием AbortSignal и timeout
-   * };
-   * const userResource = engine.resource(fetchUser, { value: userSignal.value }, {
-   *   name: 'userResource',
-   *   timeout: 5000,
-   *   retryCount: 3,
-   * });
-   *
-   * @example
-   * // Пример 3: Интеграция с React (через DI контейнер)
-   * interface User { id: number; name: string; }
-   * interface ApiResponse<T> { ok: boolean; message?: string; data: T; }
-   * class UserService {
-   *   constructor(engine: ReactiveEngineCore) {
-   *     const userSignal = engine.signal<User>({ id: 1, name: 'John Doe' });
-   *     this.myResource = engine.resource(fetchUser, { value: userSignal.value }, { name: 'userResource' });
-   *   }
-   *
-   *   myResource: Resource<ApiResponse<User>>;
-   * }
-   *
-   * const engine = new ReactiveEngineCore();
-   * engine.provide(UserService, UserService);
-   * const logic = engine.inject(UserService);
-   * const state = useReactiveValue(logic.myResource);
-   */
-  public resource<T, S = void>(
-    fetcher: (source: S, signal: AbortSignal) => Promise<T>,
-    source?: { value: S },
-    optionsOrName?: string | ResourceOptions<T, S>,
-  ): Resource<T> {
-    // Передаем инстанс движка (this) как IReactiveEngine для соблюдения строгой типизации
-    return createResource<T, S>(this, fetcher, source, optionsOrName)
+  public inject<T>(token: Token<T>): T {
+    if (token === undefined || token === null) {
+      throw new Error('[DI Error] Token is empty')
+    }
+    if (this.diCache.has(token)) {
+      return this.diCache.get(token) as T
+    }
+    if (this.cycleDetectionStack.has(token)) {
+      throw new Error('[DI Error] Cyclic dependency detected')
+    }
+
+    this.cycleDetectionStack.add(token)
+
+    try {
+      if (this.diRegistry.has(token)) {
+        const entry = this.diRegistry.get(token)
+
+        if (typeof entry === 'function') {
+          // Проверяем, является ли функция фабрикой или моком
+          if ((entry as any)._isMockFunction) {
+            const mockRes = (entry as Function)(this)
+            if (mockRes !== undefined) {
+              this.diCache.set(token, mockRes)
+              return mockRes as T
+            }
+            return entry as unknown as T
+          }
+
+          const str = entry.toString()
+          const isClass = str.startsWith('class ') ||
+                          str.startsWith('class{') ||
+                          (entry.prototype && entry.prototype.constructor === entry && !str.startsWith('function') && !str.includes('=>'))
+
+          if (!isClass) {
+            const resolved = (entry as Factory<T>)(this)
+            this.diCache.set(token, resolved)
+            return resolved
+          }
+
+          // Если это класс, переданный как фабричное значение (редкий кейс v2.x)
+          return entry as unknown as T
+        }
+        return entry as T
+      }
+
+      // Авто-резолв: если токен является конструктором класса, инстанцируем его, прокидывая engine
+      if (typeof token === 'function') {
+        const resolved = new (token as any)(this)
+        this.diCache.set(token, resolved)
+        return resolved
+      }
+
+      throw new Error('[DI Error] Token not found')
+    } finally {
+      this.cycleDetectionStack.delete(token)
+    }
   }
 }
-
-export { ReactiveEngineCore as ReactiveEngine, ReactiveEngineCore as ReactiveEngineAutomatic }
+export let currentEngineInstance = new ReactiveEngineCore()
+export function resetGlobalReactiveEngine(): void {
+  currentEngineInstance = new ReactiveEngineCore()
+}

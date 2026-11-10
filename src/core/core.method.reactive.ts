@@ -1,14 +1,20 @@
+import type { ReactiveEngineCore } from './core'
+
 /**
- * * Изолированная фабрика глубоких реактивных Proxy-объектов графа.
+ * Изолированная фабрика глубоких реактивных Proxy-объектов графа.
+ * Интегрирована со связными списками NodeLink и транзакционным логгером.
  */
 export function createReactive<T extends object>(
-  engine: any,
+  engine: ReactiveEngineCore,
   target: T,
   name?: string
 ): T {
-  if (engine.proxyTargets.has(target)) return target as any
-  if (engine.proxyCache.has(target)) return engine.proxyCache.get(target) as any
-  if (!engine.reactiveSignals.has(target)) engine.reactiveSignals.set(target, new Map())
+  if (engine.proxyTargets.has(target)) return target
+  if (engine.proxyCache.has(target)) return engine.proxyCache.get(target) as T
+
+  if (!engine.reactiveSignals.has(target)) {
+    engine.reactiveSignals.set(target, new Map<string | symbol, any>())
+  }
   const signalsMap = engine.reactiveSignals.get(target)!
 
   const handler: ProxyHandler<T> = {
@@ -24,24 +30,44 @@ export function createReactive<T extends object>(
         }
       }
 
-      if (Array.isArray(t) && typeof prop === 'string' && ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'].includes(prop)) {
+      if (
+        Array.isArray(t) &&
+        typeof prop === 'string' &&
+        ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'].includes(prop)
+      ) {
         return (...args: any[]) => {
           let result: any
+          const label = name ? `${name}.${prop}` : `array.${prop}`
+          const oldLength = t.length
+
           engine.batch(() => {
-            result = (Reflect.get(t, prop) as Function).apply(receiver, args)
+            const origMethod = Reflect.get(t, prop) as Function
+            result = origMethod.apply(receiver, args)
 
             let lengthSig = signalsMap.get('length')
-            if (lengthSig) lengthSig.value = t.length
+            if (lengthSig) {
+              lengthSig.value = t.length
+            }
 
-            signalsMap.forEach((sig: any, key: string) => {
-              if (key !== 'length') sig.value = Reflect.get(t, key)
+            signalsMap.forEach((sig: any, key: string | symbol) => {
+              if (key !== 'length') {
+                sig.value = Reflect.get(t, key)
+              }
+            })
+
+            engine.log({
+              type: 'reactive',
+              label,
+              details: { from: { length: oldLength }, to: { length: t.length } }
             })
           })
           return result
         }
       }
 
-      if (typeof prop === 'symbol' || prop === 'constructor' || prop === 'toJSON') return Reflect.get(t, prop, receiver)
+      if (typeof prop === 'symbol' || prop === 'constructor' || prop === 'toJSON') {
+        return Reflect.get(t, prop, receiver)
+      }
 
       let sig = signalsMap.get(prop)
       if (!sig) {
@@ -49,24 +75,25 @@ export function createReactive<T extends object>(
         sig = engine.signal(rawValue)
         signalsMap.set(prop, sig)
 
-        // ⚡ ЛЕНИВОЕ КЭШИРОВАНИЕ НА ЧТЕНИИ (O(1) Hot Path):
-        // Создаем прокси-обертку строго один раз при первом РЕАЛЬНОМ обращении к свойству,
-        // а не принудительно при записи.
+        // ЛЕНИВОЕ КЭШИРОВАНИЕ НА ЧТЕНИИ (O(1) Hot Path)
         if (rawValue !== null && typeof rawValue === 'object') {
-          (sig as any)._proxyCache = engine.reactive(rawValue, name ? `${name}.${String(prop)}` : String(prop))
+          (sig as any)._proxyCache = engine.reactive(
+            rawValue,
+            name ? `${name}.${String(prop)}` : String(prop)
+          )
         }
       }
 
       if ((sig as any)._proxyCache !== undefined) {
-        sig.value // Честная регистрация ребра для сохранения топологии глубины веток
+        sig.value // Регистрация ребра NodeLink
         return (sig as any)._proxyCache
       }
 
       return sig.value
     },
 
-    set(t: T, prop: string | symbol, value: any, receiver: any) {
-      const rawValue = engine.proxyTargets.has(value) ? value : value
+    set(t: T, prop: string | symbol, value: any, receiver: any): boolean {
+      const rawValue = value
       const oldValue = Reflect.get(t, prop)
 
       if (oldValue === rawValue && prop !== 'length') return true
@@ -78,16 +105,22 @@ export function createReactive<T extends object>(
         signalsMap.set(prop, sig)
       }
 
-      // ⚡ МЕГА-УСКOРЕНИЕ ДЛЯ СЕТТЕРOВ:
-      // При записи мы просто СБРАСЫВАЕМ кэш прокси на узле в undefined.
-      // Если бенчмарк захочет прочитать это свойство на следующей итерации,
-      // ловушка геттера лениво создаст прокси. Если нет — мы сэкономили 100% ресурсов!
+      const label = name ? `${name}.${String(prop)}` : String(prop)
+      engine.log({
+        type: 'reactive',
+        label,
+        details: { from: oldValue, to: rawValue }
+      });
+
+      // СБРАСЫВАЕМ кэш прокси на узле для ленивой инвалидации геттера
       (sig as any)._proxyCache = undefined
       sig.value = rawValue
 
       if (Array.isArray(t) && prop !== 'length') {
-        let lengthSig = signalsMap.get('length')
-        if (lengthSig) lengthSig.value = t.length
+        const lengthSig = signalsMap.get('length')
+        if (lengthSig) {
+          lengthSig.value = t.length
+        }
       }
       return true
     }
