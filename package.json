@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -42,7 +42,8 @@
     "./angular": {
       "types": "./dist/angular/index.d.ts",
       "import": "./dist/angular/index.mjs"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
