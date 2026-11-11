@@ -16,11 +16,8 @@ import { ReactiveDebounceLogger, queueLog } from './core.logger'
 import { createReactive } from './core.method.reactive'
 import { createResource } from './core.method.resource'
 
-export type NodeState = 0 | 1 | 2;
+export type NodeState = 0 | 1 | 2
 
-/**
- * Высокопроизводительное ребро графа
- */
 export class NodeLink {
   public source: ReactiveNode | null = null
   public target: ReactiveNode | null = null
@@ -41,9 +38,6 @@ export class NodeLink {
   }
 }
 
-/**
- * Глобальный статический пул ребер (GC-Free)
- */
 export class LinkPool {
   private static pool: NodeLink[] = []
   private static size = 0
@@ -73,9 +67,6 @@ export class LinkPool {
   }
 }
 
-/**
- * Единый унифицированный узел реактивного графа
- */
 export class ReactiveNode {
   public id: string
   public type: 'signal' | 'computed' | 'effect'
@@ -83,25 +74,45 @@ export class ReactiveNode {
   public state: NodeState = 0
   public depth: number = 0
   public subscribersHead: NodeLink | null = null
+  public subscribersTail: NodeLink | null = null
   public dependenciesHead: NodeLink | null = null
+  public dependenciesTail: NodeLink | null = null
   public _value: any
+  public _prevValue: any
   public fn: (() => any) | null = null
-  public cleanup: CleanupFn | null = null
+  public cleanups = new Set<CleanupFn>()
   public isDisposed: boolean = false
-  public ownedEffects: ReactiveNode[] | null = null
+  public ownedEffects = new Set<ReactiveNode>()
   public wrapper: any = null
 
   constructor(type: 'signal' | 'computed' | 'effect', id: string, initialValue?: any) {
     this.type = type
     this.id = id
     this._value = initialValue
+    this._prevValue = initialValue
+  }
+
+  public get subscribers(): Set<ReactiveNode> {
+    const set = new Set<ReactiveNode>()
+    let link = this.subscribersHead
+    while (link !== null) {
+      if (link.target) set.add(link.target)
+      link = link.nextSubscriber
+    }
+    return set
+  }
+
+  public get dependencies(): Set<ReactiveNode> {
+    const set = new Set<ReactiveNode>()
+    let link = this.dependenciesHead
+    while (link !== null) {
+      if (link.source) set.add(link.source)
+      link = link.nextDependency
+    }
+    return set
   }
 }
 
-/**
- * Оптимизированный планировщик задач на базе Bucket-Queue.
- * ИСПРАВЛЕН: Теперь детерминированно обрабатывает re-entry мутации на любых уровнях глубины (включая 0).
- */
 export class EffectScheduler {
   private buckets: ReactiveNode[][] = []
   private maxDepth = -1
@@ -115,6 +126,19 @@ export class EffectScheduler {
       this.buckets[d].push(node)
       if (d > this.maxDepth) this.maxDepth = d
     }
+  }
+
+  public clearAll(): void {
+    for (let d = 0; d <= this.maxDepth; d++) {
+      const bucket = this.buckets[d]
+      if (bucket) {
+        for (const node of bucket) {
+          node.state = 0
+        }
+        this.buckets[d] = []
+      }
+    }
+    this.maxDepth = -1
   }
 
   public flush(engine: ReactiveEngineCore): void {
@@ -143,7 +167,13 @@ export class EffectScheduler {
           }
 
           if (node.state === 2) {
-            engine.runEffectNode(node)
+            try {
+              engine.runEffectNode(node)
+            } catch (err) {
+              // Изоляция очереди при падении эффекта (#177, #247)
+              this.clearAll()
+              throw err
+            }
           }
         }
 
@@ -158,7 +188,6 @@ export class EffectScheduler {
         if (!hasTasks) d++
       }
     } finally {
-      // ГАРАНТИРУЕТ полный сброс активных потребителей при падении эффектов
       engine.activeConsumer = prevConsumer
       this.maxDepth = -1
     }
@@ -169,6 +198,8 @@ export class ReactiveEngineCore {
   public activeConsumer: ReactiveNode | null = null
   public batchDepth = 0
   public batchedSignals: ReactiveNode[] = []
+  public batchInitialValues = new Map<ReactiveNode, { value: any; version: number }>()
+  public computedCache = new WeakMap<Function, any>()
   public logger: EngineLoggerOptions
 
   public proxyCache = new WeakMap<object, any>()
@@ -183,6 +214,8 @@ export class ReactiveEngineCore {
   private diCache = new Map<unknown, unknown>()
   private cycleDetectionStack = new Set<unknown>()
 
+  // public isCleaningUp = false
+
   constructor(options?: { logger?: EngineLoggerOptions }) {
     this.logger = options?.logger || { isEnabled: false }
   }
@@ -192,15 +225,18 @@ export class ReactiveEngineCore {
     ReactiveDebounceLogger.processLog(this.logger, queueLog, params)
   }
 
-  // ИСПРАВЛЕН: Поддержка Object.is bypass для объектов, тихой валидации с выгрузкой в console.error
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
     const name = typeof optionsOrName === 'string' ? optionsOrName : (optionsOrName?.name || 'signal')
     const validate = typeof optionsOrName === 'object' ? optionsOrName?.validate : undefined
     const node = new ReactiveNode('signal', name, initialValue)
-    const self = this // Гарантируем лексическую привязку к инстансу класса
+    const self = this
 
-    const publicSignal: Signal<T> = {
+    const publicSignal: Signal<T> & { _node: ReactiveNode } = {
+      _node: node,
       get value(): T {
+        // if (self.isCleaningUp && self.activeConsumer === null) {
+        //   return node._prevValue
+        // }
         if (self.activeConsumer) {
           self.trackNode(node, self.activeConsumer)
         }
@@ -214,22 +250,27 @@ export class ReactiveEngineCore {
             return
           }
         }
-
         const isObj = newValue !== null && typeof newValue === 'object'
         if (Object.is(node._value, newValue) && !isObj) return
 
         const oldVal = node._value
+        node._prevValue = oldVal
+
+        if (self.batchDepth > 0 && !self.batchInitialValues.has(node)) {
+          self.batchInitialValues.set(node, { value: oldVal, version: node.version })
+        }
+
         node._value = newValue
         node.version++
 
         self.log({ type: 'signal', label: name, details: { from: oldVal, to: newValue } })
+        self.notifySubscribers(node, 2)
 
         if (self.batchDepth > 0) {
           if (!self.batchedSignals.includes(node)) {
             self.batchedSignals.push(node)
           }
         } else {
-          self.notifySubscribers(node, 2)
           self.flushEffects()
         }
       },
@@ -250,14 +291,10 @@ export class ReactiveEngineCore {
     return publicSignal
   }
 
-  // ИСПРАВЛЕН: Добавлена циклическая защита от записи внутри эффекта (activeConsumer barrier)
   public notifySubscribers(node: ReactiveNode, state: NodeState): void {
     let link = node.subscribersHead
     while (link !== null) {
       const target = link.target!
-
-      // 3. ФИКС ЦИКЛОВ: Если эффект пытается мутировать сигнал, от которого сам зависит,
-      // мы блокируем пуш-уведомление вверх по этой же ветке во избежание бесконечной рекурсии
       if (target === this.activeConsumer) {
         link = link.nextSubscriber
         continue
@@ -282,7 +319,8 @@ export class ReactiveEngineCore {
     node.state = 2
     const self = this
 
-    const publicComputed: Computed<T> = {
+    const publicComputed: Computed<T> & { _node: ReactiveNode } = {
+      _node: node,
       get value(): T {
         if (node.state === 1) {
           if (self.checkNeedsUpdate(node)) {
@@ -315,9 +353,8 @@ export class ReactiveEngineCore {
       _isDirty(): boolean {
         return node.state === 2
       },
-      // ФИКС КОНТРАКТА v2.x ДЛЯ ПОДДЕРЖКИ ТЕСТА #161 (КАСКАДНОЕ УНИЧТОЖЕНИЕ СВЯЗЕЙ)
       get dependencies(): Set<any> {
-        const depsSet = new Set<any>()
+        const depsSet = new Set()
         let link = node.dependenciesHead
         while (link !== null) {
           if (link.source && link.source.wrapper) {
@@ -328,17 +365,17 @@ export class ReactiveEngineCore {
         return depsSet
       }
     }
-
     node.wrapper = publicComputed
+    if (this.batchDepth === 0) {
+      this.computedCache.set(fn, publicComputed)
+    }
     return publicComputed
   }
-
   public effect(fn: EffectFn, effectName?: string): () => void {
     const name = effectName || 'effect'
     const node = new ReactiveNode('effect', name)
     node.state = 2
     node.depth = this.currentOwner ? this.currentOwner.depth + 1 : 0
-
     const publicEffect: IEffect = {
       id: ++this.effectIdCounter,
       run: () => {
@@ -348,40 +385,30 @@ export class ReactiveEngineCore {
         node.state = 2
         this.scheduler.schedule(node)
       },
-      cleanups: new Set<CleanupFn>(),
+      cleanups: node.cleanups,
       label: name,
       get isDirty(): boolean { return node.state === 2 },
       get isDisposed(): boolean { return node.isDisposed },
       _node: node
     }
-
     node.wrapper = publicEffect
     node.fn = () => {
       this.log({ type: 'effect', label: name })
       const res = fn()
       if (typeof res === 'function') {
-        publicEffect.cleanups.add(res)
-        node.cleanup = () => {
-          res()
-          publicEffect.cleanups.delete(res)
-        }
+        node.cleanups.add(res)
       }
     }
-
     if (this.currentOwner) {
-      if (!this.currentOwner.ownedEffects) this.currentOwner.ownedEffects = []
-      this.currentOwner.ownedEffects.push(node)
+      this.currentOwner.ownedEffects.add(node)
     }
-
     this.runEffectNode(node)
-
     const disposeFn = () => {
       this.disposeNode(node)
     }
-    return disposeFn.bind(this)
+;(disposeFn as any)._node = node
+    return disposeFn
   }
-
-  // 6. ИЗМЕНЕН: Интеграция фабричного метода создания асинхронных ресурсов
   public resource<T, S = void>(
     fetcher: (source: S, signal: AbortSignal) => Promise<T>,
     source?: { value: S },
@@ -389,28 +416,39 @@ export class ReactiveEngineCore {
   ): Resource<T> {
     return createResource<T, S>(this, fetcher, source, optionsOrName)
   }
-
-  // ИСПРАВЛЕН: Атомарный flush накопленных батч-сигналов на выходе из макро-транзакции
   public batch<T>(fn: () => T): T {
     this.batchDepth++
     try {
       return fn()
-    } // Любые ошибки из пользовательского тела батча прозрачно летят наверх по спецификации
-    finally {
+    } finally {
       this.batchDepth--
       if (this.batchDepth === 0) {
-        const signalsToFlush = this.batchedSignals
-        this.batchedSignals = []
-
-        for (const sig of signalsToFlush) {
-          this.notifySubscribers(sig, 2)
+        // Проверка Net-Zero откатов (#147)
+        for (const sig of this.batchedSignals) {
+          const initial = this.batchInitialValues.get(sig)
+          const isObj = sig._value !== null && typeof sig._value === 'object'
+          if (initial && !isObj && Object.is(sig._value, initial.value)) {
+            sig.version = initial.version
+            this.resetCleanState(sig)
+          }
         }
-
+        this.batchedSignals = []
+        this.batchInitialValues.clear()
         this.flushEffects()
       }
     }
   }
-
+  private resetCleanState(node: ReactiveNode): void {
+    let link = node.subscribersHead
+    while (link !== null) {
+      const target = link.target!
+      if (target.state > 0 && !this.checkNeedsUpdate(target)) {
+        target.state = 0
+        this.resetCleanState(target)
+      }
+      link = link.nextSubscriber
+    }
+  }
   public untrack<T>(fn: () => T): T {
     const prevConsumer = this.activeConsumer
     this.activeConsumer = null
@@ -420,13 +458,11 @@ export class ReactiveEngineCore {
       this.activeConsumer = prevConsumer
     }
   }
-
   public flushEffects(): void {
     if (this.batchDepth === 0) {
       this.scheduler.flush(this)
     }
   }
-  /* Внутренние Core методы NodeLink */
   public trackNode(source: ReactiveNode, target: ReactiveNode): void {
     let link = target.dependenciesHead
     while (link !== null) {
@@ -441,20 +477,29 @@ export class ReactiveEngineCore {
     if (target.depth <= source.depth) {
       target.depth = source.depth + 1
     }
-    if (source.subscribersHead !== null) {
-      source.subscribersHead.prevSubscriber = newLink
-      newLink.nextSubscriber = source.subscribersHead
+
+    if (source.subscribersTail !== null) {
+      source.subscribersTail.nextSubscriber = newLink
+      newLink.prevSubscriber = source.subscribersTail
+      source.subscribersTail = newLink
+    } else {
+      source.subscribersHead = newLink
+      source.subscribersTail = newLink
     }
-    source.subscribersHead = newLink
-    if (target.dependenciesHead !== null) {
-      target.dependenciesHead.prevDependency = newLink
-      newLink.nextDependency = target.dependenciesHead
+
+    if (target.dependenciesTail !== null) {
+      target.dependenciesTail.nextDependency = newLink
+      newLink.prevDependency = target.dependenciesTail
+      target.dependenciesTail = newLink
+    } else {
+      target.dependenciesHead = newLink
+      target.dependenciesTail = newLink
     }
-    target.dependenciesHead = newLink
   }
-  public unlinkDependencies(target: ReactiveNode): void {
+  public unlinkDependencies(target: ReactiveNode, cascadeOrphans = false): void {
     let link = target.dependenciesHead
     target.dependenciesHead = null
+    target.dependenciesTail = null
     while (link !== null) {
       const next = link.nextDependency
       const source = link.source!
@@ -465,13 +510,17 @@ export class ReactiveEngineCore {
       }
       if (link.nextSubscriber !== null) {
         link.nextSubscriber.prevSubscriber = link.prevSubscriber
+      } else {
+        source.subscribersTail = link.prevSubscriber
       }
       LinkPool.release(link)
+
+      if (cascadeOrphans && source.type === 'computed' && source.subscribersHead === null) {
+        this.disposeNode(source)
+      }
       link = next
     }
   }
-
-  // ИСПРАВЛЕН: Валидация версий рёбер (Hot-fix для Value-Equality Cut и Domino-эффекта)
   public checkNeedsUpdate(node: ReactiveNode): boolean {
     let link = node.dependenciesHead
     while (link !== null) {
@@ -486,7 +535,6 @@ export class ReactiveEngineCore {
       if (source.state === 2) {
         this.evaluateComputed(source)
       }
-      // Синхронизируем локальный снимок ребра с актуальной версией источника
       if (link.version !== source.version) {
         link.version = source.version
         return true
@@ -496,9 +544,18 @@ export class ReactiveEngineCore {
     return false
   }
   public evaluateComputed(node: ReactiveNode): void {
-    this.unlinkDependencies(node)
+    if (node.ownedEffects.size > 0) {
+      const children = Array.from(node.ownedEffects)
+      node.ownedEffects.clear()
+      for (const eff of children) {
+        this.disposeNode(eff)
+      }
+    }
+    this.unlinkDependencies(node, false)
     const prevConsumer = this.activeConsumer
+    const prevOwner = this.currentOwner
     this.activeConsumer = node
+    this.currentOwner = node
     try {
       const newValue = node.fn!()
       if (!Object.is(node._value, newValue)) {
@@ -508,58 +565,107 @@ export class ReactiveEngineCore {
       node.state = 0
     } finally {
       this.activeConsumer = prevConsumer
+      this.currentOwner = prevOwner
+    }
+  }
+  private executeCleanups(node: ReactiveNode): void {
+    if (node.cleanups.size === 0) return
+    const cleanupsList = Array.from(node.cleanups)
+    node.cleanups.clear()
+    let firstError: unknown = null
+    // const prevCleaning = this.isCleaningUp
+    // this.isCleaningUp = true
+
+    for (const cleanup of cleanupsList) {
+      try {
+        this.untrack(() => cleanup())
+      } catch (err) {
+        if (firstError === null) {
+          firstError = err
+        }
+      }
+    }
+
+    // finally {
+    //   this.isCleaningUp = prevCleaning
+    // }
+    if (firstError !== null) {
+      throw firstError
     }
   }
   public runEffectNode(node: ReactiveNode): void {
-    if (node.cleanup) {
-      try {
-        this.untrack(() => node.cleanup!())
-      } catch (e) {
-        node.state = 0
-        throw e
-      }
-      node.cleanup = null
-    }
-    if (node.ownedEffects) {
-      const copy = [...node.ownedEffects]
-      node.ownedEffects = null
-      for (const eff of copy) {
+    if (node.isDisposed) return
+
+    if (node.ownedEffects.size > 0) {
+      const children = Array.from(node.ownedEffects)
+      node.ownedEffects.clear()
+      for (const eff of children) {
         this.disposeNode(eff)
       }
     }
-    this.unlinkDependencies(node)
+
+    try {
+      this.executeCleanups(node)
+    } catch (e) {
+      node.state = 0
+      throw e
+    }
+
+    // Не прерываем текущий перезапуск (#111), даже если cleanup вызвал dispose() для будущих циклов;
+    // дальнейшая подписка не создастся, так как после fn() мы зачистим зависимости, если isDisposed === true
+    this.unlinkDependencies(node, false)
     const prevConsumer = this.activeConsumer
     const prevOwner = this.currentOwner
     this.activeConsumer = node
     this.currentOwner = node
     try {
-node.fn!()
-node.state = 0
+      node.fn!()
+      node.state = 0
     } finally {
       this.activeConsumer = prevConsumer
       this.currentOwner = prevOwner
+      if (node.isDisposed) {
+        this.unlinkDependencies(node, true)
+      }
     }
   }
   public disposeNode(node: ReactiveNode): void {
+    if (node.isDisposed) return
     node.isDisposed = true
     node.state = 0
-    if (node.cleanup) {
-      try {
-        node.cleanup()
-      } catch (e) {}
-      node.cleanup = null
-    }
-    if (node.ownedEffects) {
-      for (const eff of node.ownedEffects) {
+
+    if (node.ownedEffects.size > 0) {
+      const children = Array.from(node.ownedEffects)
+      node.ownedEffects.clear()
+      for (const eff of children) {
         this.disposeNode(eff)
       }
-      node.ownedEffects = null
     }
-    this.unlinkDependencies(node)
+
+    try {
+      this.executeCleanups(node)
+    } catch (e) {}
+
+    this.unlinkDependencies(node, true)
+
     let link = node.subscribersHead
     node.subscribersHead = null
+    node.subscribersTail = null
     while (link !== null) {
       const next = link.nextSubscriber
+      const target = link.target
+      if (target) {
+        if (link.prevDependency !== null) {
+          link.prevDependency.nextDependency = link.nextDependency
+        } else {
+          target.dependenciesHead = link.nextDependency
+        }
+        if (link.nextDependency !== null) {
+          link.nextDependency.prevDependency = link.prevDependency
+        } else {
+          target.dependenciesTail = link.prevDependency
+        }
+      }
       LinkPool.release(link)
       link = next
     }
@@ -567,25 +673,19 @@ node.state = 0
   public reactive<T extends object>(target: T, name?: string): T {
     return createReactive<T>(this, target, name)
   }
-  /**
-   * Утилита для асинхронной задержки, чувствительная к AbortSignal.
-   */
   public delay(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) {
         return reject(new DOMException('Aborted', 'AbortError'))
       }
-
       const timeoutId = setTimeout(() => {
         signal.removeEventListener('abort', onAbort)
         resolve()
       }, ms)
-
       const onAbort = () => {
         clearTimeout(timeoutId)
         reject(new DOMException('Aborted', 'AbortError'))
       }
-
       signal.addEventListener('abort', onAbort, { once: true })
     })
   }
@@ -593,7 +693,6 @@ node.state = 0
     this.diRegistry.set(token, valueOrFactory)
     this.diCache.delete(token)
   }
-
   public inject<T>(token: Token<T>): T {
     if (token === undefined || token === null) {
       throw new Error('[DI Error] Token is empty')
@@ -604,15 +703,11 @@ node.state = 0
     if (this.cycleDetectionStack.has(token)) {
       throw new Error('[DI Error] Cyclic dependency detected')
     }
-
     this.cycleDetectionStack.add(token)
-
     try {
       if (this.diRegistry.has(token)) {
         const entry = this.diRegistry.get(token)
-
         if (typeof entry === 'function') {
-          // Проверяем, является ли функция фабрикой или моком
           if ((entry as any)._isMockFunction) {
             const mockRes = (entry as Function)(this)
             if (mockRes !== undefined) {
@@ -621,31 +716,24 @@ node.state = 0
             }
             return entry as unknown as T
           }
-
           const str = entry.toString()
           const isClass = str.startsWith('class ') ||
-                          str.startsWith('class{') ||
-                          (entry.prototype && entry.prototype.constructor === entry && !str.startsWith('function') && !str.includes('=>'))
-
+str.startsWith('class{') ||
+(entry.prototype && entry.prototype.constructor === entry && !str.startsWith('function') && !str.includes('=>'))
           if (!isClass) {
             const resolved = (entry as Factory<T>)(this)
             this.diCache.set(token, resolved)
             return resolved
           }
-
-          // Если это класс, переданный как фабричное значение (редкий кейс v2.x)
           return entry as unknown as T
         }
         return entry as T
       }
-
-      // Авто-резолв: если токен является конструктором класса, инстанцируем его, прокидывая engine
       if (typeof token === 'function') {
         const resolved = new (token as any)(this)
         this.diCache.set(token, resolved)
         return resolved
       }
-
       throw new Error('[DI Error] Token not found')
     } finally {
       this.cycleDetectionStack.delete(token)
@@ -656,3 +744,5 @@ export let currentEngineInstance = new ReactiveEngineCore()
 export function resetGlobalReactiveEngine(): void {
   currentEngineInstance = new ReactiveEngineCore()
 }
+
+export { ReactiveEngineCore as ReactiveEngine, ReactiveEngineCore as ReactiveEngineAutomatic }

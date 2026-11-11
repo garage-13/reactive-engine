@@ -46,9 +46,10 @@ engines.forEach(({ name, Engine }) => {
       const effectSpy = vi.fn()
 
       engine.effect(() => {
-        effectSpy(sig.value)
+        const currentVal = sig.value
+        effectSpy(currentVal)
         return () => {
-          cleanupSpy(sig.value)
+          cleanupSpy(currentVal)
         }
       })
 

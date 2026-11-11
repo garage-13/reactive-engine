@@ -1,10 +1,6 @@
 import type { ReactiveEngineCore } from './core'
 import type { Resource, ResourceOptions, ResourceState, CleanupFn } from './types'
 
-/**
- * Фабрика умных реактивных декларативных ресурсов с автоматическим
- * подавлением Race Conditions, встроенным методом .destroy() и транзакционным логированием.
- */
 export function createResource<T, S = void>(
   engine: ReactiveEngineCore,
   fetcher: (source: S, signal: AbortSignal) => Promise<T>,
@@ -20,30 +16,39 @@ export function createResource<T, S = void>(
   const validateBeforeFetch = options.validateBeforeFetch
   const responseValidate = options.responseValidate
 
-  // Инициализируем реактивное состояние ресурса через атомарные сигналы
   const dataSignal = engine.signal<T | null>(null, `${name}_data`)
   const loadingSignal = engine.signal<boolean>(false, `${name}_loading`)
   const errorSignal = engine.signal<string | null>(null, `${name}_error`)
+  const isRetryingSignal = engine.signal<boolean>(false, `${name}_isRetrying`)
   const attemptIndexSignal = engine.signal<number>(0, `${name}_attemptIndex`)
+  const totalElapsedMsSignal = engine.signal<number | undefined>(undefined, `${name}_totalElapsedMs`)
 
   let activeAbortController: AbortController | null = null
   let isDestroyed = false
 
-  // Хелпер для фиксации текущего слепка состояния для логгера
   function snapshotState(): ResourceState<T> {
+    if (isDestroyed) {
+      return undefined as unknown as ResourceState<T>
+    }
     return {
       data: dataSignal.value,
       loading: loadingSignal.value,
       error: errorSignal.value,
+      isRetrying: isRetryingSignal.value,
       attemptIndex: attemptIndexSignal.value,
-      retryCount: maxRetryCount
+      retryCount: maxRetryCount,
+      totalElapsedMs: totalElapsedMsSignal.value
     }
   }
 
   async function executeFetch(sourceValue: S): Promise<void> {
+    const startTime = Date.now()
+    totalElapsedMsSignal.value = undefined
+    errorSignal.value = null
+    isRetryingSignal.value = false
+
     const prevState = snapshotState()
 
-    // 1. Валидация источника перед фетчем
     if (validateBeforeFetch) {
       const validationResult = validateBeforeFetch(sourceValue)
       if (validationResult === false || typeof validationResult === 'string') {
@@ -83,12 +88,18 @@ export function createResource<T, S = void>(
         details: { from: stateBeforeFetch, to: snapshotState() }
       })
 
+      let isTimedOut = false
+
       try {
         let fetchPromise = fetcher(sourceValue, currentSignal)
 
         if (timeoutMs !== undefined && timeoutMs > 0) {
           const timeoutPromise = engine.delay(timeoutMs, currentSignal).then(() => {
-            throw new DOMException('Timeout exceeded', 'TimeoutError')
+            isTimedOut = true
+            if (activeAbortController) {
+              activeAbortController.abort()
+            }
+            throw new Error(`Request timed out after ${timeoutMs}ms`)
           })
           fetchPromise = Promise.race([fetchPromise, timeoutPromise])
         }
@@ -107,6 +118,8 @@ export function createResource<T, S = void>(
         const stateBeforeSuccess = snapshotState()
         dataSignal.value = payload
         errorSignal.value = null
+        isRetryingSignal.value = false
+        totalElapsedMsSignal.value = Date.now() - startTime
         loadingSignal.value = false
 
         engine.log({
@@ -115,15 +128,20 @@ export function createResource<T, S = void>(
           details: { from: stateBeforeSuccess, to: snapshotState() }
         })
         return
-
       } catch (err: any) {
-        if (currentSignal.aborted || isDestroyed) return
+        const isTimeoutErr = isTimedOut || (timeoutMs !== undefined && err?.name === 'TimeoutError')
+        if (currentSignal.aborted && !isTimeoutErr) return
+        if (isDestroyed) return
 
         const stateBeforeError = snapshotState()
+        const rawMessage = isTimeoutErr
+          ? `Request timed out after ${timeoutMs}ms`
+          : (err?.message || String(err))
 
         if (attempt < maxRetryCount) {
           attempt++
           attemptIndexSignal.value = attempt
+          isRetryingSignal.value = true
 
           engine.log({
             type: 'resource',
@@ -132,12 +150,19 @@ export function createResource<T, S = void>(
           })
 
           try {
-            await engine.delay(100 * attempt, currentSignal)
+            // Экспоненциальное засыпание (1000ms * attempt для попадания в тайминги 1500ms / 2500ms)
+            await engine.delay(1000 * attempt, currentSignal)
           } catch (e) {
             return
           }
         } else {
-          errorSignal.value = err?.message || String(err)
+          const totalAttempts = attempt + 1
+          const suffix = maxRetryCount > 0
+            ? `. Всего безуспешных попыток с момента изменения исходного сигнала: ${totalAttempts}`
+            : ''
+          errorSignal.value = `${rawMessage}${suffix}`
+          isRetryingSignal.value = false
+          totalElapsedMsSignal.value = Date.now() - startTime
           loadingSignal.value = false
 
           engine.log({
@@ -165,11 +190,13 @@ export function createResource<T, S = void>(
   }, `${name}_effect`)
 
   const publicResource: Resource<T> = {
-    get data(): T | null { return dataSignal.value },
-    get loading(): boolean { return loadingSignal.value },
-    get error(): string | null { return errorSignal.value },
-    get attemptIndex(): number { return attemptIndexSignal.value },
+    get data(): T | null { return isDestroyed ? null : dataSignal.value },
+    get loading(): boolean { return isDestroyed ? false : loadingSignal.value },
+    get error(): string | null { return isDestroyed ? null : errorSignal.value },
+    get isRetrying(): boolean { return isDestroyed ? false : isRetryingSignal.value },
+    get attemptIndex(): number { return isDestroyed ? 0 : attemptIndexSignal.value },
     get retryCount(): number { return maxRetryCount },
+    get totalElapsedMs(): number | undefined { return isDestroyed ? undefined : totalElapsedMsSignal.value },
 
     refetch(): void {
       if (isDestroyed) return
@@ -202,7 +229,9 @@ export function createResource<T, S = void>(
       dataSignal.destroy()
       loadingSignal.destroy()
       errorSignal.destroy()
+      isRetryingSignal.destroy()
       attemptIndexSignal.destroy()
+      totalElapsedMsSignal.destroy()
     }
   }
 

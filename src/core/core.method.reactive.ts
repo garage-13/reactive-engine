@@ -1,9 +1,5 @@
 import type { ReactiveEngineCore } from './core'
 
-/**
- * Изолированная фабрика глубоких реактивных Proxy-объектов графа.
- * Интегрирована со связными списками NodeLink и транзакционным логгером.
- */
 export function createReactive<T extends object>(
   engine: ReactiveEngineCore,
   target: T,
@@ -16,16 +12,28 @@ export function createReactive<T extends object>(
     engine.reactiveSignals.set(target, new Map<string | symbol, any>())
   }
   const signalsMap = engine.reactiveSignals.get(target)!
+  const OWN_KEYS_SYMBOL = Symbol('ownKeys')
+
+  function getOrCreateSignal(prop: string | symbol, initialVal: any) {
+    let sig = signalsMap.get(prop)
+    if (!sig) {
+      sig = engine.signal(initialVal)
+      signalsMap.set(prop, sig)
+    }
+    return sig
+  }
 
   const handler: ProxyHandler<T> = {
+    ownKeys(t: T) {
+      const keysSig = getOrCreateSignal(OWN_KEYS_SYMBOL, 0)
+      keysSig.value
+      return Reflect.ownKeys(t)
+    },
+
     get(t: T, prop: string | symbol, receiver: any) {
       if (prop === '__subscribe' && Array.isArray(t)) {
         return (cb: () => void) => {
-          let lengthSig = signalsMap.get('length')
-          if (!lengthSig) {
-            lengthSig = engine.signal(t.length)
-            signalsMap.set('length', lengthSig)
-          }
+          const lengthSig = getOrCreateSignal('length', t.length)
           return lengthSig.subscribe(cb)
         }
       }
@@ -44,13 +52,14 @@ export function createReactive<T extends object>(
             const origMethod = Reflect.get(t, prop) as Function
             result = origMethod.apply(receiver, args)
 
-            let lengthSig = signalsMap.get('length')
-            if (lengthSig) {
-              lengthSig.value = t.length
-            }
+            const lengthSig = getOrCreateSignal('length', t.length)
+            lengthSig.value = t.length
+
+            const keysSig = getOrCreateSignal(OWN_KEYS_SYMBOL, 0)
+            keysSig.value = keysSig.valueWithoutTracking + 1
 
             signalsMap.forEach((sig: any, key: string | symbol) => {
-              if (key !== 'length') {
+              if (key !== 'length' && key !== OWN_KEYS_SYMBOL) {
                 sig.value = Reflect.get(t, key)
               }
             })
@@ -75,7 +84,6 @@ export function createReactive<T extends object>(
         sig = engine.signal(rawValue)
         signalsMap.set(prop, sig)
 
-        // ЛЕНИВОЕ КЭШИРОВАНИЕ НА ЧТЕНИИ (O(1) Hot Path)
         if (rawValue !== null && typeof rawValue === 'object') {
           (sig as any)._proxyCache = engine.reactive(
             rawValue,
@@ -85,44 +93,57 @@ export function createReactive<T extends object>(
       }
 
       if ((sig as any)._proxyCache !== undefined) {
-        sig.value // Регистрация ребра NodeLink
+        sig.value
         return (sig as any)._proxyCache
       }
 
       return sig.value
     },
 
-    set(t: T, prop: string | symbol, value: any, receiver: any): boolean {
-      const rawValue = value
+    set(t: T, prop: string | symbol, value: any): boolean {
+      const hadKey = Object.prototype.hasOwnProperty.call(t, prop)
       const oldValue = Reflect.get(t, prop)
 
-      if (oldValue === rawValue && prop !== 'length') return true
-      Reflect.set(t, prop, rawValue)
+      if (hadKey && oldValue === value && prop !== 'length') return true
+      Reflect.set(t, prop, value)
 
-      let sig = signalsMap.get(prop)
-      if (!sig) {
-        sig = engine.signal(oldValue)
-        signalsMap.set(prop, sig)
-      }
+      const sig = getOrCreateSignal(prop, oldValue)
 
       const label = name ? `${name}.${String(prop)}` : String(prop)
       engine.log({
         type: 'reactive',
         label,
-        details: { from: oldValue, to: rawValue }
-      });
+        details: { from: oldValue, to: value }
+      })
 
-      // СБРАСЫВАЕМ кэш прокси на узле для ленивой инвалидации геттера
-      (sig as any)._proxyCache = undefined
-      sig.value = rawValue
+      ;(sig as any)._proxyCache = undefined
+      sig.value = value
+
+      if (!hadKey) {
+        const keysSig = getOrCreateSignal(OWN_KEYS_SYMBOL, 0)
+        keysSig.value = keysSig.valueWithoutTracking + 1
+      }
 
       if (Array.isArray(t) && prop !== 'length') {
-        const lengthSig = signalsMap.get('length')
-        if (lengthSig) {
-          lengthSig.value = t.length
-        }
+        const lengthSig = getOrCreateSignal('length', t.length)
+        lengthSig.value = t.length
       }
       return true
+    },
+
+    deleteProperty(t: T, prop: string | symbol): boolean {
+      const hadKey = Object.prototype.hasOwnProperty.call(t, prop)
+      const result = Reflect.deleteProperty(t, prop)
+      if (hadKey && result) {
+        const sig = signalsMap.get(prop)
+        if (sig) {
+          ;(sig as any)._proxyCache = undefined
+          sig.value = undefined
+        }
+        const keysSig = getOrCreateSignal(OWN_KEYS_SYMBOL, 0)
+        keysSig.value = keysSig.valueWithoutTracking + 1
+      }
+      return result
     }
   }
 
