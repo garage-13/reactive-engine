@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { ISignalLike } from '../../core/types'
 
 type CleanupFn = () => void
@@ -13,9 +13,9 @@ export function useReactiveSubscription<T>(
 ): void {
   const callbackRef = useRef(callback)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     callbackRef.current = callback
-  }, [callback])
+  })
 
   useEffect(() => {
     if (!item || typeof item !== 'object') return
@@ -23,13 +23,13 @@ export function useReactiveSubscription<T>(
     if ('subscribe' in item && typeof (item as Record<string, unknown>).subscribe === 'function') {
       const signalItem = (item as unknown) as ISignalLike<unknown>
       return signalItem.subscribe((newValue) => {
-        callbackRef.current(newValue as any)
+        callbackRef.current(newValue as never)
       })
     }
 
     if ('__subscribe' in item && typeof (item as Record<string, unknown>).__subscribe === 'function') {
       return ((item as Record<string, unknown>).__subscribe as (cb: () => void) => CleanupFn)(() => {
-        callbackRef.current(item as any)
+        callbackRef.current(item as never)
       })
     }
   }, [item])
