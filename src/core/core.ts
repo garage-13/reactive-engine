@@ -77,21 +77,36 @@ export class ReactiveNode {
   public subscribersTail: NodeLink | null = null
   public dependenciesHead: NodeLink | null = null
   public dependenciesTail: NodeLink | null = null
-  public depsCursor: NodeLink | null = null // Курсор для O(1) переиспользования связей
+  public depsCursor: NodeLink | null = null
   public _value: any
   public _prevValue: any
   public fn: (() => any) | null = null
-  public cleanups = new Set<CleanupFn>()
   public isDisposed: boolean = false
-  public ownedEffects = new Set<ReactiveNode>()
+  public ownedEffects: Set<ReactiveNode> | null = null
   public wrapper: any = null
   public engine: ReactiveEngineCore | null = null
+  public _cleanups: Set<CleanupFn> | null = null
+
+  public get cleanups(): Set<CleanupFn> {
+    if (this._cleanups === null) {
+      this._cleanups = new Set<CleanupFn>()
+    }
+    return this._cleanups
+  }
 
   constructor(type: 'signal' | 'computed' | 'effect', id: string, initialValue?: any) {
     this.type = type
     this.id = id
     this._value = initialValue
     this._prevValue = initialValue
+  }
+
+  public get _node(): ReactiveNode {
+    return this
+  }
+
+  public get _engine(): ReactiveEngineCore | null {
+    return this.engine
   }
 
   public get subscribers(): Set<ReactiveNode> {
@@ -104,20 +119,158 @@ export class ReactiveNode {
     return set
   }
 
-  public get dependencies(): Set<ReactiveNode> {
-    const set = new Set<ReactiveNode>()
+  public get dependencies(): Set<any> {
+    const set = new Set<any>()
     let link = this.dependenciesHead
     while (link !== null) {
-      if (link.source) set.add(link.source)
+      if (link.source) {
+        set.add(link.source.wrapper || link.source)
+      }
       link = link.nextDependency
     }
     return set
   }
 }
 
+export class SignalNode<T> extends ReactiveNode implements Signal<T> {
+  private validate?: (value: T) => boolean | string
+  private isInternal: boolean
+
+  constructor(
+    engine: ReactiveEngineCore,
+    id: string,
+    initialValue: T,
+    validate?: (value: T) => boolean | string,
+    isInternal: boolean = false
+  ) {
+    super('signal', id, initialValue)
+    this.engine = engine
+    this.validate = validate
+    this.isInternal = isInternal
+    this.wrapper = this
+  }
+
+  public get value(): T {
+    const engine = this.engine!
+    if (engine.activeConsumer !== null) {
+      engine.trackNode(this, engine.activeConsumer)
+    }
+    return this._value
+  }
+
+  public set value(newValue: T) {
+    if (this.validate !== undefined) {
+      const validationResult = this.validate(newValue)
+      if (validationResult === false || typeof validationResult === 'string') {
+        console.error(`[Validation Error] Invalid value supplied to signal "${this.id}": ${validationResult}`)
+        return
+      }
+    }
+
+    const isObj = newValue !== null && typeof newValue === 'object'
+    if (Object.is(this._value, newValue) && !isObj) return
+
+    const engine = this.engine!
+    const oldVal = this._value
+    this._prevValue = oldVal
+
+    if (engine.batchDepth > 0 && !engine.batchInitialValues.has(this)) {
+      engine.batchInitialValues.set(this, { value: oldVal, version: this.version })
+    }
+
+    this._value = newValue
+    this.version++
+
+    if (engine.logger.isEnabled) {
+      engine.log({ type: 'signal', label: this.id, details: { from: oldVal, to: newValue }, isInternalCoreSignal: this.isInternal })
+    }
+
+    engine.notifySubscribers(this, 2)
+
+    if (engine.batchDepth > 0) {
+      if (!engine.batchedSignals.includes(this)) {
+        engine.batchedSignals.push(this)
+      }
+    } else if (engine.activeConsumer === null) {
+      // Флушим эффекты только на верхнем уровне, не прерывая текущее вычисление computed/effect (#186)
+      engine.flushEffects()
+    }
+  }
+
+  public get valueWithoutTracking(): T {
+    return this._value
+  }
+
+  public subscribe(cb: (v: T) => void): CleanupFn {
+    return this.engine!.effect(() => {
+      cb(this.value)
+    })
+  }
+
+  public destroy(): void {
+    this.engine!.disposeNode(this)
+  }
+}
+
+export class ComputedNode<T> extends ReactiveNode implements Computed<T> {
+  public isEvaluating: boolean = false
+
+  constructor(engine: ReactiveEngineCore, id: string, fn: () => T) {
+    super('computed', id)
+    this.engine = engine
+    this.fn = fn
+    this.state = 2
+    this.wrapper = this
+  }
+
+  public get value(): T {
+    if (this.isEvaluating) {
+      throw new Error(`[Graph Error] Cyclic dependency detected in computed "${this.id}"`)
+    }
+
+    const engine = this.engine!
+    if (this.state === 1) {
+      if (engine.checkNeedsUpdate(this)) {
+        this.state = 2
+      } else {
+        this.state = 0
+      }
+    }
+    if (this.state === 2) {
+      engine.evaluateComputed(this)
+    }
+    if (engine.activeConsumer !== null) {
+      engine.trackNode(this, engine.activeConsumer)
+    }
+    return this._value
+  }
+
+  public get valueWithoutTracking(): T {
+    if (this.isEvaluating) {
+      throw new Error(`[Graph Error] Cyclic dependency detected in computed "${this.id}"`)
+    }
+    return this._value
+  }
+
+  public subscribe(cb: (v: T) => void): CleanupFn {
+    return this.engine!.effect(() => {
+      cb(this.value)
+    })
+  }
+
+  public destroy(): void {
+    this.engine!.disposeNode(this)
+  }
+
+  public _isDirty(): boolean {
+    return this.state === 2
+  }
+}
+
 export class EffectScheduler {
   private buckets: ReactiveNode[][] = []
   private maxDepth = -1
+  private isFlushing = false
 
   public schedule(node: ReactiveNode): void {
     const d = node.depth
@@ -144,10 +297,20 @@ export class EffectScheduler {
   }
 
   public flush(engine: ReactiveEngineCore): void {
+    // Защита от реентерабельного вложенного flush (гарантирует топологический порядок #95)
+    if (this.isFlushing) return
+    this.isFlushing = true
+
     const prevConsumer = engine.activeConsumer
     try {
+      let iterations = 0
       let d = 0
       while (d <= this.maxDepth) {
+        if (++iterations > 10000) {
+          this.clearAll()
+          throw new Error('[Graph Error] Infinite reactive loop detected')
+        }
+
         const bucket = this.buckets[d]
         if (!bucket || bucket.length === 0) {
           d++
@@ -172,7 +335,6 @@ export class EffectScheduler {
             try {
               engine.runEffectNode(node)
             } catch (err) {
-              // Изоляция очереди при падении эффекта (#177, #247)
               this.clearAll()
               throw err
             }
@@ -192,6 +354,7 @@ export class EffectScheduler {
     } finally {
       engine.activeConsumer = prevConsumer
       this.maxDepth = -1
+      this.isFlushing = false
     }
   }
 }
@@ -228,75 +391,23 @@ export class ReactiveEngineCore {
   }
 
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
-    const name = typeof optionsOrName === 'string' ? optionsOrName : (optionsOrName?.name || 'signal')
-    const validate = typeof optionsOrName === 'object' ? optionsOrName?.validate : undefined
-    const isInternal = typeof optionsOrName === 'object' ? optionsOrName?.isInternalCoreSignal : false
-    const node = new ReactiveNode('signal', name, initialValue)
-    node.engine = this
-    const self = this
+    let name = 'signal'
+    let validate: ((value: T) => boolean | string) | undefined
+    let isInternal = false
 
-    // Логируем стартовую инициализацию сигнала (from: undefined -> формат "SIGNAL label (initialValue)")
-    this.log({ type: 'signal', label: name, details: { to: initialValue }, isInternalCoreSignal: isInternal })
-
-    const publicSignal: Signal<T> & { _node: ReactiveNode; _engine: ReactiveEngineCore } = {
-      _node: node,
-      _engine: this,
-      get value(): T {
-        // if (self.isCleaningUp && self.activeConsumer === null) {
-        //   return node._prevValue
-        // }
-        if (self.activeConsumer) {
-          self.trackNode(node, self.activeConsumer)
-        }
-        return node._value
-      },
-      set value(newValue: T) {
-        if (validate) {
-          const validationResult = validate(newValue)
-          if (validationResult === false || typeof validationResult === 'string') {
-            console.error(`[Validation Error] Invalid value supplied to signal "${name}": ${validationResult}`)
-            return
-          }
-        }
-        const isObj = newValue !== null && typeof newValue === 'object'
-        if (Object.is(node._value, newValue) && !isObj) return
-
-        const oldVal = node._value
-        node._prevValue = oldVal
-
-        if (self.batchDepth > 0 && !self.batchInitialValues.has(node)) {
-          self.batchInitialValues.set(node, { value: oldVal, version: node.version })
-        }
-
-        node._value = newValue
-        node.version++
-
-        self.log({ type: 'signal', label: name, details: { from: oldVal, to: newValue }, isInternalCoreSignal: isInternal })
-        self.notifySubscribers(node, 2)
-
-        if (self.batchDepth > 0) {
-          if (!self.batchedSignals.includes(node)) {
-            self.batchedSignals.push(node)
-          }
-        } else {
-          self.flushEffects()
-        }
-      },
-      get valueWithoutTracking(): T {
-        return node._value
-      },
-      subscribe(cb: (v: T) => void): CleanupFn {
-        return self.effect(() => {
-          cb(publicSignal.value)
-        })
-      },
-      destroy(): void {
-        self.disposeNode(node)
-      }
+    if (typeof optionsOrName === 'string') {
+      name = optionsOrName
+    } else if (optionsOrName !== undefined) {
+      if (optionsOrName.name !== undefined) name = optionsOrName.name
+      validate = optionsOrName.validate
+      isInternal = Boolean(optionsOrName.isInternalCoreSignal)
     }
 
-    node.wrapper = publicSignal
-    return publicSignal
+    if (this.logger.isEnabled) {
+      this.log({ type: 'signal', label: name, details: { to: initialValue }, isInternalCoreSignal: isInternal })
+    }
+
+    return new SignalNode<T>(this, name, initialValue, validate, isInternal)
   }
 
   public notifySubscribers(node: ReactiveNode, state: NodeState): void {
@@ -321,71 +432,19 @@ export class ReactiveEngineCore {
   }
 
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
-    const name = signalName || 'computed'
-    const node = new ReactiveNode('computed', name)
-    node.engine = this
-    node.fn = fn
-    node.state = 2
-    const self = this
-
-    const publicComputed: Computed<T> & { _node: ReactiveNode; _engine: ReactiveEngineCore } = {
-      _node: node,
-      _engine: this,
-      get value(): T {
-        if (node.state === 1) {
-          if (self.checkNeedsUpdate(node)) {
-            node.state = 2
-          } else {
-            node.state = 0
-          }
-        }
-        if (node.state === 2) {
-          const oldVal = node._value
-          self.evaluateComputed(node)
-          // self.log({ type: 'computed', label: name, details: { from: oldVal, to: node._value } })
-        }
-        if (self.activeConsumer) {
-          self.trackNode(node, self.activeConsumer)
-        }
-        return node._value
-      },
-      get valueWithoutTracking(): T {
-        return node._value
-      },
-      subscribe(cb: (v: T) => void): CleanupFn {
-        return self.effect(() => {
-          cb(publicComputed.value)
-        })
-      },
-      destroy(): void {
-        self.disposeNode(node)
-      },
-      _isDirty(): boolean {
-        return node.state === 2
-      },
-      get dependencies(): Set<any> {
-        const depsSet = new Set()
-        let link = node.dependenciesHead
-        while (link !== null) {
-          if (link.source && link.source.wrapper) {
-            depsSet.add(link.source.wrapper)
-          }
-          link = link.nextDependency
-        }
-        return depsSet
-      }
-    }
-    node.wrapper = publicComputed
+    const node = new ComputedNode<T>(this, signalName || 'computed', fn)
     if (this.batchDepth === 0) {
-      this.computedCache.set(fn, publicComputed)
+      this.computedCache.set(fn, node)
     }
-    return publicComputed
+    return node
   }
   public effect(fn: EffectFn, effectName?: string): () => void {
     const name = effectName || 'effect'
     const node = new ReactiveNode('effect', name)
+    node.engine = this
     node.state = 2
     node.depth = this.currentOwner ? this.currentOwner.depth + 1 : 0
+
     const publicEffect: IEffect = {
       id: ++this.effectIdCounter,
       run: () => {
@@ -395,28 +454,45 @@ export class ReactiveEngineCore {
         node.state = 2
         this.scheduler.schedule(node)
       },
-      cleanups: node.cleanups,
+      get cleanups() {
+        if (!node.cleanups) node._cleanups = new Set<CleanupFn>()
+        return node.cleanups
+      },
       label: name,
       get isDirty(): boolean { return node.state === 2 },
       get isDisposed(): boolean { return node.isDisposed },
       _node: node
     }
+
     node.wrapper = publicEffect
     node.fn = () => {
-      this.log({ type: 'effect', label: name })
+      if (this.logger.isEnabled) {
+        this.log({ type: 'effect', label: name })
+      }
       const res = fn()
       if (typeof res === 'function') {
-        node.cleanups.add(res)
+        if (node._cleanups === null) node._cleanups = new Set<CleanupFn>()
+        node._cleanups.add(res)
       }
     }
+
     if (this.currentOwner) {
+      if (!this.currentOwner.ownedEffects) {
+        this.currentOwner.ownedEffects = new Set<ReactiveNode>()
+      }
       this.currentOwner.ownedEffects.add(node)
     }
+
     this.runEffectNode(node)
+
+    if (this.activeConsumer === null && this.batchDepth === 0) {
+      this.flushEffects()
+    }
+
     const disposeFn = () => {
       this.disposeNode(node)
     }
-;(disposeFn as any)._node = node
+    ;(disposeFn as any)._node = node
     return disposeFn
   }
   public resource<T, S = void>(
@@ -648,7 +724,7 @@ export class ReactiveEngineCore {
     return false
   }
   public evaluateComputed(node: ReactiveNode): void {
-    if (node.ownedEffects.size > 0) {
+    if (node.ownedEffects !== null && node.ownedEffects.size > 0) {
       const children = Array.from(node.ownedEffects)
       node.ownedEffects.clear()
       for (const eff of children) {
@@ -656,8 +732,9 @@ export class ReactiveEngineCore {
       }
     }
 
-    // Ставим курсор в начало существующих зависимостей вместо полного разрыва связей
     node.depsCursor = node.dependenciesHead
+    ;(node as ComputedNode<unknown>).isEvaluating = true
+    node.state = 0 // Сбрасываем состояние ДО вызова fn()
 
     const prevConsumer = this.activeConsumer
     const prevOwner = this.currentOwner
@@ -670,21 +747,28 @@ export class ReactiveEngineCore {
         node._value = newValue
         node.version++
       }
-      node.state = 0
-      this.log({ type: 'computed', label: node.id, details: { from: oldVal, to: node._value } })
+      if (this.logger.isEnabled) {
+        this.log({ type: 'computed', label: node.id, details: { from: oldVal, to: node._value } })
+      }
+    } catch (err) {
+      node.state = 2 // При ошибке оставляем узел dirty для пересчёта при следующем чтении (#84, #93)
+      throw err
     } finally {
+      ;(node as ComputedNode<unknown>).isEvaluating = false
       this.endTracking(node)
       this.activeConsumer = prevConsumer
       this.currentOwner = prevOwner
+      if (this.activeConsumer === null && this.batchDepth === 0) {
+        this.flushEffects()
+      }
     }
   }
   private executeCleanups(node: ReactiveNode): void {
-    if (node.cleanups.size === 0) return
-    const cleanupsList = Array.from(node.cleanups)
+    if (node._cleanups === null || node._cleanups.size === 0) return
+
+    const cleanupsList = Array.from(node._cleanups)
     node.cleanups.clear()
     let firstError: unknown = null
-    // const prevCleaning = this.isCleaningUp
-    // this.isCleaningUp = true
 
     for (const cleanup of cleanupsList) {
       try {
@@ -696,9 +780,6 @@ export class ReactiveEngineCore {
       }
     }
 
-    // finally {
-    //   this.isCleaningUp = prevCleaning
-    // }
     if (firstError !== null) {
       throw firstError
     }
@@ -706,7 +787,7 @@ export class ReactiveEngineCore {
   public runEffectNode(node: ReactiveNode): void {
     if (node.isDisposed) return
 
-    if (node.ownedEffects.size > 0) {
+    if (node.ownedEffects !== null && node.ownedEffects.size > 0) {
       const children = Array.from(node.ownedEffects)
       node.ownedEffects.clear()
       for (const eff of children) {
@@ -721,8 +802,8 @@ export class ReactiveEngineCore {
       throw e
     }
 
-    // Ставим курсор в начало существующих зависимостей
     node.depsCursor = node.dependenciesHead
+    node.state = 0 // Сбрасываем состояние ДО вызова fn(), чтобы не затереть побочные инвалидации (#186)
 
     const prevConsumer = this.activeConsumer
     const prevOwner = this.currentOwner
@@ -730,7 +811,6 @@ export class ReactiveEngineCore {
     this.currentOwner = node
     try {
       node.fn!()
-      node.state = 0
     } finally {
       this.endTracking(node)
       this.activeConsumer = prevConsumer
@@ -746,7 +826,7 @@ export class ReactiveEngineCore {
     node.state = 0
     node.depsCursor = null
 
-    if (node.ownedEffects.size > 0) {
+    if (node.ownedEffects !== null && node.ownedEffects.size > 0) {
       const children = Array.from(node.ownedEffects)
       node.ownedEffects.clear()
       for (const eff of children) {

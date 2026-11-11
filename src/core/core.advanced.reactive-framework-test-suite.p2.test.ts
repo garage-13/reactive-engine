@@ -1,5 +1,6 @@
 import { describe, test, expect, vi } from 'vitest'
 import { ReactiveEngineCore } from './core'
+import { Computed } from './types'
 
 describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интеграционные бенчмарки)', () => {
 
@@ -30,6 +31,54 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     spy.mockClear()
     a.value = 10
     expect(spy).not.toHaveBeenCalled() // c не должен пересчитываться, эффект молчит
+  })
+
+  test('#57: computed side effect triggers downstream observer after direct read', () => {
+    const engine = new ReactiveEngineCore()
+    const src = engine.signal(0)
+    const sideEffect = engine.signal(0)
+
+    const c = engine.computed(() => {
+      const val = src.value
+      sideEffect.value = val * 10
+      return val + 1
+    })
+
+    let observedSide = -1
+    engine.effect(() => {
+      observedSide = sideEffect.value
+    })
+
+    expect(observedSide).toBe(0)
+
+    // Меняем источник и напрямую читаем computed (вне flushEffects)
+    src.value = 2
+    expect(c.value).toBe(3)
+
+    // Эффект, подписанный на побочный сигнал sideEffect, обязан был синхронно отработать
+    expect(observedSide).toBe(20)
+  })
+
+  test('#64 / #221 / #223: unbounded effect ping-pong cycle throws iteration limit error', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+    const b = engine.signal(0)
+    const c = engine.computed(() => b.value + 1)
+
+    let guard = 0
+    engine.effect(() => {
+      if (++guard > 20000) return
+      b.value = a.value + 1
+    })
+
+    expect(() => {
+      engine.effect(() => {
+        if (++guard > 20000) return
+        a.value = c.value + 1
+      })
+    }).toThrow(/Infinite reactive loop/)
+
+    expect(guard).toBeLessThan(20000)
   })
 
   test('#169: live pruning: effect not re-run when intermediate computed returns same', () => {
@@ -1273,6 +1322,30 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     a.value = 2
     b.value = 10
     expect(runs).toBe(2)
+  })
+
+  test('#153: computed self-dep recovery after catching cycle error', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+
+    const c: Computed<number> = engine.computed(() => {
+      if (a.value === 0) {
+        try {
+          return c.value + 1
+        } catch {
+          return -1
+        }
+      }
+      return a.value * 10
+    })
+
+    // 1. При a === 0 внутренний try/catch перехватывает цикл и возвращает fallback (-1)
+    expect(c.value).toBe(-1)
+
+    // 2. После изменения a на 2 computed обязан сохранить подписку на 'a',
+    // пересчитаться и вернуть 20 (на текущем коде вернётся -1 из-за потери подписки на 'a'!)
+    a.value = 2
+    expect(c.value).toBe(20)
   })
 
 })

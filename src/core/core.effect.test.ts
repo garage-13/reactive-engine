@@ -388,7 +388,7 @@ engines.forEach(({ name, Engine }) => {
       expect(side.value).toBe(50)
     })
 
-    it.skip('TDD-SUITE #186: [Архитектурное ограничение] одновременное чтение computed и его побочного сигнала вызывает ложный Cyclic dependency detected', () => {
+    it('TDD-SUITE #186: [Архитектурное ограничение] одновременное чтение computed и его побочного сигнала вызывает ложный Cyclic dependency detected', () => {
       const src = engine.signal(0)
       const side = engine.signal(10)
 
