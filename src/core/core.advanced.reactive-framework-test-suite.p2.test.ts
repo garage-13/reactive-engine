@@ -1245,4 +1245,34 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     // из-за инверсии хэш-таблицы рантайма, и тест упадет!
     expect(order).toEqual(['inner_cleanup', 'outer_cleanup'])
   })
+
+  test('#141: dispose during execution then continue: no re-run', () => {
+    const engine = new ReactiveEngineCore()
+    const a = engine.signal(0)
+    const b = engine.signal(0)
+
+    let runs = 0
+    let dispose: () => void = () => {}
+
+    dispose = engine.effect(() => {
+      runs++
+      const valA = a.value
+      if (valA === 1) {
+        dispose() // Эффект уничтожает сам себя в середине выполнения
+      }
+      const _ = b.value // Продолжает читать другие сигналы после self-dispose
+    })
+
+    expect(runs).toBe(1)
+
+    // Триггерим self-dispose в середине прогона
+    a.value = 1
+    expect(runs).toBe(2)
+
+    // Последующие изменения как 'a', так и 'b' (прочитанного после dispose) НЕ должны вызывать эффект
+    a.value = 2
+    b.value = 10
+    expect(runs).toBe(2)
+  })
+
 })

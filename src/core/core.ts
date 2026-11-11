@@ -474,6 +474,9 @@ export class ReactiveEngineCore {
     }
   }
   public trackNode(source: ReactiveNode, target: ReactiveNode): void {
+    // Защита от подписки уже уничтоженного узла (тест #141)
+    if (target.isDisposed) return
+
     const cursor = target.depsCursor
 
     // 1. FAST PATH (O(1)): Зависимость совпала с текущей позицией курсора
@@ -741,6 +744,7 @@ export class ReactiveEngineCore {
     if (node.isDisposed) return
     node.isDisposed = true
     node.state = 0
+    node.depsCursor = null
 
     if (node.ownedEffects.size > 0) {
       const children = Array.from(node.ownedEffects)
