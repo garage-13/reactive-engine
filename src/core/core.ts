@@ -77,6 +77,7 @@ export class ReactiveNode {
   public subscribersTail: NodeLink | null = null
   public dependenciesHead: NodeLink | null = null
   public dependenciesTail: NodeLink | null = null
+  public depsCursor: NodeLink | null = null // Курсор для O(1) переиспользования связей
   public _value: any
   public _prevValue: any
   public fn: (() => any) | null = null
@@ -473,20 +474,56 @@ export class ReactiveEngineCore {
     }
   }
   public trackNode(source: ReactiveNode, target: ReactiveNode): void {
+    const cursor = target.depsCursor
+
+    // 1. FAST PATH (O(1)): Зависимость совпала с текущей позицией курсора
+    if (cursor !== null && cursor.source === source) {
+      cursor.version = source.version
+      target.depsCursor = cursor.nextDependency
+      return
+    }
+
+    // 2. SLOW PATH: Проверяем, нет ли уже этого source среди уже пройденных (от head до cursor)
+    // или среди оставшихся после cursor (если зависимости поменялись местами)
     let link = target.dependenciesHead
-    while (link !== null) {
-      if (link.source === source) {
-        link.version = source.version
+    while (link !== cursor) {
+      if (link!.source === source) {
+        link!.version = source.version
         return
       }
-      link = link.nextDependency
+      link = link!.nextDependency
     }
+
+    // Проверяем, не встречается ли source дальше по списку (после cursor)
+    let ahead = cursor !== null ? cursor.nextDependency : null
+    while (ahead !== null) {
+      if (ahead.source === source) {
+        // Вырезаем ahead из его текущей позиции и перемещаем перед cursor
+        if (ahead.prevDependency !== null) {
+          ahead.prevDependency.nextDependency = ahead.nextDependency
+        }
+        if (ahead.nextDependency !== null) {
+          ahead.nextDependency.prevDependency = ahead.prevDependency
+        } else {
+          target.dependenciesTail = ahead.prevDependency
+        }
+
+        ahead.version = source.version
+        this.insertLinkBeforeCursor(target, ahead, cursor!)
+        return
+      }
+      ahead = ahead.nextDependency
+    }
+
+    // 3. Совершенно новая зависимость — берём из пула
     const newLink = LinkPool.acquire(source, target)
     newLink.version = source.version
+
     if (target.depth <= source.depth) {
       target.depth = source.depth + 1
     }
 
+    // Вставляем в хвост подписчиков source
     if (source.subscribersTail !== null) {
       source.subscribersTail.nextSubscriber = newLink
       newLink.prevSubscriber = source.subscribersTail
@@ -496,13 +533,66 @@ export class ReactiveEngineCore {
       source.subscribersTail = newLink
     }
 
-    if (target.dependenciesTail !== null) {
-      target.dependenciesTail.nextDependency = newLink
-      newLink.prevDependency = target.dependenciesTail
-      target.dependenciesTail = newLink
+    // Вставляем в список зависимостей target строго перед cursor (или в хвост, если cursor === null)
+    if (cursor !== null) {
+      this.insertLinkBeforeCursor(target, newLink, cursor)
     } else {
-      target.dependenciesHead = newLink
-      target.dependenciesTail = newLink
+      if (target.dependenciesTail !== null) {
+        target.dependenciesTail.nextDependency = newLink
+        newLink.prevDependency = target.dependenciesTail
+        target.dependenciesTail = newLink
+      } else {
+        target.dependenciesHead = newLink
+        target.dependenciesTail = newLink
+      }
+    }
+  }
+
+  private insertLinkBeforeCursor(target: ReactiveNode, link: NodeLink, cursor: NodeLink): void {
+    const prev = cursor.prevDependency
+    link.prevDependency = prev
+    link.nextDependency = cursor
+    cursor.prevDependency = link
+    if (prev !== null) {
+      prev.nextDependency = link
+    } else {
+      target.dependenciesHead = link
+    }
+  }
+
+  private endTracking(target: ReactiveNode): void {
+    let link = target.depsCursor
+    target.depsCursor = null
+
+    if (link === null) return
+
+    // Отрезаем неиспользованный хвост начиная с link
+    const prev = link.prevDependency
+    if (prev !== null) {
+      prev.nextDependency = null
+      target.dependenciesTail = prev
+    } else {
+      target.dependenciesHead = null
+      target.dependenciesTail = null
+    }
+
+    while (link !== null) {
+      const next: NodeLink | null = link.nextDependency
+      const source = link.source!
+
+      if (link.prevSubscriber !== null) {
+        link.prevSubscriber.nextSubscriber = link.nextSubscriber
+      } else {
+        source.subscribersHead = link.nextSubscriber
+      }
+      if (link.nextSubscriber !== null) {
+        link.nextSubscriber.prevSubscriber = link.prevSubscriber
+      } else {
+        source.subscribersTail = link.prevSubscriber
+      }
+
+      LinkPool.release(link)
+      link = next
     }
   }
   public unlinkDependencies(target: ReactiveNode, cascadeOrphans = false): void {
@@ -563,7 +653,9 @@ export class ReactiveEngineCore {
       }
     }
 
-    this.unlinkDependencies(node, false)
+    // Ставим курсор в начало существующих зависимостей вместо полного разрыва связей
+    node.depsCursor = node.dependenciesHead
+
     const prevConsumer = this.activeConsumer
     const prevOwner = this.currentOwner
     this.activeConsumer = node
@@ -578,6 +670,7 @@ export class ReactiveEngineCore {
       node.state = 0
       this.log({ type: 'computed', label: node.id, details: { from: oldVal, to: node._value } })
     } finally {
+      this.endTracking(node)
       this.activeConsumer = prevConsumer
       this.currentOwner = prevOwner
     }
@@ -625,9 +718,9 @@ export class ReactiveEngineCore {
       throw e
     }
 
-    // Не прерываем текущий перезапуск (#111), даже если cleanup вызвал dispose() для будущих циклов;
-    // дальнейшая подписка не создастся, так как после fn() мы зачистим зависимости, если isDisposed === true
-    this.unlinkDependencies(node, false)
+    // Ставим курсор в начало существующих зависимостей
+    node.depsCursor = node.dependenciesHead
+
     const prevConsumer = this.activeConsumer
     const prevOwner = this.currentOwner
     this.activeConsumer = node
@@ -636,6 +729,7 @@ export class ReactiveEngineCore {
       node.fn!()
       node.state = 0
     } finally {
+      this.endTracking(node)
       this.activeConsumer = prevConsumer
       this.currentOwner = prevOwner
       if (node.isDisposed) {

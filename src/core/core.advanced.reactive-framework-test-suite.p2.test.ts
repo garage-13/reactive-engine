@@ -1245,5 +1245,4 @@ describe('⚛️ Reactive Framework Test Suite — Пакет P2 (Интегра
     // из-за инверсии хэш-таблицы рантайма, и тест упадет!
     expect(order).toEqual(['inner_cleanup', 'outer_cleanup'])
   })
-
 })
