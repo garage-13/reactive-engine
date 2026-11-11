@@ -8,6 +8,14 @@ export function createReactive<T extends object>(
   if (engine.proxyTargets.has(target)) return target
   if (engine.proxyCache.has(target)) return engine.proxyCache.get(target) as T
 
+  // Логируем стартовую инициализацию реактивного Proxy-объекта (REACTIVE <name> (<target>))
+  const rootLabel = name || 'reactive'
+  engine.log({
+    type: 'reactive',
+    label: rootLabel,
+    details: { to: target }
+  })
+
   if (!engine.reactiveSignals.has(target)) {
     engine.reactiveSignals.set(target, new Map<string | symbol, any>())
   }
@@ -17,7 +25,11 @@ export function createReactive<T extends object>(
   function getOrCreateSignal(prop: string | symbol, initialVal: any) {
     let sig = signalsMap.get(prop)
     if (!sig) {
-      sig = engine.signal(initialVal)
+      // Передаём флаг внутреннего сигнала, чтобы не дублировать логи REACTIVE записями SIGNAL
+      sig = engine.signal(initialVal, {
+        name: `${rootLabel}.${String(prop)}`,
+        isInternalCoreSignal: true
+      } as any)
       signalsMap.set(prop, sig)
     }
     return sig

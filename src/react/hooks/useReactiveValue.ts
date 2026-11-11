@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useDebugValue, useMemo, useState } from 'react'
+import { useSyncExternalStore, useDebugValue, useMemo, useRef } from 'react'
 import { ISignalLike } from '../../core/types'
 
 /**
@@ -17,38 +17,52 @@ export function useReactiveValue(signal: any): any {
   }
 
   const rawNode = signal._node || signal
-  const engine = rawNode.engine || signal.engine
+  const engine = rawNode.engine || signal._engine || signal.engine
 
-  // Локальный тикет рендеринга для useSyncExternalStore.
-  const [ticket, setTicket] = useState(0)
+  // Синхронный монотонный счётчик версий для getSnapshot() в useSyncExternalStore
+  const versionRef = useRef(0)
 
-  // 🟢 КАНОНИЧЕСКИЙ ВЕРСИОННЫЙ СНАПШOТ useSyncExternalStore С СИНХРOННЫМ ПOДТЯГИВАНИЕМ КЭША
-  useSyncExternalStore(
-    useMemo(() => (onStoreChange: () => void) => {
-      const triggerStoreRerender = () => {
-        setTicket((t) => t + 1)
-        onStoreChange()
+  const subscribe = useMemo(() => (onStoreChange: () => void) => {
+    let isInitialRun = true
+
+    const triggerStoreRerender = () => {
+      // Игнорируем синхронный стартовый вызов при подписке, чтобы не вызывать лишний ререндер при маунте
+      if (isInitialRun) {
+        isInitialRun = false
+        return
       }
+      versionRef.current += 1
+      onStoreChange()
+    }
 
-      if (rawNode.type === 'computed' && typeof signal.__subscribe === 'function') {
-        return signal.__subscribe(triggerStoreRerender)
-      }
+    // 1. Для computed и обычных signal всегда используем активный .subscribe(),
+    // который гарантированно пересчитывает ленивый узел при мутации корня
+    if (isSignal && typeof signal.subscribe === 'function') {
+      const unsub = signal.subscribe(triggerStoreRerender)
+      isInitialRun = false
+      return unsub
+    }
 
-      if (rawNode.type !== 'computed' && '__subscribe' in signal && typeof signal.__subscribe === 'function') {
-        return signal.__subscribe(triggerStoreRerender)
-      }
+    // 2. Пассивный __subscribe оставляем только для глубоких Proxy-объектов (где нет .subscribe)
+    if (isProxy && typeof signal.__subscribe === 'function') {
+      const unsub = signal.__subscribe(triggerStoreRerender)
+      isInitialRun = false
+      return unsub
+    }
 
-      return signal.subscribe(triggerStoreRerender)
-    }, [signal, rawNode]),
+    return () => {}
+  }, [signal, isSignal, isProxy])
 
-    () => ticket,
+  const version = useSyncExternalStore(
+    subscribe,
+    () => versionRef.current,
     () => 0
   )
 
-  useDebugValue(ticket)
+  useDebugValue(version)
 
   // ⚛️ ТОПОЛОГИЧЕСКИЙ Pull: Стягиваем свежее значение в теле рендера под untrack
-  if (engine && 'untrack' in engine) {
+  if (engine && typeof engine.untrack === 'function') {
     return engine.untrack(() => (signal.value !== undefined ? signal.value : signal))
   }
 

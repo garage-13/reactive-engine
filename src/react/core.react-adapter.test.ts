@@ -310,4 +310,49 @@ describe('React Adapter Hooks — useReactiveSubscription (Imperative Flow)', ()
     expect(result.current).toEqual(['IVAN', 'ALEX', 'SERGEY'])
   })
 
+  it('должен корректно обновлять оба значения (signal и computed) в сценарии Example100 с DI-сервисом и включённым логгером', async () => {
+    const { AbstractService } = await import('../index')
+
+    class Logic extends AbstractService {
+      public counter = this.engine.signal<number>(0, 'example-100:signal:counter')
+      public doubledCounter = this.engine.computed<number>(() => this.counter.value * 2, 'example-100:computed:counter')
+
+      public inc = () => {
+        this.counter.value += 1
+      }
+    }
+
+    const appEngine = new ReactiveEngine({
+      logger: {
+        isEnabled: true,
+        traceTime: true,
+        filter: /^example-*/
+      }
+    })
+
+    const logic = appEngine.inject(Logic)
+
+    const { result } = renderHook(() => ({
+      counter: use(logic.counter),
+      doubledCounter: use(logic.doubledCounter)
+    }))
+
+    expect(result.current.counter).toBe(0)
+    expect(result.current.doubledCounter).toBe(0)
+
+    act(() => {
+      logic.inc()
+    })
+
+    expect(result.current.counter).toBe(1)
+    expect(result.current.doubledCounter).toBe(2)
+
+    act(() => {
+      logic.inc()
+    })
+
+    expect(result.current.counter).toBe(2)
+    expect(result.current.doubledCounter).toBe(4)
+  })
+
 })

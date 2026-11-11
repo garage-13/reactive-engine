@@ -84,6 +84,7 @@ export class ReactiveNode {
   public isDisposed: boolean = false
   public ownedEffects = new Set<ReactiveNode>()
   public wrapper: any = null
+  public engine: ReactiveEngineCore | null = null
 
   constructor(type: 'signal' | 'computed' | 'effect', id: string, initialValue?: any) {
     this.type = type
@@ -228,11 +229,17 @@ export class ReactiveEngineCore {
   public signal<T>(initialValue: T, optionsOrName?: string | SignalOptions<T>): Signal<T> {
     const name = typeof optionsOrName === 'string' ? optionsOrName : (optionsOrName?.name || 'signal')
     const validate = typeof optionsOrName === 'object' ? optionsOrName?.validate : undefined
+    const isInternal = typeof optionsOrName === 'object' ? optionsOrName?.isInternalCoreSignal : false
     const node = new ReactiveNode('signal', name, initialValue)
+    node.engine = this
     const self = this
 
-    const publicSignal: Signal<T> & { _node: ReactiveNode } = {
+    // Логируем стартовую инициализацию сигнала (from: undefined -> формат "SIGNAL label (initialValue)")
+    this.log({ type: 'signal', label: name, details: { to: initialValue }, isInternalCoreSignal: isInternal })
+
+    const publicSignal: Signal<T> & { _node: ReactiveNode; _engine: ReactiveEngineCore } = {
       _node: node,
+      _engine: this,
       get value(): T {
         // if (self.isCleaningUp && self.activeConsumer === null) {
         //   return node._prevValue
@@ -263,7 +270,7 @@ export class ReactiveEngineCore {
         node._value = newValue
         node.version++
 
-        self.log({ type: 'signal', label: name, details: { from: oldVal, to: newValue } })
+        self.log({ type: 'signal', label: name, details: { from: oldVal, to: newValue }, isInternalCoreSignal: isInternal })
         self.notifySubscribers(node, 2)
 
         if (self.batchDepth > 0) {
@@ -315,12 +322,14 @@ export class ReactiveEngineCore {
   public computed<T>(fn: () => T, signalName?: string): Computed<T> {
     const name = signalName || 'computed'
     const node = new ReactiveNode('computed', name)
+    node.engine = this
     node.fn = fn
     node.state = 2
     const self = this
 
-    const publicComputed: Computed<T> & { _node: ReactiveNode } = {
+    const publicComputed: Computed<T> & { _node: ReactiveNode; _engine: ReactiveEngineCore } = {
       _node: node,
+      _engine: this,
       get value(): T {
         if (node.state === 1) {
           if (self.checkNeedsUpdate(node)) {
@@ -332,7 +341,7 @@ export class ReactiveEngineCore {
         if (node.state === 2) {
           const oldVal = node._value
           self.evaluateComputed(node)
-          self.log({ type: 'computed', label: name, details: { from: oldVal, to: node._value } })
+          // self.log({ type: 'computed', label: name, details: { from: oldVal, to: node._value } })
         }
         if (self.activeConsumer) {
           self.trackNode(node, self.activeConsumer)
@@ -515,7 +524,9 @@ export class ReactiveEngineCore {
       }
       LinkPool.release(link)
 
-      if (cascadeOrphans && source.type === 'computed' && source.subscribersHead === null) {
+      // Не уничтожаем computed при отписке слушателей (иначе React StrictMode убивает computed при ремаунте),
+      // каскадно удаляем только если сам узел явным образом уничтожен через .destroy()
+      if (cascadeOrphans && target.isDisposed && target.type === 'computed' && source.type === 'computed' && source.subscribersHead === null) {
         this.disposeNode(source)
       }
       link = next
@@ -551,11 +562,13 @@ export class ReactiveEngineCore {
         this.disposeNode(eff)
       }
     }
+
     this.unlinkDependencies(node, false)
     const prevConsumer = this.activeConsumer
     const prevOwner = this.currentOwner
     this.activeConsumer = node
     this.currentOwner = node
+    const oldVal = node._value
     try {
       const newValue = node.fn!()
       if (!Object.is(node._value, newValue)) {
@@ -563,6 +576,7 @@ export class ReactiveEngineCore {
         node.version++
       }
       node.state = 0
+      this.log({ type: 'computed', label: node.id, details: { from: oldVal, to: node._value } })
     } finally {
       this.activeConsumer = prevConsumer
       this.currentOwner = prevOwner

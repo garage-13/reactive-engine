@@ -85,6 +85,7 @@ export interface IEffect {
 export interface SignalOptions<T> {
   name?: string;
   validate?: (value: T) => boolean | string;
+  isInternalCoreSignal?: boolean;
 }
 
 export interface ResourceState<T> {
