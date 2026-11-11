@@ -42,6 +42,34 @@ When building large-scale frontend applications, developers constantly run into 
 * **The Problem:** Dynamically instantiating computed properties (e.g., dynamically filtering an active tab) accumulates abandoned reactive effects in memory that continue to listen to global state updates forever.
 * **The Solution:** Built-in memory cleanup and computation memoization inside the core engine. The library hooks automatically trigger `.destroy()` on component unmount, seamlessly purging dead reactive effects from RAM.
 
+## Performance & Semantics (v3.0.0)
+
+In **v3.0.0**, the reactive core has been rebuilt around doubly-linked intrusive lists (`NodeLink`), object pooling (`LinkPool`), and **O(1)** cursor-based dependency tracking — eliminating `Set` and `Map` allocations on hot paths.
+
+### 1. Graph Semantics ([reactive-framework-test-suite](https://github.com/johnsoncodehk/reactive-framework-test-suite))
+Passes **159 out of 161** cross-framework correctness tests covering propagation, batching, error isolation, and garbage collection (**98.8% pass rate**, **100% coverage** — on par with `@vue/reactivity` 3.5.45).
+
+### 2. Benchmark Comparison ([js-reactivity-benchmark](https://github.com/transitive-bullshit/js-reactivity-benchmark))
+*Geometric mean of each case's execution time divided by the fastest engine on that case (lower is better; `1.00×` means fastest across all cases in the suite):*
+
+| Engine | `kairo` | `mol` | `dynamic` | `cellx` | `s` |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| `alien-signals` (3.2.1) | 1.00× | 1.03× | 1.00× | 1.10× | 1.02× |
+| `Preact Signals` (1.14.4) | 1.19× | 1.03× | 1.52× | 1.32× | 1.37× |
+| **`@pravosleva/reactive-engine` (3.0.0)** | **1.69×** | **1.06×** | **1.30×** | **1.22×** | **3.69×** |
+| `@vue/reactivity` (3.5.44) | 1.89× | 1.00× | 2.03× | 1.51× | 1.54× |
+| `@amadeus-it-group/tansu` (2.0.0) | 2.79× | 1.10× | 2.47× | 2.23× | 3.22× |
+| `@angular/signals` (22.1.7) | 2.72× | 1.05× | 3.32× | 1.63× | 3.29× |
+| `SolidJS` (1.9.17) | 3.78× | 1.27× | 4.39× | 1.63× | 3.89× |
+| `Svelte v5` (5.57.0) | 3.92× | 1.03× | 2.80× | 111.18× | 3.40× |
+| `MobX` (7.0.6) | 4.41× | 1.28× | 4.37× | 2.54× | 4.90× |
+
+#### Key Workload Highlights (execution time in ms, lower is better)
+* **`updateComputations1000to1` (s-suite):** **`4.79 ms`** *(faster than `alien-signals` at `7.25 ms` and `Vue` at `13.32 ms`)*
+* **`1000x5 - 25 sources` (wide dense):** **`681.5 ms`** *(faster than `Vue` at `1282.8 ms`, `Angular` at `1909.3 ms`, and `SolidJS` at `2170.2 ms`)*
+* **`1000x12 - 4 sources` (large web app):** **`433.3 ms`** *(faster than `Preact Signals` at `540.5 ms` and `Vue` at `740.7 ms`)*
+* **`broadPropagation` (kairo):** **`683.7 ms`** *(faster than `Vue` at `953.4 ms`, `Angular` at `1260.5 ms`, and `SolidJS` at `1815.2 ms`)*
+
 ---
 
 ## Installation
