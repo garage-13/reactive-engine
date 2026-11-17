@@ -133,20 +133,6 @@ export default withPwa(defineConfig({
         ],
         // Боковое меню для русской версии
         sidebar: {
-          '/guides/': [
-            {
-              text: 'Руководство',
-              items: [
-                { text: 'Введение', link: '/guides' },
-                { text: 'Старт с UI-слоем', link: '/guides/quick-start' },
-                // { text: 'React', link: '/react' },
-                // { text: 'Хуки для React', link: '/react/hooks' },
-                { text: 'Философия движка', link: '/guides/philosophy' },
-                // { text: 'Подробное описание', link: '/guides/introduction' },
-                { text: 'Примеры', link: '/guides/state-management-patterns' },
-              ]
-            }
-          ],
           '/guides/state-management-patterns/': [
             {
               text: 'Паттерны управления состоянием',
@@ -154,7 +140,7 @@ export default withPwa(defineConfig({
               items: [
                 {
                   text: 'Обзор раздела',
-                  link: '/guides/state-management-patterns/',
+                  link: '/guides/state-management-patterns',
                 },
                 {
                   text: '1. Кросс-сервисное взаимодействие и DI',
@@ -182,6 +168,20 @@ export default withPwa(defineConfig({
                 },
               ],
             },
+          ],
+          '/guides/': [
+            {
+              text: 'Руководство',
+              items: [
+                { text: 'Введение', link: '/guides' },
+                { text: 'Старт с UI-слоем', link: '/guides/quick-start' },
+                // { text: 'React', link: '/react' },
+                // { text: 'Хуки для React', link: '/react/hooks' },
+                { text: 'Философия движка', link: '/guides/philosophy' },
+                // { text: 'Подробное описание', link: '/guides/introduction' },
+                { text: 'Примеры', link: '/guides/state-management-patterns' },
+              ]
+            }
           ],
           '/methods/': [
             {
