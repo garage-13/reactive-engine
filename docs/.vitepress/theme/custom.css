@@ -50,7 +50,8 @@
 
 /* --- 💚 КНОПКА: Vue 3 (Изумрудно-зеленый) --- */
 .VPButton.brand[href="/reactive-engine/vue.html"],
-.VPButton.brand[href="/reactive-engine/en/vue.html"] {
+.VPButton.brand[href="/reactive-engine/en/vue.html"],
+.VPButton.brand[href="/reactive-engine/en/guides/quick-start/vue.html"] {
   /* - FOR WIP LABEL ONLY */
   position: relative !important;
   padding-right: 48px !important; /* Освобождаем место справа под бэйдж WIP */
@@ -60,7 +61,8 @@
   color: #ffffff !important;
 }
 .VPButton.brand[href="/reactive-engine/vue.html"]:hover,
-.VPButton.brand[href="/reactive-engine/en/vue.html"]:hover {
+.VPButton.brand[href="/reactive-engine/en/vue.html"]:hover,
+.VPButton.brand[href="/reactive-engine/en/guides/quick-start/vue.html"]:hover {
   background-color: #33a06f !important;
   border-color: #33a06f !important;
   box-shadow: 0 0 16px rgba(66, 184, 131, 0.6) !important;
@@ -81,7 +83,8 @@
 } */
 /* --- ❤️ КНОПКА: Angular 16+ (ЗАДИЗЕЙБЛЕНА ШТРИХОВКОЙ + WIP ЛЕЙБЛ) --- */
 .VPButton.brand[href="/reactive-engine/angular.html"],
-.VPButton.brand[href="/reactive-engine/en/angular.html"] {
+.VPButton.brand[href="/reactive-engine/en/angular.html"],
+.VPButton.brand[href="/reactive-engine/en/guides/quick-start/angular.html"] {
   position: relative !important;
   background: linear-gradient(
     rgba(221, 0, 49, 0.45),
@@ -106,7 +109,13 @@
 }
 
 .VPButton.alt[href="/reactive-engine/examples.html"],
-.VPButton.alt[href="/reactive-engine/en/examples.html"] {
+.VPButton.brand[href="/reactive-engine/vue.html"],
+.VPButton.brand[href="/reactive-engine/angular.html"],
+.VPButton.alt[href="/reactive-engine/en/examples.html"],
+.VPButton.brand[href="/reactive-engine/en/vue.html"],
+.VPButton.brand[href="/reactive-engine/en/angular.html"],
+.VPButton.brand[href="/reactive-engine/en/guides/quick-start/vue.html"],
+.VPButton.brand[href="/reactive-engine/en/guides/quick-start/angular.html"] {
   /* - FOR WIP LABEL ONLY */
   position: relative !important;
   padding-right: 48px !important; /* Освобождаем место справа под бэйдж WIP */
@@ -115,11 +124,13 @@
 
 /* 🏷️ ПРИНУДИТЕЛЬНЫЙ ЛЕЙБЛ "WIP" НА БАЗЕ ПСЕВДОЭЛЕМЕНТА */
 .VPButton.alt[href="/reactive-engine/examples.html"]::after,
-.VPButton.alt[href="/reactive-engine/en/examples.html"]::after,
 .VPButton.brand[href="/reactive-engine/vue.html"]::after,
-.VPButton.brand[href="/reactive-engine/en/vue.html"]::after,
 .VPButton.brand[href="/reactive-engine/angular.html"]::after,
-.VPButton.brand[href="/reactive-engine/en/angular.html"]::after {
+.VPButton.alt[href="/reactive-engine/en/examples.html"]::after,
+.VPButton.brand[href="/reactive-engine/en/vue.html"]::after,
+.VPButton.brand[href="/reactive-engine/en/angular.html"]::after,
+.VPButton.brand[href="/reactive-engine/en/guides/quick-start/vue.html"]::after,
+.VPButton.brand[href="/reactive-engine/en/guides/quick-start/angular.html"]::after {
   content: "WIP";
   position: absolute;
   right: 8px;
