@@ -128,7 +128,8 @@ export default withPwa(defineConfig({
           { text: 'Старт с UI-слоем', link: '/guides/quick-start' },
           { text: 'Методы', link: '/methods/' },
           { text: 'Декораторы', link: '/decorators/' },
-          { text: 'Примеры', link: '/examples/' },
+          // { text: 'Примеры', link: '/examples/' },
+          { text: 'Примеры', link: '/guides/state-management-patterns' },
         ],
         // Боковое меню для русской версии
         sidebar: {
@@ -142,8 +143,45 @@ export default withPwa(defineConfig({
                 // { text: 'Хуки для React', link: '/react/hooks' },
                 { text: 'Философия движка', link: '/guides/philosophy' },
                 // { text: 'Подробное описание', link: '/guides/introduction' },
+                { text: 'Примеры', link: '/guides/state-management-patterns' },
               ]
             }
+          ],
+          '/guides/state-management-patterns': [
+            {
+              text: 'Паттерны управления состоянием',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Обзор раздела',
+                  link: '/guides/state-management-patterns/',
+                },
+                {
+                  text: '1. Кросс-сервисное взаимодействие и DI',
+                  link: '/guides/state-management-patterns/cross-service-di',
+                },
+                {
+                  text: '2. Автобатчинг и частые обновления',
+                  link: '/guides/state-management-patterns/auto-batching',
+                },
+                {
+                  text: '3. Динамические зависимости и LinkPool',
+                  link: '/guides/state-management-patterns/dynamic-dependencies-and-link-pool',
+                },
+                {
+                  text: '4. Изоляция инстансов и мосты',
+                  link: '/guides/state-management-patterns/multi-instance-isolation',
+                },
+                {
+                  text: '5. Асинхронные ресурсы (resource)',
+                  link: '/guides/state-management-patterns/async-resources',
+                },
+                {
+                  text: '6. Большие формы и валидация',
+                  link: '/guides/state-management-patterns/reactive-forms',
+                },
+              ],
+            },
           ],
           '/methods/': [
             {
@@ -269,6 +307,7 @@ export default withPwa(defineConfig({
           // { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
           { text: 'Methods', link: '/en/methods/' },
           { text: 'Decorators', link: '/en/decorators/' },
+          { text: 'Patterns', link: '/en/guides/state-management-patterns' },
         ],
         // Боковое меню для английской версии
         sidebar: {
@@ -279,9 +318,46 @@ export default withPwa(defineConfig({
                 { text: 'Guides', link: '/en/guides' },
                 // { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
                 { text: 'Philosophy', link: '/en/guides/philosophy' },
-                { text: 'Introduction', link: '/guides/introduction' },
+                { text: 'Introduction', link: '/en/guides/introduction' },
+                { text: 'Examples', link: '/en/guides/state-management-patterns' },
               ]
             }
+          ],
+          '/en/guides/state-management-patterns': [
+            {
+              text: 'State Management Patterns',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Overview',
+                  link: '/en/guides/state-management-patterns/',
+                },
+                {
+                  text: '1. Cross-Service Communication & DI',
+                  link: '/en/guides/state-management-patterns/cross-service-di',
+                },
+                {
+                  text: '2. Auto-Batching & High-Frequency Updates',
+                  link: '/en/guides/state-management-patterns/auto-batching',
+                },
+                {
+                  text: '3. Dynamic Dependencies & LinkPool',
+                  link: '/en/guides/state-management-patterns/dynamic-dependencies-and-link-pool',
+                },
+                {
+                  text: '4. Multi-Instance Isolation & Bridges',
+                  link: '/en/guides/state-management-patterns/multi-instance-isolation',
+                },
+                {
+                  text: '5. Async Resources & Race Conditions',
+                  link: '/en/guides/state-management-patterns/async-resources',
+                },
+                {
+                  text: '6. Large Reactive Forms & Validation',
+                  link: '/en/guides/state-management-patterns/reactive-forms',
+                },
+              ],
+            },
           ],
           '/en/methods/': [
             {

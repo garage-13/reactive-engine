@@ -34,6 +34,9 @@ hero:
     - theme: alt
       text: Примеры и сущности
       link: /examples
+    - theme: alt
+      text: Паттерны СТМ
+      link: /guides/state-management-patterns
 
 features:
   - title: Минимум ререндеров

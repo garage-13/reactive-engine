@@ -13,15 +13,24 @@ hero:
     - theme: brand
       text: React 18+
       link: /en/guides/quick-start/react
+    - theme: brand
+      text: Vue 3.2+
+      link: /en/guides/quick-start/vue
+    - theme: brand
+      text: Angular 16+
+      link: /en/guides/quick-start/angular
     - theme: alt
       text: Core Description
       link: /en/guides
     - theme: alt
       text: Methods
-      link: /methods
+      link: /en/methods
     - theme: alt
       text: Decorators
       link: /en/decorators
+    - theme: alt
+      text: State management patterns
+      link: /en/guides/state-management-patterns
 
 features:
   - title: Minimal Re-renders
