@@ -13,7 +13,7 @@ interface IVueProxyExtensions {
 }
 
 class ExtendedReactiveEngine extends ReactiveEngineAutomatic {
-  protected override frameworkPrefix = 'vue-auto'
+  // protected override frameworkPrefix = 'vue'
 
   public override reactive<T extends object>(target: T, name?: string): T {
     // Внутренний кэш оригинального прокси, который будет доступен в замыкании макрозадачи подписки

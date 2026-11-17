@@ -14,7 +14,7 @@ export interface AngularUseOptions {
 }
 
 export class ReactiveEngine extends ReactiveEngineAutomatic {
-  protected override frameworkPrefix = 'angular'
+  // protected override frameworkPrefix = 'angular'
 
   /**
    * Использование реактивного значения (Signal, Computed, Resource или Reactive Proxy) в Angular.
@@ -29,7 +29,7 @@ export class ReactiveEngine extends ReactiveEngineAutomatic {
     }
 
     const isSignalOrComputed = 'subscribe' in item && typeof item.subscribe === 'function'
-    
+
     const getFreshValue = () => {
       if (isSignalOrComputed) return item.value
       return item
@@ -41,9 +41,9 @@ export class ReactiveEngine extends ReactiveEngineAutomatic {
     const triggerUpdate = () => {
       if (isPendingUpdate) return
       isPendingUpdate = true
-      
+
       angularSignal.set(getFreshValue())
-      
+
       // Синхронно разжимаем защёлку, позволяя Angular подхватывать
       // асинхронные хвостовые вызовы (trailing edge) декораторов ядра
       isPendingUpdate = false

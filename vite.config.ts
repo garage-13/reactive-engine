@@ -3,9 +3,35 @@ import type { UserConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
-import path from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
+import fs from 'node:fs'
+import path from 'node:path'
 import pkj from './package.json'
+
+function fixDtsExtensions(dir: string) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      fixDtsExtensions(fullPath)
+    } else if (entry.isFile() && entry.name.endsWith('.d.ts')) {
+      let content = fs.readFileSync(fullPath, 'utf8')
+      // Обрабатываем from '...', import '...' и инлайн-типы import('...')
+      content = content.replace(
+        /((?:from|import)\s*\(?\s*['"])(\.\.?(?:\/[^'"]*)?)(['"])/g,
+        (match, prefix, spec, suffix) => {
+          if (spec.endsWith('.js') || spec.endsWith('.json')) return match
+          const resolvedTarget = path.resolve(dir, spec)
+          if (fs.existsSync(resolvedTarget) && fs.statSync(resolvedTarget).isDirectory()) {
+            const cleanSpec = spec.replace(/\/+$/, '')
+            return `${prefix}${cleanSpec}/index.js${suffix}`
+          }
+          return `${prefix}${spec}.js${suffix}`
+        }
+      )
+      fs.writeFileSync(fullPath, content, 'utf8')
+    }
+  }
+}
 
 type TViteOutputObject = Exclude<
   Required<Required<UserConfig>['build']>['rolldownOptions']['output'],
@@ -46,7 +72,10 @@ export default defineConfig({
       compilerOptions: {
         // Указываем компилятору типов обрабатывать только стандартный TS
         allowNonTsExtensions: false,
-      }
+      },
+      afterBuild: () => {
+        fixDtsExtensions(path.resolve(__dirname, 'dist'))
+      },
     }),
     react(),
     vue(),

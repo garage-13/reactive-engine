@@ -12,6 +12,7 @@ export interface LogRecord {
 }
 
 export interface TransactionContext {
+  frameworkPrefix?: string;
   id: string;
   pendingLogQueue: LogRecord[];
   isFlushing: boolean;

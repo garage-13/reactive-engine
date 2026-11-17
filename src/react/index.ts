@@ -19,6 +19,8 @@ export class ReactiveEngine extends ReactiveEngineCore {
     return useReactiveValue(item)
   }
   // Метод inject удален отсюда, так как он нативно наследуется из ReactiveEngineCore без хуков!
+
+  // protected override frameworkPrefix = 'react'
 }
 
 export { useReactiveValue }

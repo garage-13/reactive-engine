@@ -1,8 +1,4 @@
-import {
-  // ReactiveEngineCore,
-  currentEngineInstance,
-  resetGlobalReactiveEngine as resetEngineInstance,
-} from './core'
+import { currentEngineInstance } from './core'
 import { Computed, EffectFn, Signal, Token, Factory } from './types'
 
 /**
@@ -85,9 +81,7 @@ export function untrack<T>(fn: () => T): T {
  * Инициализирует новое изолированное ядро графа, гарантируя, что старые компоненты
  * и кэши вычислений не протекут в новые тестовые раны или жизненные циклы приложения.
  */
-export function resetGlobalReactiveEngine(): void {
-  resetEngineInstance()
-}
+export { resetGlobalReactiveEngine } from './core'
 
 /**
  * Регистрирует зависимость или фабрику в DI-контейнере текущей глобальной эпохи.

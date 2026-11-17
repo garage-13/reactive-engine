@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -60,14 +60,14 @@
     "test:ui": "NODE_OPTIONS='--expose-gc' vitest --ui --exclude '**/core.advanced.dynamic.test.ts'",
     "test:watch": "vitest",
     "test:dynamic": "vitest run src/core/core.advanced.dynamic.test.ts --reporter=verbose",
+    "test:types": "tsc --noEmit --strict --module nodenext --moduleResolution nodenext --skipLibCheck false dist/index.d.ts dist/react/index.d.ts dist/vue/index.d.ts dist/angular/index.d.ts",
     "preversion": "npm run test",
-    "prepublishOnly": "npm run test && npm run build",
+    "prepublishOnly": "npm run test && npm run build && npm run test:types",
     "postversion": "git push && git push --tags",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
-    "_docs:pwa-gen": "npx pwa-asset-generator docs/public/rocket-thruster-120x120.svg docs/public/pwa/ --manifest docs/public/manifest.json --base /reactive-engine/pwa/ --background \"#1a1a24\" --padding \"15%\"",
-    "report:matrix": "node report/update-readme.js"
+    "_docs:pwa-gen": "npx pwa-asset-generator docs/public/rocket-thruster-120x120.svg docs/public/pwa/ --manifest docs/public/manifest.json --base /reactive-engine/pwa/ --background \"#1a1a24\" --padding \"15%\""
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",
