@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
+## [3.0.1] — 2026-11-17
+
+### Исправления
+- **Совместимость типов с `node16` / `nodenext` ([#1](https://github.com))**: Добавлена пост-сборочная обработка сгенерированных деклараций (`.d.ts`) в `vite.config.js`, которая проставляет явные расширения `.js` и `/index.js` для всех относительных импортов, реэкспортов и инлайн-типов `import(...)` во всех входных точках пакета (`dist/index.d.ts`, `/react`, `/vue`, `/angular`).
+- **Контроль качества типов при публикации**: Добавлен скрипт `test:types` (`tsc --moduleResolution nodenext --skipLibCheck false`), встроенный в хук `prepublishOnly` перед отправкой пакета в npm.
+
 ## [3.0.0] — 2026-11-12
 
 ### Архитектура и производительность
