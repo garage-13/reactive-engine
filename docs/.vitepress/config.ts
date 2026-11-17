@@ -147,7 +147,7 @@ export default withPwa(defineConfig({
               ]
             }
           ],
-          '/guides/state-management-patterns': [
+          '/guides/state-management-patterns/': [
             {
               text: 'Паттерны управления состоянием',
               collapsed: false,
@@ -323,7 +323,7 @@ export default withPwa(defineConfig({
               ]
             }
           ],
-          '/en/guides/state-management-patterns': [
+          '/en/guides/state-management-patterns/': [
             {
               text: 'State Management Patterns',
               collapsed: false,
