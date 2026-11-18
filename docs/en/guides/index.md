@@ -11,10 +11,21 @@ next:
 
 The primary goal of the engine is to completely isolate business logic from the UI framework, reducing component re-renders to an absolute minimum.
 
+![js-reactivity-benchmark results for @pravosleva/reactive-engine v3.0.2](/js-reactivity-benchmark/2026-11-18/latest-benchmark.png)
+
+::: info How to Interpret Benchmark Tables
+Summary tables in `js-reactivity-benchmark` place libraries from two distinct architectural tiers side by side:
+* **Low-level reactive primitives** (`alien-signals`, `@preact/signals-core`) — bare-metal signal kernels with minimal object shapes and no built-in DI, debug labels, write validation, or async resource management.
+* **Full-featured application state managers** (`@pravosleva/reactive-engine`, `MobX`, `@angular/signals`, `$mol_wire`) — frameworks where every reactive node carries application-level infrastructure: string debug IDs, write-time validation, cascaded effect ownership (`ownedEffects`), dependency injection, and `resource` lifecycles.
+
+**What these measurements actually tell you:**
+1. **Abstraction overhead, not feature parity:** In allocation-heavy suites like `s` (creating thousands of empty computations in a tight loop), a minimal primitive will naturally instantiate faster due to fewer fields per node.
+2. **Hot-path efficiency:** Staying within **1.08×–1.17×** of bare-metal primitives in dynamic graph workloads (`cellx`, `dynamic`) while outperforming other full-featured state managers proves that high-level features add negligible overhead during signal propagation and edge reconciliation.
+:::
+
 ## Tree-Shaking & React-Free Core
 
 The package is built with bundle size optimization in mind and features full **tree-shaking** support out of the box. Thanks to strict entry-point separation at the `package.json` level, utilizing the core library (`@pravosleva/reactive-engine`) in Vanilla JS or headless environments is **completely isolated**. All React-specific adapters and dependencies reside exclusively within the `/react` subpath and will never be bundled into your application unless explicitly imported. Furthermore, `react` is marked as an optional peer dependency, ensuring a clean installation without cluttering packet manager logs in non-React environments.
-
 
 ## Key Features
 
