@@ -9,8 +9,6 @@ When integrating Socket.IO into a **`@pravosleva/reactive-engine` v3.0.1** servi
 3. **Promise-based acknowledgements (`emitWithAck`):** Use `socket.timeout(5000).emitWithAck(...)` instead of legacy nested callbacks.
 4. **Checking `socket.recovered`:** Leverage Connection State Recovery so the service knows whether missed packets were automatically replayed by the server or if history must be re-fetched via `resource.refresh()`.
 
----
-
 ## Practical Example: Typed Chat & Presence (`ChatSocketService.ts`)
 
 ```typescript
