@@ -11,52 +11,6 @@
 ## Практический пример: Сервис потоковых котировок (`MarketSocketService.ts`)
 
 ```typescript
-import { AbstractService } from '@pravosleva/reactive-engine'
-
-export type SocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
-
-export interface TickerPayload {
-  symbol: string
-  price: number
-  timestamp: number
-}
-
-export class MarketSocketService extends AbstractService {
-  // Реактивные параметры подключения
-  public activeSymbol = this.engine.signal<string | null>('BTC-USDT', 'ws:activeSymbol')
-  public status = this.engine.signal<SocketStatus>('disconnected', 'ws:status')
-  public latestTick = this.engine.signal<TickerPayload | null>(null, 'ws:latestTick')
-
-  private socket: WebSocket | null = null
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  private reconnectAttempts = 0
-  private isManuallyClosed = false
-
-  // Храним функцию отписки от реактивного эффекта
-  private stopAutoConnectEffect: () => void
-
-  constructor(engine: any) {
-    super(engine)
-
-    // Эффект автоматически управляет подключением при смене activeSymbol
-    this.stopAutoConnectEffect = this.engine.effect(() => {
-      const symbol = this.activeSymbol.value
-      this.cleanupSocket()
-
-      if (!symbol) {
-        this.status.value = 'disconnected'
-        return
-      }
-
-      this.isManuallyClosed = false
-      this.connect(symbol)
-    }, 'ws:autoConnectEffect')
-  }
-```
-
-## Практический пример: Сервис потоковых котировок (`MarketSocketService.ts`)
-
-```typescript
 import { AbstractService, type ReactiveEngine } from '@pravosleva/reactive-engine'
 
 export type SocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
