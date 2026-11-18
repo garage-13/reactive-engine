@@ -24,6 +24,34 @@ const GA4_KEY = process.env.VITE_GA4_KEY || 'G-XXXXXXXXXX'
 // Тест вывода в терминал при сборке
 console.log('\n--- [CHECK] VITE_GA4_KEY VALUE:', GA4_KEY, '---\n')
 
+// ============================================================================
+// Русская локаль (ru)
+// ============================================================================
+export const ruQuickStartSidebar = {
+  text: 'Быстрый старт',
+  collapsed: false,
+  items: [
+    { text: 'Angular 20+', link: '/guides/quick-start/angular' },
+    { text: 'React 18+', link: '/guides/quick-start/react' },
+    { text: 'Vue 3.2+', link: '/guides/quick-start/vue' },
+    { text: 'Vanilla JS и DOM', link: '/guides/quick-start/vanilla' },
+  ],
+}
+
+// ============================================================================
+// Английская локаль (en)
+// ============================================================================
+export const enQuickStartSidebar = {
+  text: 'Quick Start',
+  collapsed: false,
+  items: [
+    { text: 'Angular 20+', link: '/en/guides/quick-start/angular' },
+    { text: 'React 18+', link: '/en/guides/quick-start/react' },
+    { text: 'Vue 3.2+', link: '/en/guides/quick-start/vue' },
+    { text: 'Vanilla JS & DOM', link: '/en/guides/quick-start/vanilla' },
+  ],
+}
+
 // https://vitepress.dev/reference/site-config
 export default withPwa(defineConfig({
   title: 'Reactive Engine',
@@ -133,6 +161,9 @@ export default withPwa(defineConfig({
         ],
         // Боковое меню для русской версии
         sidebar: {
+          '/guides/quick-start': [
+            ruQuickStartSidebar,
+          ],
           '/guides/state-management-patterns/': [
             {
               text: 'Паттерны управления состоянием',
@@ -156,6 +187,10 @@ export default withPwa(defineConfig({
                 { text: '15. Персистентность в localStorage', link: '/guides/state-management-patterns/persistence-sync' },
                 { text: '16. IndexedDB и BroadcastChannel', link: '/guides/state-management-patterns/indexeddb-broadcast' },
                 { text: '17. Юнит-тестирование сервисов и ресурсов', link: '/guides/state-management-patterns/unit-testing' },
+                {
+                  text: '18. Подключение к UI-фреймворкам',
+                  link: '/guides/state-management-patterns/ui-integration',
+                },
               ],
             },
           ],
@@ -222,16 +257,6 @@ export default withPwa(defineConfig({
               ]
             }
           ],
-          '/examples/': [
-            {
-              text: 'Все примеры и сущности',
-              items: [
-                { text: 'Сигналы', link: '/examples/signal' },
-                { text: 'Вычисляемые значения', link: '/examples/computed' },
-                { text: 'Ресурсы', link: '/examples/resource' },
-              ]
-            }
-          ],
           '/examples/signal/': [
             {
               text: 'Сигналы',
@@ -268,6 +293,16 @@ export default withPwa(defineConfig({
               ]
             }
           ],
+          '/examples/': [
+            {
+              text: 'Все примеры и сущности',
+              items: [
+                { text: 'Сигналы', link: '/examples/signal' },
+                { text: 'Вычисляемые значения', link: '/examples/computed' },
+                { text: 'Ресурсы', link: '/examples/resource' },
+              ]
+            }
+          ],
         },
         docFooter: {
           prev: 'Предыдущая страница',
@@ -301,6 +336,9 @@ export default withPwa(defineConfig({
         ],
         // Боковое меню для английской версии
         sidebar: {
+          '/en/guides/quick-start': [
+            enQuickStartSidebar,
+          ],
           '/en/guides/state-management-patterns/': [
             {
               text: 'State Management Patterns',
@@ -324,6 +362,10 @@ export default withPwa(defineConfig({
                 { text: '15. localStorage Persistence & Tab Sync', link: '/en/guides/state-management-patterns/persistence-sync' },
                 { text: '16. IndexedDB & BroadcastChannel Sync', link: '/en/guides/state-management-patterns/indexeddb-broadcast' },
                 { text: '17. Unit Testing Services & Resources', link: '/en/guides/state-management-patterns/unit-testing' },
+                {
+                  text: '18. UI Framework Integration',
+                  link: '/en/guides/state-management-patterns/ui-integration',
+                },
               ],
             },
           ],
@@ -368,16 +410,6 @@ export default withPwa(defineConfig({
               ]
             }
           ],
-          '/en/examples/': [
-            {
-              text: 'All examples',
-              items: [
-                { text: 'Signals', link: '/en/examples/signal' },
-                // { text: 'Вычисляемые значения', link: '/en/examples/computed' },
-                // { text: 'Ресурсы', link: '/en/examples/resource' },
-              ]
-            }
-          ],
           '/en/examples/signal/': [
             {
               text: 'Signals',
@@ -385,6 +417,16 @@ export default withPwa(defineConfig({
                 // { text: 'All examples', link: '/en/examples' },
                 { text: '001: Counter', link: '/en/examples/signal/001' },
                 // { text: '002: Аудиоплеер', link: '/en/examples/signal/002' },
+              ]
+            }
+          ],
+          '/en/examples/': [
+            {
+              text: 'All examples',
+              items: [
+                { text: 'Signals', link: '/en/examples/signal' },
+                // { text: 'Вычисляемые значения', link: '/en/examples/computed' },
+                // { text: 'Ресурсы', link: '/en/examples/resource' },
               ]
             }
           ],

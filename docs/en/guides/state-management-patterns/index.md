@@ -59,6 +59,9 @@ Non-blocking storage for large offline datasets in IndexedDB paired with `engine
 ### 17. [Unit Testing Services, Signals & Resources (Vitest / Jest)](./unit-testing)
 Deterministic framework-free unit testing: per-test `ReactiveEngine` isolation, DI dependency spying, timer fast-forwarding via `vi.advanceTimersByTimeAsync()`, and `AbortSignal` cancellation assertions.
 
+### 18. [Connecting Services to UI Frameworks (View Layer Integration)](./ui-integration)
+High-level blueprint for binding `AbstractService` instances to the view layer without state duplication, with direct links to dedicated **React**, **Vue 3**, and **Vanilla JS** guides.
+
 ## General Architectural Principles
 
 Keep these three rules in mind when structuring state in `@pravosleva/reactive-engine`:
