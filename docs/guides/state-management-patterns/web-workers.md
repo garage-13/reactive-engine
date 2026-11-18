@@ -202,135 +202,40 @@ export class WorkerAnalyticsService extends AbstractService {
 }
 ```
 
-### 2. Реактивный сервис-обёртка (`WorkerAnalyticsService.ts`)
+### 3. Использование в чистом JS или UI-слое
 
 ```typescript
-import { AbstractService } from '@pravosleva/reactive-engine'
-import type { WorkerRequest, WorkerResponse } from './analytics.worker.js'
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
+import { WorkerAnalyticsService } from './WorkerAnalyticsService.js'
 
-interface PendingTask {
-  resolve: (value: { matchedCount: number; average: number }) => void
-  reject: (reason: unknown) => void
-}
+const engine = new ReactiveEngine()
+const analytics = engine.inject(WorkerAnalyticsService)
 
-export class WorkerAnalyticsService extends AbstractService {
-  // Входные реактивные параметры для вычислений
-  public dataset = this.engine.signal<number[]>([], 'worker:dataset')
-  public threshold = this.engine.signal<number>(50, 'worker:threshold')
+// Подписываемся на статус фонового расчёта
+engine.effect(() => {
+  const { loading, data, error } = analytics.summaryResource.value
 
-  private worker: Worker | null = null
-  private nextRequestId = 1
-  private pendingTasks = new Map<number, PendingTask>()
-
-  // Объединяем входные сигналы в единый источник для ресурса
-  private computeInput = this.engine.computed(
-    () => ({
-      rows: this.dataset.value,
-      threshold: this.threshold.value,
-    }),
-    'worker:computeInput'
-  )
-
-  private getOrCreateWorker(): Worker {
-    if (this.worker) return this.worker
-
-    // Стандартный синтаксис бандлеров (Vite / Webpack 5) для подключения Web Worker
-    const worker = new Worker(new URL('./analytics.worker.ts', import.meta.url), {
-      type: 'module',
-    })
-
-    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      const msg = event.data
-      const task = this.pendingTasks.get(msg.requestId)
-      if (!task) return
-
-      this.pendingTasks.delete(msg.requestId)
-
-      if (msg.ok) {
-        task.resolve(msg.result)
-      } else {
-        task.reject(new Error(msg.error))
-      }
-    }
-
-    worker.onerror = (event: ErrorEvent) => {
-      const err = new Error(event.message || 'Критическая ошибка потока Web Worker')
-      for (const task of this.pendingTasks.values()) {
-        task.reject(err)
-      }
-      this.pendingTasks.clear()
-    }
-
-    this.worker = worker
-    return worker
+  if (loading) {
+    console.log('Идёт расчёт в Web Worker (UI не заблокирован)...')
+    return
   }
 
-  /**
-   * Отправляет задачу в Web Worker и связывает её жизненный цикл с AbortSignal.
-   */
-  private runInWorker(
-    rows: number[],
-    threshold: number,
-    signal: AbortSignal
-  ): Promise<{ matchedCount: number; average: number }> {
-    if (signal.aborted) {
-      return Promise.reject(new DOMException('Aborted before worker postMessage', 'AbortError'))
-    }
-
-    const worker = this.getOrCreateWorker()
-    const requestId = this.nextRequestId++
-
-    return new Promise((resolve, reject) => {
-      const onAbort = () => {
-        this.pendingTasks.delete(requestId)
-        reject(new DOMException('Worker calculation aborted', 'AbortError'))
-      }
-
-      signal.addEventListener('abort', onAbort, { once: true })
-
-      this.pendingTasks.set(requestId, {
-        resolve: (res) => {
-          signal.removeEventListener('abort', onAbort)
-          resolve(res)
-        },
-        reject: (err) => {
-          signal.removeEventListener('abort', onAbort)
-          reject(err)
-        },
-      })
-
-      const payload: WorkerRequest = { requestId, rows, threshold }
-      worker.postMessage(payload)
-    })
+  if (error) {
+    console.error('Ошибка вычислений:', error.message)
+    return
   }
 
-  // Ресурс автоматически перезапускает расчёт при смене dataset или threshold
-  // и отменяет предыдущий расчёт при новых изменениях
-  public summaryResource = this.engine.resource(
-    async ({ rows, threshold }, abortSignal) => {
-      if (rows.length === 0) {
-        return { matchedCount: 0, average: 0 }
-      }
-      return this.runInWorker(rows, threshold, abortSignal)
-    },
-    this.computeInput,
-    'worker:summaryResource'
-  )
-
-  // Полная остановка потока воркера при уничтожении модуля или движка
-  public dispose() {
-    this.summaryResource.abort()
-    for (const task of this.pendingTasks.values()) {
-      task.reject(new DOMException('Worker disposed', 'AbortError'))
-    }
-    this.pendingTasks.clear()
-
-    if (this.worker) {
-      this.worker.terminate()
-      this.worker = null
-    }
+  if (data) {
+    console.log(`Найдено элементов: ${data.matchedCount}, среднее: ${data.average.toFixed(2)}`)
   }
-}
+})
+
+// Генерируем массив на 500 000 чисел и запускаем расчёт
+analytics.dataset.value = Array.from({ length: 500_000 }, () => Math.random() * 100)
+
+// Изменение порога мгновенно отменит незавершённый старый расчёт через AbortSignal
+// и запустит новый с актуальным порогом
+analytics.threshold.value = 75
 ```
 
 ### Как быстро собрать мини-проект (`index.html` и бандлы)
@@ -440,3 +345,9 @@ npm install
 npm run dev      # Запуск локального dev-сервера с HMR
 npm run build    # Сборка готового index.html + JS-бандлов (основного и воркера) в папку dist/
 ```
+
+## Рекомендации для продакшена
+
+* **Комбинация с `withDebounce` при ползунках (sliders):** Если пользователь двигает ползунок фильтра `threshold` мышью, оберните `runInWorker` в `withDebounce(..., { delay: 150 })`. Так воркер не будет перегружаться десятками отменённых проходов по массиву в секунду.
+* **Используйте `Transferable` (`Float64Array` / `ArrayBuffer`) для гигантских массивов:** Обычный `worker.postMessage(rows)` копирует массив через алгоритм Structured Clone. Для миллионов чисел храните данные в `Float64Array` и передавайте буфер без копирования памяти: `worker.postMessage(payload, [rows.buffer])`.
+* **Обязательный `worker.terminate()` в `dispose()`:** Браузер не закрывает поток `Worker` автоматически при сборке мусора сервиса. Всегда вызывайте `worker.terminate()` при уничтожении инстанса движка или уходе со страницы.
