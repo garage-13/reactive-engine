@@ -56,6 +56,9 @@ SSR-безопасная гидратация настроек при старт
 ### 16. [Persistence in IndexedDB & Cross-Tab Sync via `BroadcastChannel`](./indexeddb-broadcast)
 Non-blocking storage for large offline datasets in IndexedDB paired with `engine.resource()`, instant cross-tab invalidation via `BroadcastChannel`, and self-echo protection.
 
+### 17. [Unit Testing Services, Signals & Resources (Vitest / Jest)](./unit-testing)
+Deterministic framework-free unit testing: per-test `ReactiveEngine` isolation, DI dependency spying, timer fast-forwarding via `vi.advanceTimersByTimeAsync()`, and `AbortSignal` cancellation assertions.
+
 ## General Architectural Principles
 
 Keep these three rules in mind when structuring state in `@pravosleva/reactive-engine`:
