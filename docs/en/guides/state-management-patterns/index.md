@@ -38,6 +38,15 @@ Building a resilient Long Polling pipeline on top of `engine.resource()` with se
 ### 10. [Rate Limiting Requests & Computations (`withDebounce`, `withThrottle`, `withThrottleComputed`)](./rate-limiting)
 Protecting network and CPU layers against high-frequency input streams: delayed fetching (`withDebounce`), Leading/Trailing network throttling (`withThrottle`), and capped in-memory recomputations (`withThrottleComputed`).
 
+### 11. [WebSockets & Real-Time Data Streams](./websockets)
+Encapsulating `WebSocket` connections inside `AbstractService` with automatic batching of incoming message bursts, reactive reconnection via `effect`, exponential backoff on disconnects, and strict type-guarded payload parsing.
+
+### 12. [Socket.IO v4+ Integration (Typed Events, Ack & Connection State Recovery)](./socket-io)
+Building a resilient Socket.IO v4+ client inside `AbstractService` with typed `ServerToClientEvents` / `ClientToServerEvents` contracts, dynamic `auth` callbacks, promise-based `emitWithAck`, and `socket.recovered` state handling.
+
+### 13. [Finite State Machines (FSM) with Signals](./state-machines)
+Deterministic management of complex multi-step workflows without impossible states, powered by strict TypeScript Discriminated Unions, a `send(event)` transition dispatcher, and automatic cancellation of exit side effects.
+
 ## General Architectural Principles
 
 Keep these three rules in mind when structuring state in `@pravosleva/reactive-engine`:

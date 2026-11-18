@@ -182,6 +182,18 @@ export default withPwa(defineConfig({
                   text: '10. Контроль частоты (Debounce и Throttle)',
                   link: '/guides/state-management-patterns/rate-limiting',
                 },
+                {
+                  text: '11. Интеграция с WebSockets',
+                  link: '/guides/state-management-patterns/websockets',
+                },
+                {
+                  text: '12. Интеграция с Socket.IO v4+',
+                  link: '/guides/state-management-patterns/socket-io',
+                },
+                {
+                  text: '13. Конечные автоматы (FSM)',
+                  link: '/guides/state-management-patterns/state-machines',
+                },
               ],
             },
           ],
@@ -375,6 +387,18 @@ export default withPwa(defineConfig({
                 {
                   text: '10. Rate Limiting (Debounce & Throttle)',
                   link: '/en/guides/state-management-patterns/rate-limiting',
+                },
+                {
+                  text: '11. WebSockets & Real-Time Streams',
+                  link: '/en/guides/state-management-patterns/websockets',
+                },
+                {
+                  text: '12. Socket.IO v4+ Integration',
+                  link: '/en/guides/state-management-patterns/socket-io',
+                },
+                {
+                  text: '13. Finite State Machines (FSM)',
+                  link: '/en/guides/state-management-patterns/state-machines',
                 },
               ],
             },
