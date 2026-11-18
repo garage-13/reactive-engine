@@ -8,8 +8,6 @@ In **`@pravosleva/reactive-engine` v3.0.1**, this pattern is implemented without
 2. **Automatic persistence via `effect`:** Any change to the signal is automatically serialized to `localStorage` inside a standard scheduler microtask.
 3. **Infinite-loop protection across tabs:** The `'storage'` event fires strictly in **sibling** browser tabs (never in the tab that initiated the write). Additionally, an internal `isSyncingFromStorage` flag guarantees that updating the signal from another tab never triggers a redundant write back to `localStorage`.
 
----
-
 ## Practical Example: User Preferences Service (`PreferencesService.ts`)
 
 ```typescript

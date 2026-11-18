@@ -8,8 +8,6 @@ Combining **IndexedDB** with **`BroadcastChannel`** solves both problems cleanly
 2. **Instant cross-tab notifications via `BroadcastChannel`:** Unlike `localStorage`, IndexedDB does not emit a built-in `'storage'` event across sibling tabs. After every database write, the originating tab broadcasts a lightweight notification over `BroadcastChannel`, prompting sibling tabs to re-read fresh data via `engine.resource()`.
 3. **Revision-based race protection:** Incrementing a local `syncRevision` signal ensures concurrent reads always settle on the latest database state.
 
----
-
 ## Practical Example: Offline Drafts Storage (`DraftsDbService.ts`)
 
 ### 1. Service Setup & `BroadcastChannel` Listener
