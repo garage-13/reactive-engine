@@ -17,7 +17,7 @@ hero:
       text: Vue 3.2+
       link: /en/guides/quick-start/vue
     - theme: brand
-      text: Angular 16+
+      text: Angular 20+
       link: /en/guides/quick-start/angular
     - theme: alt
       text: Core Description

@@ -20,7 +20,7 @@ hero:
       text: Vue 3.2+
       link: /vue
     - theme: brand
-      text: Angular 16+
+      text: Angular 20+
       link: /angular
     - theme: alt
       text: Описание

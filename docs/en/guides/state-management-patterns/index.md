@@ -62,6 +62,9 @@ Deterministic framework-free unit testing: per-test `ReactiveEngine` isolation, 
 ### 18. [Connecting Services to UI Frameworks (View Layer Integration)](./ui-integration)
 High-level blueprint for binding `AbstractService` instances to the view layer without state duplication, with direct links to dedicated **React**, **Vue 3**, and **Vanilla JS** guides.
 
+### 19. [Lazy Service Injection (Lazy Dependency Injection)](./lazy-di)
+Deferring instantiation of auxiliary services via a `get service()` getter or dynamic `import()` to speed up cold starts, reduce memory footprint, and break circular dependencies.
+
 ## General Architectural Principles
 
 Keep these three rules in mind when structuring state in `@pravosleva/reactive-engine`:
