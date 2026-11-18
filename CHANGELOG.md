@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
+## [3.0.2-alpha.0] — 2026-11-18
+
+### Changed
+- **Bounded `LinkPool` (`maxPoolSize = 2048`):** Reduced default link pool capacity from `100,000` to `2,048` nodes to prevent unbounded *Old Space* retention in V8 after peak graph rebuilds while improving CPU cache locality.
+- **Unconditional link cleanup on `LinkPool.release()`:** Always invokes `link.clear()` before pooling or discarding a `NodeLink`, nullifying all graph pointers (`source`, `target`, `nextSubscriber`, `prevSubscriber`, `nextDependency`, `prevDependency`) to eliminate cross-engine memory retention.
+- **Added `LinkPool.configure()`, `LinkPool.clear()`, and `LinkPool.stats`:** Exposed runtime pool controls for memory profiling and custom tuning.
+
+### Fixed
+- **Traversal safety in `notifySubscribers()`:** Cached `link.nextSubscriber` before recursive subscriber propagation so in-flight node disposal or link detachment cannot prematurely truncate subscriber iteration.
+
+### Documentation
+- Added comprehensive **State Management Patterns** guides (`19` patterns across `en` and `ru` locales) covering DI, `resource`, rate limiting, WebSockets, Socket.IO v4+, FSM, Web Workers, IndexedDB/BroadcastChannel, unit testing, and lazy DI.
+- Updated **Quick Start** guides for **Angular 20+**, **React 18+**, **Vue 3.2+**, and **Vanilla JS**, including production SSR hydration patterns.
+
 ## [3.0.1] — 2026-11-17
 
 ### Исправления

@@ -41,7 +41,27 @@ export class NodeLink {
 export class LinkPool {
   private static pool: NodeLink[] = []
   private static size = 0
-  private static maxPoolSize = 100000
+  // Снижаем дефолтный потолок со 100_000 до 2_048 (~64–96 КБ в Old Space),
+  // чтобы после пиковых перестроек графа лишние звенья собирались Scavenger'ом V8
+  private static maxPoolSize = 2048
+
+  public static configure(options: { maxPoolSize: number }): void {
+    const nextMax = Math.max(0, Math.floor(options.maxPoolSize))
+    this.maxPoolSize = nextMax
+    if (this.size > nextMax) {
+      this.pool.length = nextMax
+      this.size = nextMax
+    }
+  }
+
+  public static clear(): void {
+    this.pool.length = 0
+    this.size = 0
+  }
+
+  public static get stats(): { size: number; maxPoolSize: number } {
+    return { size: this.size, maxPoolSize: this.maxPoolSize }
+  }
 
   public static acquire(source: ReactiveNode, target: ReactiveNode): NodeLink {
     if (this.size > 0) {
@@ -59,8 +79,9 @@ export class LinkPool {
   }
 
   public static release(link: NodeLink): void {
+    // Всегда обнуляем ссылки (dep/sub/next/prev), даже если пул заполнен
+    link.clear()
     if (this.size < this.maxPoolSize) {
-      link.clear()
       this.pool[this.size] = link
       this.size++
     }
@@ -413,9 +434,12 @@ export class ReactiveEngineCore {
   public notifySubscribers(node: ReactiveNode, state: NodeState): void {
     let link = node.subscribersHead
     while (link !== null) {
-      const target = link.target!
-      if (target === this.activeConsumer) {
-        link = link.nextSubscriber
+      // Сохраняем ссылку на следующий узел ДО рекурсии, чтобы отвязка и clear()
+      // текущего звена во время обхода не оборвали цикл
+      const next = link.nextSubscriber
+      const target = link.target
+      if (target === null || target === this.activeConsumer) {
+        link = next
         continue
       }
 
@@ -427,7 +451,7 @@ export class ReactiveEngineCore {
           this.notifySubscribers(target, 1)
         }
       }
-      link = link.nextSubscriber
+      link = next
     }
   }
 
