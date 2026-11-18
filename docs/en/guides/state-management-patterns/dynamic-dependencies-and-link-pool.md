@@ -1,6 +1,18 @@
-# Dynamic Dependencies & Link Reuse (`LinkPool`)
+# Dynamic Dependencies & Link Reuse (`O(1)` Linked-List Tracking)
 
-Unlike systems built around a static dependency topology, **`@pravosleva/reactive-engine` v3.0.1** tracks dependencies dynamically at runtime. Whenever a conditional branch (`if / else` or ternary expression) switches inside a `computed` or `effect`, the graph automatically rewires itself to match the active execution path.
+In real-world applications, the dependency graph is rarely static: `computed` values and `effect` callbacks continuously switch conditional branches (`if / else`), filter changing datasets, or subscribe to the currently active view.
+
+In **`@pravosleva/reactive-engine` v3.0.1**, dynamic dependency tracking is built on **doubly-linked intrusive lists** with ordered edge reuse (`depsTail` / `subsTail`):
+
+1. **`O(1)` branch switching:** During re-evaluation, the engine matches incoming signal reads against the existing link chain. When dependency order remains stable, zero new allocations and zero `Set` / `Map` lookups occur.
+2. **Instant unsubscription from stale branches:** When an `if / else` branch switches, obsolete edges are unlinked via pointer reassignment in `O(1)` without collection rehashing.
+3. **Bounded link pooling (`LinkPool`):** Detached link nodes have all graph references nullified (preventing cross-engine memory retention) and are returned to a bounded pool to reduce GC pressure during high-churn graph rebuilds.
+
+## Architectural Trade-Offs & Memory Management
+
+* **Keep `computed` getters pure:** Computed properties must remain side-effect-free. Branching logic (`if / else`) should depend strictly on reactive signal reads so the engine can accurately reconcile the link chain on subsequent passes.
+* **`LinkPool` trade-offs & V8 garbage collection:** Modern JS engines (such as V8) collect short-lived monomorphic objects very cheaply in *Young Generation (Scavenger)*, whereas an unbounded global pool can promote objects into *Old Space*. To avoid cross-instance retention leaks, the core explicitly nullifies all internal pointers (`dep`, `sub`, `nextDep`, `prevDep`, `nextSub`, `prevSub`) whenever a link node is released back to the pool.
+* **Avoid mutating a root signal inside an effect that depends on it (Inner Write):** Writing to a signal directly inside an `effect` that subscribes to that same signal complicates graph traversal invariants. Use `engine.untrack()` or move state mutations into event handlers instead.
 
 ## How It Works Under the Hood (GC-Free)
 
