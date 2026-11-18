@@ -11,8 +11,8 @@ hero:
     alt: Reactive Engine Logo
   actions:
     - theme: sponsor
-      text: Читать большой обзор
-      link: https://pravosleva.pro/p/reactive-engine-ru/
+      text: Обзор v3.0.0
+      link: https://pravosleva.pro/p/reactive-engine-news-3.0.0
     - theme: brand
       text: React 18+
       link: /react
@@ -31,9 +31,9 @@ hero:
     - theme: alt
       text: Декораторы
       link: /decorators
-    - theme: alt
-      text: Примеры и сущности
-      link: /examples
+    #- theme: alt
+    #  text: Примеры и сущности
+    #  link: /examples
     - theme: alt
       text: Паттерны СТМ
       link: /guides/state-management-patterns

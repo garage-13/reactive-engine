@@ -166,6 +166,22 @@ export default withPwa(defineConfig({
                   text: '6. Большие формы и валидация',
                   link: '/guides/state-management-patterns/reactive-forms',
                 },
+                {
+                  text: '7. Оптимистичные обновления (Optimistic UI)',
+                  link: '/guides/state-management-patterns/optimistic-ui',
+                },
+                {
+                  text: '8. Стратегии кэширования запросов',
+                  link: '/guides/state-management-patterns/caching-strategies',
+                },
+                {
+                  text: '9. Непрерывный опрос (Long Polling)',
+                  link: '/guides/state-management-patterns/long-polling',
+                },
+                {
+                  text: '10. Контроль частоты (Debounce и Throttle)',
+                  link: '/guides/state-management-patterns/rate-limiting',
+                },
               ],
             },
           ],
@@ -311,18 +327,6 @@ export default withPwa(defineConfig({
         ],
         // Боковое меню для английской версии
         sidebar: {
-          '/en/guides/': [
-            {
-              text: 'Guide',
-              items: [
-                { text: 'Guides', link: '/en/guides' },
-                // { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
-                { text: 'Philosophy', link: '/en/guides/philosophy' },
-                { text: 'Introduction', link: '/en/guides/introduction' },
-                { text: 'Examples', link: '/en/guides/state-management-patterns' },
-              ]
-            }
-          ],
           '/en/guides/state-management-patterns/': [
             {
               text: 'State Management Patterns',
@@ -356,8 +360,36 @@ export default withPwa(defineConfig({
                   text: '6. Large Reactive Forms & Validation',
                   link: '/en/guides/state-management-patterns/reactive-forms',
                 },
+                {
+                  text: '7. Optimistic UI & Rollback',
+                  link: '/en/guides/state-management-patterns/optimistic-ui',
+                },
+                {
+                  text: '8. Request Caching Strategies',
+                  link: '/en/guides/state-management-patterns/caching-strategies',
+                },
+                {
+                  text: '9. Long Polling & Exponential Backoff',
+                  link: '/en/guides/state-management-patterns/long-polling',
+                },
+                {
+                  text: '10. Rate Limiting (Debounce & Throttle)',
+                  link: '/en/guides/state-management-patterns/rate-limiting',
+                },
               ],
             },
+          ],
+          '/en/guides/': [
+            {
+              text: 'Guide',
+              items: [
+                { text: 'Guides', link: '/en/guides' },
+                // { text: 'React (Quick start)', link: '/en/guides/quick-start/react' },
+                { text: 'Philosophy', link: '/en/guides/philosophy' },
+                { text: 'Introduction', link: '/en/guides/introduction' },
+                { text: 'Examples', link: '/en/guides/state-management-patterns' },
+              ]
+            }
           ],
           '/en/methods/': [
             {

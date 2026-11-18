@@ -26,6 +26,18 @@
 ### 6. [Оптимизация больших реактивных форм через Proxy (`reactive`)](./reactive-forms)
 Гранулярное отслеживание изменений на уровне отдельных полей формы (`engine.reactive()`) без клонирования всего дерева состояния, дополненное синхронной и асинхронной валидацией через декораторы `withValidationSync` и `withValidationAsync`.
 
+### 7. [Оптимистичные обновления интерфейса (Optimistic UI)](./optimistic-ui)
+Мгновенный отклик интерфейса на действия пользователя с сохранением снимка состояния (`previousSnapshot`), защитой от гонок при повторных кликах (`AbortController`) и автоматическим откатом при сетевых ошибках.
+
+### 8. [Стратегии кэширования запросов (`withCache` и `withStaleWhileRevalidate`)](./caching-strategies)
+Кэширование ответов с временем жизни (`ttl`), склеивание параллельных запросов (Request Collapsing) через `withCache` и отказоустойчивый фолбэк с LRU-вытеснением (`maxSize`) через `withStaleWhileRevalidate`.
+
+### 9. [Непрерывный опрос сервера и Exponential Backoff (`withLongPolling`)](./long-polling)
+Организация надёжного цикла Long Polling поверх `engine.resource()` с защитой от пересечения сессий (`currentSessionToken`), прогрессивным откатом при сбоях сети и двойным контуром отмены (`AbortSignal` + `externalSignal`).
+
+### 10. [Контроль частоты запросов и вычислений (`withDebounce`, `withThrottle`, `withThrottleComputed`)](./rate-limiting)
+Защита сетевого и вычислительного слоёв при частом вводе или потоке событий: отложенные запросы (`withDebounce`), троттлинг с Leading/Trailing фазами (`withThrottle`) и ограничение частоты тяжёлых вычислений в памяти (`withThrottleComputed`).
+
 ## Общие принципы архитектуры
 
 При проектировании состояния в `@pravosleva/reactive-engine` придерживайтесь трёх правил:

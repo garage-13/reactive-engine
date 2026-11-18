@@ -26,6 +26,18 @@ Declarative network request management via `engine.resource()`: automatic re-exe
 ### 6. [Optimizing Large Reactive Forms via Proxy (`reactive`)](./reactive-forms)
 Granular property-level reactivity for large nested forms (`engine.reactive()`) without cloning the entire state tree, paired with synchronous and asynchronous schema validation using `withValidationSync` and `withValidationAsync` decorators.
 
+### 7. [Optimistic UI Updates with Automatic Rollback](./optimistic-ui)
+Instant UI feedback on user actions with state snapshot preservation (`previousSnapshot`), race-condition cancellation on rapid clicks (`AbortController`), and automatic rollback on network failures.
+
+### 8. [Request Caching Strategies (`withCache` & `withStaleWhileRevalidate`)](./caching-strategies)
+TTL-based response caching with parallel Request Collapsing via `withCache`, and Network-First resilient fallback with LRU memory eviction (`maxSize`) via `withStaleWhileRevalidate`.
+
+### 9. [Continuous Server Polling & Exponential Backoff (`withLongPolling`)](./long-polling)
+Building a resilient Long Polling pipeline on top of `engine.resource()` with session token isolation (`currentSessionToken`), progressive failure backoff, and a dual cancellation circuit (`AbortSignal` + `externalSignal`).
+
+### 10. [Rate Limiting Requests & Computations (`withDebounce`, `withThrottle`, `withThrottleComputed`)](./rate-limiting)
+Protecting network and CPU layers against high-frequency input streams: delayed fetching (`withDebounce`), Leading/Trailing network throttling (`withThrottle`), and capped in-memory recomputations (`withThrottleComputed`).
+
 ## General Architectural Principles
 
 Keep these three rules in mind when structuring state in `@pravosleva/reactive-engine`:
