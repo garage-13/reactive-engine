@@ -14,6 +14,26 @@ In **`@pravosleva/reactive-engine` v3.0.1**, dynamic dependency tracking is buil
 * **`LinkPool` trade-offs & V8 garbage collection:** Modern JS engines (such as V8) collect short-lived monomorphic objects very cheaply in *Young Generation (Scavenger)*, whereas an unbounded global pool can promote objects into *Old Space*. To avoid cross-instance retention leaks, the core explicitly nullifies all internal pointers (`dep`, `sub`, `nextDep`, `prevDep`, `nextSub`, `prevSub`) whenever a link node is released back to the pool.
 * **Avoid mutating a root signal inside an effect that depends on it (Inner Write):** Writing to a signal directly inside an `effect` that subscribes to that same signal complicates graph traversal invariants. Use `engine.untrack()` or move state mutations into event handlers instead.
 
+### What Happens When the Pool Reaches Its Cap (`maxPoolSize = 2048`)?
+
+The `2048` cap limits **only the number of idle link objects held in the standby cache**, not the maximum size of your reactive graph. A graph can hold tens or hundreds of thousands of active edges simultaneously with zero hard limits:
+
+1. **Acquiring edges (`LinkPool.acquire`):** As long as standby nodes exist in the pool, they are reused with zero allocations. Once the pool is empty (`size === 0`), the core seamlessly allocates `new NodeLink()` on the heap.
+2. **Releasing edges (`LinkPool.release`):** The core first nullifies all pointers via `link.clear()`. If the pool holds fewer than `2048` nodes, the link is retained for future reuse; if the pool is already full, excess nodes are simply discarded and collected cheaply by V8's *Scavenger*.
+3. **Protection against post-peak memory bloat:** After tearing down a heavy view (such as a 50,000-cell data grid), only a compact 2,048-link buffer (~64–96 KB) stays resident, while the remaining 48,000 links are reclaimed instead of lingering permanently in *Old Space*.
+
+You can tune the pool cap at runtime to match your application's workload profile:
+
+```typescript
+import { LinkPool } from '@pravosleva/reactive-engine'
+
+// Increase standby capacity for apps with continuous large-scale graph churn
+LinkPool.configure({ maxPoolSize: 8192 })
+
+// Inspect current pool utilization
+console.log(LinkPool.stats) // { size: 0, maxPoolSize: 8192 }
+```
+
 ## How It Works Under the Hood (GC-Free)
 
 When switching execution branches, the engine achieves both **zero redundant computations** and **minimal Garbage Collector (GC) pressure**:
