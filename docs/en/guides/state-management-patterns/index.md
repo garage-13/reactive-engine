@@ -47,6 +47,15 @@ Building a resilient Socket.IO v4+ client inside `AbstractService` with typed `S
 ### 13. [Finite State Machines (FSM) with Signals](./state-machines)
 Deterministic management of complex multi-step workflows without impossible states, powered by strict TypeScript Discriminated Unions, a `send(event)` transition dispatcher, and automatic cancellation of exit side effects.
 
+### 14. [Offloading Heavy Computations to Web Workers](./web-workers)
+Encapsulating background `Worker` threads inside `AbstractService` with `requestId` correlation, `engine.resource()` integration, cancellation of stale calculations via `AbortSignal`, and clean thread shutdown via `terminate()`.
+
+### 15. [Персистентность состояния в `localStorage` и кросс-вкладочная синхронизация](./persistence-sync)
+SSR-безопасная гидратация настроек при старте, автосохранение через `effect` и мгновенная синхронизация между вкладками браузера через событие `storage` с защитой от циклических перезаписей.
+
+### 16. [Persistence in IndexedDB & Cross-Tab Sync via `BroadcastChannel`](./indexeddb-broadcast)
+Non-blocking storage for large offline datasets in IndexedDB paired with `engine.resource()`, instant cross-tab invalidation via `BroadcastChannel`, and self-echo protection.
+
 ## General Architectural Principles
 
 Keep these three rules in mind when structuring state in `@pravosleva/reactive-engine`:

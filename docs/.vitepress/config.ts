@@ -138,62 +138,23 @@ export default withPwa(defineConfig({
               text: 'Паттерны управления состоянием',
               collapsed: false,
               items: [
-                {
-                  text: 'Обзор раздела',
-                  link: '/guides/state-management-patterns',
-                },
-                {
-                  text: '1. Кросс-сервисное взаимодействие и DI',
-                  link: '/guides/state-management-patterns/cross-service-di',
-                },
-                {
-                  text: '2. Автобатчинг и частые обновления',
-                  link: '/guides/state-management-patterns/auto-batching',
-                },
-                {
-                  text: '3. Динамические зависимости и LinkPool',
-                  link: '/guides/state-management-patterns/dynamic-dependencies-and-link-pool',
-                },
-                {
-                  text: '4. Изоляция инстансов и мосты',
-                  link: '/guides/state-management-patterns/multi-instance-isolation',
-                },
-                {
-                  text: '5. Асинхронные ресурсы (resource)',
-                  link: '/guides/state-management-patterns/async-resources',
-                },
-                {
-                  text: '6. Большие формы и валидация',
-                  link: '/guides/state-management-patterns/reactive-forms',
-                },
-                {
-                  text: '7. Оптимистичные обновления (Optimistic UI)',
-                  link: '/guides/state-management-patterns/optimistic-ui',
-                },
-                {
-                  text: '8. Стратегии кэширования запросов',
-                  link: '/guides/state-management-patterns/caching-strategies',
-                },
-                {
-                  text: '9. Непрерывный опрос (Long Polling)',
-                  link: '/guides/state-management-patterns/long-polling',
-                },
-                {
-                  text: '10. Контроль частоты (Debounce и Throttle)',
-                  link: '/guides/state-management-patterns/rate-limiting',
-                },
-                {
-                  text: '11. Интеграция с WebSockets',
-                  link: '/guides/state-management-patterns/websockets',
-                },
-                {
-                  text: '12. Интеграция с Socket.IO v4+',
-                  link: '/guides/state-management-patterns/socket-io',
-                },
-                {
-                  text: '13. Конечные автоматы (FSM)',
-                  link: '/guides/state-management-patterns/state-machines',
-                },
+                { text: 'Обзор раздела', link: '/guides/state-management-patterns/' },
+                { text: '1. Кросс-сервисное взаимодействие и DI', link: '/guides/state-management-patterns/cross-service-di' },
+                { text: '2. Автобатчинг и частые обновления', link: '/guides/state-management-patterns/auto-batching' },
+                { text: '3. Динамические зависимости и LinkPool', link: '/guides/state-management-patterns/dynamic-dependencies' },
+                { text: '4. Изоляция инстансов и мосты', link: '/guides/state-management-patterns/multi-instance-isolation' },
+                { text: '5. Асинхронные ресурсы (resource)', link: '/guides/state-management-patterns/async-resources' },
+                { text: '6. Большие формы и валидация', link: '/guides/state-management-patterns/reactive-forms' },
+                { text: '7. Оптимистичные обновления (Optimistic UI)', link: '/guides/state-management-patterns/optimistic-ui' },
+                { text: '8. Стратегии кэширования запросов', link: '/guides/state-management-patterns/caching-strategies' },
+                { text: '9. Непрерывный опрос (Long Polling)', link: '/guides/state-management-patterns/long-polling' },
+                { text: '10. Контроль частоты (Debounce и Throttle)', link: '/guides/state-management-patterns/rate-limiting' },
+                { text: '11. Интеграция с WebSockets', link: '/guides/state-management-patterns/websockets' },
+                { text: '12. Интеграция с Socket.IO v4+', link: '/guides/state-management-patterns/socket-io' },
+                { text: '13. Конечные автоматы (FSM)', link: '/guides/state-management-patterns/state-machines' },
+                { text: '14. Вынос вычислений в Web Workers', link: '/guides/state-management-patterns/web-workers' },
+                { text: '15. Персистентность в localStorage', link: '/guides/state-management-patterns/persistence-sync' },
+                { text: '16. IndexedDB и BroadcastChannel', link: '/guides/state-management-patterns/indexeddb-broadcast' },
               ],
             },
           ],
@@ -344,62 +305,23 @@ export default withPwa(defineConfig({
               text: 'State Management Patterns',
               collapsed: false,
               items: [
-                {
-                  text: 'Overview',
-                  link: '/en/guides/state-management-patterns/',
-                },
-                {
-                  text: '1. Cross-Service Communication & DI',
-                  link: '/en/guides/state-management-patterns/cross-service-di',
-                },
-                {
-                  text: '2. Auto-Batching & High-Frequency Updates',
-                  link: '/en/guides/state-management-patterns/auto-batching',
-                },
-                {
-                  text: '3. Dynamic Dependencies & LinkPool',
-                  link: '/en/guides/state-management-patterns/dynamic-dependencies-and-link-pool',
-                },
-                {
-                  text: '4. Multi-Instance Isolation & Bridges',
-                  link: '/en/guides/state-management-patterns/multi-instance-isolation',
-                },
-                {
-                  text: '5. Async Resources & Race Conditions',
-                  link: '/en/guides/state-management-patterns/async-resources',
-                },
-                {
-                  text: '6. Large Reactive Forms & Validation',
-                  link: '/en/guides/state-management-patterns/reactive-forms',
-                },
-                {
-                  text: '7. Optimistic UI & Rollback',
-                  link: '/en/guides/state-management-patterns/optimistic-ui',
-                },
-                {
-                  text: '8. Request Caching Strategies',
-                  link: '/en/guides/state-management-patterns/caching-strategies',
-                },
-                {
-                  text: '9. Long Polling & Exponential Backoff',
-                  link: '/en/guides/state-management-patterns/long-polling',
-                },
-                {
-                  text: '10. Rate Limiting (Debounce & Throttle)',
-                  link: '/en/guides/state-management-patterns/rate-limiting',
-                },
-                {
-                  text: '11. WebSockets & Real-Time Streams',
-                  link: '/en/guides/state-management-patterns/websockets',
-                },
-                {
-                  text: '12. Socket.IO v4+ Integration',
-                  link: '/en/guides/state-management-patterns/socket-io',
-                },
-                {
-                  text: '13. Finite State Machines (FSM)',
-                  link: '/en/guides/state-management-patterns/state-machines',
-                },
+                { text: 'Overview', link: '/en/guides/state-management-patterns/' },
+                { text: '1. Cross-Service Communication & DI', link: '/en/guides/state-management-patterns/cross-service-di' },
+                { text: '2. Auto-Batching & High-Frequency Updates', link: '/en/guides/state-management-patterns/auto-batching' },
+                { text: '3. Dynamic Dependencies & LinkPool', link: '/en/guides/state-management-patterns/dynamic-dependencies' },
+                { text: '4. Multi-Instance Isolation & Bridges', link: '/en/guides/state-management-patterns/multi-instance-isolation' },
+                { text: '5. Async Resources & Race Conditions', link: '/en/guides/state-management-patterns/async-resources' },
+                { text: '6. Large Reactive Forms & Validation', link: '/en/guides/state-management-patterns/reactive-forms' },
+                { text: '7. Optimistic UI & Rollback', link: '/en/guides/state-management-patterns/optimistic-ui' },
+                { text: '8. Request Caching Strategies', link: '/en/guides/state-management-patterns/caching-strategies' },
+                { text: '9. Long Polling & Exponential Backoff', link: '/en/guides/state-management-patterns/long-polling' },
+                { text: '10. Rate Limiting (Debounce & Throttle)', link: '/en/guides/state-management-patterns/rate-limiting' },
+                { text: '11. WebSockets & Real-Time Streams', link: '/en/guides/state-management-patterns/websockets' },
+                { text: '12. Socket.IO v4+ Integration', link: '/en/guides/state-management-patterns/socket-io' },
+                { text: '13. Finite State Machines (FSM)', link: '/en/guides/state-management-patterns/state-machines' },
+                { text: '14. Offloading to Web Workers', link: '/en/guides/state-management-patterns/web-workers' },
+                { text: '15. localStorage Persistence & Tab Sync', link: '/en/guides/state-management-patterns/persistence-sync' },
+                { text: '16. IndexedDB & BroadcastChannel Sync', link: '/en/guides/state-management-patterns/indexeddb-broadcast' },
               ],
             },
           ],
