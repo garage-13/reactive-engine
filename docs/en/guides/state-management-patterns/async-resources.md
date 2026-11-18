@@ -11,8 +11,6 @@ The `resource` primitive bridges the reactive dependency graph with the lifecycl
 3. **Pre-flight validation (`validateBeforeFetch`):** Allows you to short-circuit invalid requests (such as search queries below a minimum length) before hitting the network.
 4. **Payload validation (`responseValidate`):** Validates the structure of the server response before committing it to `data` and clearing any previous error state.
 
----
-
 ## Practical Example: Paginated Search with Validation
 
 ### 1. Service Definition (`SearchService.ts`)
@@ -43,7 +41,7 @@ export class SearchService extends AbstractService {
     'search:deps'
   )
 
-    public usersResource = this.engine.resource<SearchResponse, { q: string; page: number }>(
+  public usersResource = this.engine.resource<SearchResponse, { q: string; page: number }>(
     async ({ q, page }, abortSignal) => {
       const params = new URLSearchParams({ q, page: String(page) })
       const res = await fetch(`/api/users?${params}`, {

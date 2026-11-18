@@ -54,7 +54,7 @@ export class SearchService extends AbstractService {
 
       return res.json()
     },
-        this.requestDeps,
+    this.requestDeps,
     {
       name: 'search:usersResource',
       // Блокируем запрос до выхода в сеть, если введено меньше 2 символов
@@ -69,7 +69,7 @@ export class SearchService extends AbstractService {
     }
   )
 
-    public setQuery(newQuery: string) {
+  public setQuery(newQuery: string) {
     this.query.value = newQuery
     this.page.value = 1
   }
