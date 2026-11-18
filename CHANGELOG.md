@@ -14,19 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
-## [3.0.2-alpha.0] — 2026-11-18
+## [3.0.2] — 2026-11-18
 
-### Changed
-- **Bounded `LinkPool` (`maxPoolSize = 2048`):** Reduced default link pool capacity from `100,000` to `2,048` nodes to prevent unbounded *Old Space* retention in V8 after peak graph rebuilds while improving CPU cache locality.
-- **Unconditional link cleanup on `LinkPool.release()`:** Always invokes `link.clear()` before pooling or discarding a `NodeLink`, nullifying all graph pointers (`source`, `target`, `nextSubscriber`, `prevSubscriber`, `nextDependency`, `prevDependency`) to eliminate cross-engine memory retention.
-- **Added `LinkPool.configure()`, `LinkPool.clear()`, and `LinkPool.stats`:** Exposed runtime pool controls for memory profiling and custom tuning.
+### Изменено
+- **Ограниченный пул звеньев `LinkPool` (`maxPoolSize = 2048`):** Дефолтный лимит размера пула снижен со `100 000` до `2 048` звеньев (~64–96 КБ), чтобы исключить удержание пиковых аллокаций в *Old Space* сборщика мусора V8 и улучшить локальность данных в кэше процессора (ускорение на **31.5%** относительно `3.0.1` в сьюте `Dynamic Graphs`).
+- **Безусловная очистка ссылок при вызове `LinkPool.release()`:** Метод `link.clear()` теперь вызывается при каждом освобождении ребра независимо от заполненности пула — все указатели (`source`, `target`, `nextSubscriber`, `prevSubscriber`, `nextDependency`, `prevDependency`) принудительно зануляются для защиты от междвижковых утечек памяти.
+- **Добавлены методы управления пулом `LinkPool.configure()`, `LinkPool.clear()` и геттер `LinkPool.stats`:** Предоставлен публичный API для настройки лимита пула и профилирования памяти в рантайме.
 
-### Fixed
-- **Traversal safety in `notifySubscribers()`:** Cached `link.nextSubscriber` before recursive subscriber propagation so in-flight node disposal or link detachment cannot prematurely truncate subscriber iteration.
+### Исправлено
+- **Безопасность обхода подписчиков в `notifySubscribers()`:** Ссылка на `link.nextSubscriber` сохраняется до рекурсивного обхода дочерних узлов, что предотвращает преждевременный обрыв цикла уведомлений при синхронном удалении (`dispose`) узлов во время распространения сигнала.
 
-### Documentation
-- Added comprehensive **State Management Patterns** guides (`19` patterns across `en` and `ru` locales) covering DI, `resource`, rate limiting, WebSockets, Socket.IO v4+, FSM, Web Workers, IndexedDB/BroadcastChannel, unit testing, and lazy DI.
-- Updated **Quick Start** guides for **Angular 20+**, **React 18+**, **Vue 3.2+**, and **Vanilla JS**, including production SSR hydration patterns.
+### Документация
+- Добавлен цикл из **19 практических руководств в разделе «Паттерны управления состоянием»** (на русском и английском языках): кросс-сервисный DI, автобатчинг, `LinkPool`, изоляция инстансов и мосты, `resource`, формы и валидация, Optimistic UI, стратегии кэширования, Long Polling, Debounce/Throttle, WebSockets, Socket.IO v4+, конечные автоматы (FSM), Web Workers, `localStorage`, IndexedDB + `BroadcastChannel`, юнит-тестирование в Vitest, интеграция с UI-фреймворками и ленивый DI.
+- Обновлены руководства **Быстрого старта (Quick Start)** для **Angular 20+**, **React 18+**, **Vue 3.2+** и **Vanilla JS** с готовыми паттернами SSR-гидратации данных с API.
 
 ## [3.0.1] — 2026-11-17
 
