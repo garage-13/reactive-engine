@@ -176,3 +176,31 @@ console.log(repeat.value); // Выведет: BB
 ## Дополнительная информация
 
 Вычисляемые значения являются фундаментальной частью реактивной системы, позволяя автоматически обновлять UI и другие зависимости при изменении значений зависимых сигналов.
+
+### Кастомная функция сравнения (`equals`)
+
+По умолчанию `computed` сравнивает предыдущее и новое значение через `Object.is(prev, next)`, а `signal` пропускает перезапись только для одинаковых примитивов (чтобы мутации по одной объектной ссылке могли инициировать обновление).
+
+Если вычисление или сеттер возвращает новый массив или объект с идентичным содержимым (например, после `.map()` или `.filter()`), передайте опцию **`equals: (prev, next) => boolean`**, чтобы погасить лишние пересчёты зависимых узлов:
+
+```typescript
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
+
+interface Point {
+  x: number
+  y: number
+}
+
+const engine = new ReactiveEngine()
+
+// В computed(): не уведомляем подписчиков, если новый массив имеет те же элементы
+const rawItems = engine.signal<number[]>([1, 2, 3], 'data:raw')
+const normalized = engine.computed(
+  () => rawItems.value.map((n) => Math.max(0, n)),
+  {
+    name: 'data:normalized',
+    equals: (prev, next) =>
+      prev.length === next.length && prev.every((val, idx) => val === next[idx]),
+  }
+)
+```

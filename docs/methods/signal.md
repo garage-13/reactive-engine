@@ -170,3 +170,29 @@ console.log(doubledCount); // Выведет: 2
 ```
 
 Эти примеры и объяснения демонстрируют основные возможности и особенности метода `signal` в реактивной системе.
+
+### Кастомная функция сравнения (`equals`)
+
+По умолчанию `computed` сравнивает предыдущее и новое значение через `Object.is(prev, next)`, а `signal` пропускает перезапись только для одинаковых примитивов (чтобы мутации по одной объектной ссылке могли инициировать обновление).
+
+Если вычисление или сеттер возвращает новый массив или объект с идентичным содержимым (например, после `.map()` или `.filter()`), передайте опцию **`equals: (prev, next) => boolean`**, чтобы погасить лишние пересчёты зависимых узлов:
+
+```typescript
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
+
+interface Point {
+  x: number
+  y: number
+}
+
+const engine = new ReactiveEngine()
+
+// В signal(): игнорируем запись координат, если значения x и y не изменились
+const cursor = engine.signal<Point>(
+  { x: 0, y: 0 },
+  {
+    name: 'ui:cursor',
+    equals: (prev, next) => prev.x === next.x && prev.y === next.y,
+  }
+)
+```

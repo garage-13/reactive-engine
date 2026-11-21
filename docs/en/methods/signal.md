@@ -209,3 +209,29 @@ console.log(doubledCount); // Outputs: 2
 ```
 
 These examples and explanations demonstrate the main capabilities and features of the `signal` method in the reactive system.
+
+### Custom Equality Comparator (`equals`)
+
+By default, `computed` compares previous and next results using `Object.is(prev, next)`, while `signal` skips updates only for identical primitives (allowing same-reference object updates to propagate).
+
+When a computation or signal update produces a freshly allocated array or object with identical contents (for example, after `.map()` or `.filter()`), pass **`equals: (prev, next) => boolean`** to prevent unnecessary downstream re-evaluations:
+
+```typescript
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
+
+interface Point {
+  x: number
+  y: number
+}
+
+const engine = new ReactiveEngine()
+
+// In signal(): ignore coordinate updates when x and y remain unchanged
+const cursor = engine.signal<Point>(
+  { x: 0, y: 0 },
+  {
+    name: 'ui:cursor',
+    equals: (prev, next) => prev.x === next.x && prev.y === next.y,
+  }
+)
+```

@@ -87,6 +87,12 @@ export interface SignalOptions<T> {
   name?: string;
   validate?: (value: T) => boolean | string;
   isInternalCoreSignal?: boolean;
+  equals?: (prev: T, next: T) => boolean
+}
+
+export interface ComputedOptions<T> {
+  name?: string
+  equals?: (prev: T, next: T) => boolean
 }
 
 export interface ResourceState<T> {

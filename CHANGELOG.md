@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
+## [3.0.3] — 2026-11-21
+
+### Added
+- **Custom equality comparator (`equals`) in `engine.computed()` and `engine.signal()`:** Added optional `equals?: (prev: T, next: T) => boolean` in `ComputedOptions` and `SignalOptions` (preserving fast `Object.is` as the zero-overhead default).
+- **Built-in `shallowEqual` and `deepEqual` helpers:** Exported cycle-safe `shallowEqual` and `deepEqual` utilities from `@pravosleva/reactive-engine` for structural value comparison on mapped arrays and DTOs.
+
+### Documentation
+- Documented `{ equals }`, `shallowEqual`, and `deepEqual` usage for suppressing redundant downstream recomputations.
+
 ## [3.0.2] — 2026-11-18
 
 ### Изменено

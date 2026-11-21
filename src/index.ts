@@ -12,3 +12,5 @@ export * from './core/types'
 export * from './core/AbstractService'
 export * from './core/BaseREServiceEnhanced'
 export * from './decorators'
+
+export { shallowEqual, deepEqual } from './core/equals'

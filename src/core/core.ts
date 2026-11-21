@@ -10,7 +10,8 @@ import type {
   Token,
   Factory,
   Resource,
-  ResourceOptions
+  ResourceOptions,
+  ComputedOptions
 } from './types'
 import { ReactiveDebounceLogger, queueLog } from './core.logger'
 import { createReactive } from './core.method.reactive'
@@ -156,18 +157,21 @@ export class ReactiveNode {
 export class SignalNode<T> extends ReactiveNode implements Signal<T> {
   private validate?: (value: T) => boolean | string
   private isInternal: boolean
+  public equals?: (prev: T, next: T) => boolean
 
   constructor(
     engine: ReactiveEngineCore,
     id: string,
     initialValue: T,
     validate?: (value: T) => boolean | string,
-    isInternal: boolean = false
+    isInternal: boolean = false,
+    equals?: (prev: T, next: T) => boolean
   ) {
     super('signal', id, initialValue)
     this.engine = engine
     this.validate = validate
     this.isInternal = isInternal
+    this.equals = equals
     this.wrapper = this
   }
 
@@ -188,8 +192,12 @@ export class SignalNode<T> extends ReactiveNode implements Signal<T> {
       }
     }
 
-    const isObj = newValue !== null && typeof newValue === 'object'
-    if (Object.is(this._value, newValue) && !isObj) return
+    if (this.equals !== undefined) {
+      if (this.equals(this._value, newValue)) return
+    } else {
+      const isObj = newValue !== null && typeof newValue === 'object'
+      if (Object.is(this._value, newValue) && !isObj) return
+    }
 
     const engine = this.engine!
     const oldVal = this._value
@@ -235,13 +243,21 @@ export class SignalNode<T> extends ReactiveNode implements Signal<T> {
 
 export class ComputedNode<T> extends ReactiveNode implements Computed<T> {
   public isEvaluating: boolean = false
+  public hasValue: boolean = false
+  public equals?: (prev: T, next: T) => boolean
 
-  constructor(engine: ReactiveEngineCore, id: string, fn: () => T) {
+  constructor(
+    engine: ReactiveEngineCore,
+    id: string,
+    fn: () => T,
+    equals?: (prev: T, next: T) => boolean
+  ) {
     super('computed', id)
     this.engine = engine
     this.fn = fn
     this.state = 2
     this.wrapper = this
+    this.equals = equals
   }
 
   public get value(): T {
@@ -415,6 +431,7 @@ export class ReactiveEngineCore {
     let name = 'signal'
     let validate: ((value: T) => boolean | string) | undefined
     let isInternal = false
+    let equals: ((prev: T, next: T) => boolean) | undefined
 
     if (typeof optionsOrName === 'string') {
       name = optionsOrName
@@ -422,13 +439,14 @@ export class ReactiveEngineCore {
       if (optionsOrName.name !== undefined) name = optionsOrName.name
       validate = optionsOrName.validate
       isInternal = Boolean(optionsOrName.isInternalCoreSignal)
+      equals = optionsOrName.equals
     }
 
     if (this.logger.isEnabled) {
       this.log({ type: 'signal', label: name, details: { to: initialValue }, isInternalCoreSignal: isInternal })
     }
 
-    return new SignalNode<T>(this, name, initialValue, validate, isInternal)
+    return new SignalNode<T>(this, name, initialValue, validate, isInternal, equals)
   }
 
   public notifySubscribers(node: ReactiveNode, state: NodeState): void {
@@ -455,8 +473,18 @@ export class ReactiveEngineCore {
     }
   }
 
-  public computed<T>(fn: () => T, signalName?: string): Computed<T> {
-    const node = new ComputedNode<T>(this, signalName || 'computed', fn)
+  public computed<T>(fn: () => T, optionsOrName?: string | ComputedOptions<T>): Computed<T> {
+    let name = 'computed'
+    let equals: ((prev: T, next: T) => boolean) | undefined
+
+    if (typeof optionsOrName === 'string') {
+      name = optionsOrName
+    } else if (optionsOrName !== undefined) {
+      if (optionsOrName.name !== undefined) name = optionsOrName.name
+      equals = optionsOrName.equals
+    }
+
+    const node = new ComputedNode<T>(this, name, fn, equals)
     if (this.batchDepth === 0) {
       this.computedCache.set(fn, node)
     }
@@ -767,8 +795,17 @@ export class ReactiveEngineCore {
     const oldVal = node._value
     try {
       const newValue = node.fn!()
-      if (!Object.is(node._value, newValue)) {
+      const comp = node as ComputedNode<unknown>
+      const equals = (node as ComputedNode<unknown>).equals
+      const isSame = comp.hasValue && (
+        comp.equals !== undefined
+          ? comp.equals(node._value, newValue)
+          : Object.is(node._value, newValue)
+      )
+
+      if (!isSame) {
         node._value = newValue
+        comp.hasValue = true
         node.version++
       }
       if (this.logger.isEnabled) {

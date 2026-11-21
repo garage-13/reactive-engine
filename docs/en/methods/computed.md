@@ -154,3 +154,31 @@ export function MyComponent(): React.JSX.Element {
 ## Additional Information
 
 Computed values are a fundamental part of the reactive system, allowing automatic updates to UI and other dependencies when dependent signals change.
+
+### Custom Equality Comparator (`equals`)
+
+By default, `computed` compares previous and next results using `Object.is(prev, next)`, while `signal` skips updates only for identical primitives (allowing same-reference object updates to propagate).
+
+When a computation or signal update produces a freshly allocated array or object with identical contents (for example, after `.map()` or `.filter()`), pass **`equals: (prev, next) => boolean`** to prevent unnecessary downstream re-evaluations:
+
+```typescript
+import { ReactiveEngine } from '@pravosleva/reactive-engine'
+
+interface Point {
+  x: number
+  y: number
+}
+
+const engine = new ReactiveEngine()
+
+// In computed(): suppress downstream notifications when the mapped array is identical
+const rawItems = engine.signal<number[]>([1, 2, 3], 'data:raw')
+const normalized = engine.computed(
+  () => rawItems.value.map((n) => Math.max(0, n)),
+  {
+    name: 'data:normalized',
+    equals: (prev, next) =>
+      prev.length === next.length && prev.every((val, idx) => val === next[idx]),
+  }
+)
+```
