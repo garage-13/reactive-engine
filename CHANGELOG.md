@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ---
 
+## [3.0.4] — 2026-11-21
+
+### Fixed
+- Re-exported `ComputedOptions` type from the main entry point (`src/index.ts`).
+
 ## [3.0.3] — 2026-11-21
 
 ### Added

@@ -11,7 +11,7 @@ next:
 
 Главная цель движка — полностью изолировать бизнес-логику от UI-фреймворка, сократив количество обновлений компонентов до абсолютного минимума.
 
-![Результаты js-reactivity-benchmark для @pravosleva/reactive-engine v3.0.2](/js-reactivity-benchmark/2026-11-18/latest-benchmark.png)
+![Результаты js-reactivity-benchmark для @pravosleva/reactive-engine v3.0.3](/js-reactivity-benchmark/2026-11-21/latest-benchmark.png)
 
 ::: info Как правильно читать таблицы бенчмарков
 В сводных таблицах `js-reactivity-benchmark` рядом находятся решения из разных архитектурных категорий:

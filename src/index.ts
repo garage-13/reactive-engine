@@ -14,3 +14,4 @@ export * from './core/BaseREServiceEnhanced'
 export * from './decorators'
 
 export { shallowEqual, deepEqual } from './core/equals'
+export type { ComputedOptions, SignalOptions } from './core/types'
