@@ -58,6 +58,9 @@ export default withPwa(defineConfig({
   description: 'Логическое ядро проекта',
   base: PUBLIC_URL,
 
+  // Автоматически берёт дату последнего коммита файла из git log
+  lastUpdated: true,
+
   pwa: {
     outDir: '.vitepress/dist', // Куда складывать sw.js при сборке
     registerType: 'autoUpdate', // Автоматически обновлять кэш при пуше новой доки

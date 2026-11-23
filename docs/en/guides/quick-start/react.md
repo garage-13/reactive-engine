@@ -84,7 +84,7 @@ class ProfileService extends AbstractService {
 
   public profileResource = this.engine.resource<UserProfile, number>(
     async (id, signal) => {
-      const res = await fetch(`https://typicode.com{id}`, { signal })
+      const res = await fetch(`https://example.com/api/profiles/whatever/${id}`, { signal })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json()
     },
@@ -144,7 +144,7 @@ export class ArticleService extends AbstractService {
     this.error.value = null
 
     try {
-      const res = await fetch(`https://example.com{encodeURIComponent(id)}`)
+      const res = await fetch(`https://example.com/api/articles/${encodeURIComponent(id)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: ArticleDto = await res.json()
@@ -195,6 +195,8 @@ export const EngineProvider = ({ initialArticle = null, children }: EngineProvid
     return instance
   })
 
+  useEffect(() => () => engine.dispose(), [engine])
+
   return <EngineContext.Provider value={engine}>{children}</EngineContext.Provider>
 }
 
@@ -210,24 +212,30 @@ export const useEngine = (): ReactiveEngine => {
 ### Step 3. Server Component (Next.js App Router) & Client View
 
 ```tsx
-// app/articles/[id]/page.tsx (Server Component)
+// app/articles/[id]/page.tsx (Server Component — Next.js 15+ App Router)
 import { ReactiveEngine } from '@pravosleva/reactive-engine'
 import { ArticleService } from './ArticleService'
 import { EngineProvider } from './EngineProvider'
 import { ArticleView } from './ArticleView'
 
-export default async function ArticlePage({ params }: { params: { id: string } }) {
+export default async function ArticlePage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
   // 1. Create an isolated engine scoped strictly to this HTTP request
   const serverEngine = new ReactiveEngine()
   const articleService = serverEngine.inject(ArticleService)
 
   // 2. Fetch API data on the server
-  await articleService.loadArticle(params.id)
+  await articleService.loadArticle(id)
 
   // 3. Pass the serializable snapshot down to the client provider
   return (
     <EngineProvider initialArticle={articleService.exportSnapshot()}>
-      <ArticleView articleId={params.id} />
+      <ArticleView articleId={id} />
     </EngineProvider>
   )
 }

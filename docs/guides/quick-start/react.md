@@ -84,7 +84,7 @@ class ProfileService extends AbstractService {
 
   public profileResource = this.engine.resource<UserProfile, number>(
     async (id, signal) => {
-      const res = await fetch(`https://typicode.com{id}`, { signal })
+      const res = await fetch(`https://example.com/api/profiles/whatever/${id}`, { signal })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json()
     },
@@ -144,7 +144,7 @@ export class ArticleService extends AbstractService {
     this.error.value = null
 
     try {
-      const res = await fetch(`https://example.com{encodeURIComponent(id)}`)
+      const res = await fetch(`https://example.com/api/articles/${encodeURIComponent(id)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: ArticleDto = await res.json()
@@ -195,6 +195,9 @@ export const EngineProvider = ({ initialArticle = null, children }: EngineProvid
     return instance
   })
 
+  // Чтобы при размонтировании провайдера на клиенте освобождались все эффекты, подписки и ресурсы ядра (с учётом Strict Mode в React 18+, где useEffect монтируется дважды, можно либо не вызывать dispose() на первом цикле Strict Mode, либо указать в комментарии, что engine.dispose() вызывается при полном удалении дерева).
+  useEffect(() => () => engine.dispose(), [engine])
+
   return <EngineContext.Provider value={engine}>{children}</EngineContext.Provider>
 }
 
@@ -210,27 +213,34 @@ export const useEngine = (): ReactiveEngine => {
 ### Шаг 3. Серверный компонент (Next.js App Router) и клиентский UI
 
 ```tsx
-// app/articles/[id]/page.tsx (Server Component)
+// app/articles/[id]/page.tsx (Server Component — Next.js 15+ App Router)
 import { ReactiveEngine } from '@pravosleva/reactive-engine'
 import { ArticleService } from './ArticleService'
 import { EngineProvider } from './EngineProvider'
 import { ArticleView } from './ArticleView'
 
-export default async function ArticlePage({ params }: { params: { id: string } }) {
+export default async function ArticlePage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
   // 1. Создаём изолированный движок строго для текущего HTTP-запроса
   const serverEngine = new ReactiveEngine()
   const articleService = serverEngine.inject(ArticleService)
 
   // 2. Загружаем данные по API на сервере
-  await articleService.loadArticle(params.id)
+  await articleService.loadArticle(id)
 
   // 3. Передаём сериализуемый снимок в клиентский провайдер
   return (
     <EngineProvider initialArticle={articleService.exportSnapshot()}>
-      <ArticleView articleId={params.id} />
+      <ArticleView articleId={id} />
     </EngineProvider>
   )
 }
+
 ```
 
 ```tsx
