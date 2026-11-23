@@ -113,7 +113,7 @@ export class TodosComponent {
 In Angular SSR, never store `const engine = new ReactiveEngine()` in a module-level variable—on a Node.js server, doing so leaks state across concurrent requests from different users.
 
 The recommended Angular SSR pattern consists of three steps:
-1. **Per-request isolation via Angular DI (`providers: [ReactiveEngine]`):** Register `ReactiveEngine` in the `providers` array of your root or route component. Angular automatically instantiates a dedicated engine per server HTTP request.
+1. **Per-request isolation via Angular DI (`providers: [{ provide: ReactiveEngine, useFactory: ... }]`):** Register `ReactiveEngine` in the `providers` array of your root or route component. Angular automatically instantiates a dedicated engine per server HTTP request.
 2. **Serialization via `TransferState`:** On the server (`isPlatformServer`), the service fetches API data and stores the snapshot in `TransferState` under a `makeStateKey(...)` key.
 3. **Instant client hydration:** In the browser, the component checks `transferState.hasKey(KEY)`, hydrates the signal without a duplicate HTTP request, and removes the consumed key (`transferState.remove(KEY)`).
 
@@ -165,6 +165,7 @@ export class ArticleService extends AbstractService {
 ```ts
 import {
   Component,
+  DestroyRef,
   PLATFORM_ID,
   TransferState,
   effect,

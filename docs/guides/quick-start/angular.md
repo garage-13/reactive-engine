@@ -113,7 +113,7 @@ export class TodosComponent {
 В Angular SSR нельзя хранить `const engine = new ReactiveEngine()` в глобальной переменной модуля — на сервере Node.js это приведёт к пересечению состояния между запросами разных пользователей.
 
 Лучший паттерн для Angular SSR состоит из трёх шагов:
-1. **Изоляция через DI Angular (`providers: [ReactiveEngine]`):** Регистрируйте `ReactiveEngine` в массиве `providers` корневого компонента или конкретного маршрута. Angular автоматически создаст отдельный экземпляр движка для каждого HTTP-запроса на сервере.
+1. **Изоляция через DI Angular (`providers: [{ provide: ReactiveEngine, useFactory: ... }]`):** Регистрируйте `ReactiveEngine` в массиве `providers` корневого компонента или конкретного маршрута. Angular автоматически создаст отдельный экземпляр движка для каждого HTTP-запроса на сервере.
 2. **Сериализация через `TransferState`:** На сервере (`isPlatformServer`) сервис загружает данные по API и записывает снимок в `TransferState` по ключу `makeStateKey(...)`.
 3. **Мгновенная гидратация на клиенте:** В браузере компонент проверяет наличие ключа через `transferState.hasKey(KEY)`, восстанавливает сигнал без повторного HTTP-запроса и удаляет использованный ключ (`transferState.remove(KEY)`).
 
@@ -165,6 +165,7 @@ export class ArticleService extends AbstractService {
 ```ts
 import {
   Component,
+  DestroyRef,
   PLATFORM_ID,
   TransferState,
   effect,
