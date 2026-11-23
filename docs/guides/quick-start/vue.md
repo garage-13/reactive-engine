@@ -93,14 +93,16 @@ const items = useReactiveValue(cart.items)
 </template>
 ```
 
-## SSR и гидратация данных с API (Nuxt 3 `onServerPrefetch` + `useState`)
+## SSR и гидратация данных с API (Nuxt 3 / Nuxt 4)
 
-В Nuxt 3 и других SSR-фреймворках на базе Vue 3 нельзя создавать `const engine = new ReactiveEngine()` на верхнем уровне модуля за пределами `setup()` — это приведёт к пересечению данных между запросами разных пользователей на сервере.
+В Nuxt 3, Nuxt 4 и других SSR-фреймворках на базе Vue 3 нельзя создавать `const engine = new ReactiveEngine()` на верхнем уровне модуля за пределами `setup()` — это приведёт к пересечению данных между запросами разных пользователей на сервере.
 
-Лучший паттерн для Nuxt 3 объединяет:
+Надёжный паттерн для Nuxt 3 / 4 объединяет:
 1. **Изоляцию инстанса внутри `<script setup>` (или Nuxt-плагина на каждый запрос).**
-2. **Сериализуемый контейнер `useState('ssr:article')`:** Nuxt автоматически сериализует его в HTML на сервере (`window.__NUXT__`) и восстанавливает на клиенте.
-3. **`onServerPrefetch`:** Выполняет загрузку данных по API во время серверного рендера и записывает снимок в `useState`.
+2. **Сериализуемый контейнер `useState('article:...')`:** Nuxt автоматически сериализует его в HTML-payload на сервере и восстанавливает на клиенте.
+3. **`onServerPrefetch` (или `useAsyncData`):** Выполняет загрузку данных по API во время серверного рендера и записывает снимок в `useState`.
+
+> **Примечание:** В Nuxt 3 и Nuxt 4 функции `useRoute()`, `useState()` и `useAsyncData()` являются глобальными автоимпортируемыми composables (генерируются в `.nuxt/imports.d.ts`), поэтому их не нужно импортировать вручную.
 
 ### Шаг 1. Сервис с поддержкой гидратации (`ArticleService.ts`)
 
@@ -123,7 +125,7 @@ export class ArticleService extends AbstractService {
     this.error.value = null
 
     try {
-      const res = await fetch(`https://example.com{encodeURIComponent(id)}`)
+      const res = await fetch(`https://example.com/api/articles/${encodeURIComponent(id)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: ArticleDto = await res.json()
@@ -145,7 +147,7 @@ export class ArticleService extends AbstractService {
 }
 ```
 
-### Шаг 2. Страница Nuxt 3 (`pages/articles/[id].vue`)
+### Шаг 2. Страница Nuxt 3 / 4 (`pages/articles/[id].vue` или `app/pages/articles/[id].vue`)
 
 ```vue
 <script setup lang="ts">
@@ -153,6 +155,7 @@ import { onServerPrefetch, onMounted } from 'vue'
 import { ReactiveEngine } from '@pravosleva/reactive-engine/vue'
 import { ArticleService, type ArticleDto } from '~/services/ArticleService'
 
+// useRoute и useState автоимпортируются Nuxt 3 / 4
 const route = useRoute()
 const articleId = String(route.params.id)
 

@@ -93,14 +93,16 @@ const items = useReactiveValue(cart.items)
 </template>
 ```
 
-## SSR & API Data Hydration (Nuxt 3 `onServerPrefetch` + `useState`)
+## SSR & API Data Hydration (Nuxt 3 / Nuxt 4)
 
-In Nuxt 3 and other Vue 3 SSR setups, never instantiate `const engine = new ReactiveEngine()` at module top-level outside `setup()`—doing so leaks state across concurrent server requests from different users.
+In Nuxt 3, Nuxt 4, and other Vue 3 SSR frameworks, you must not create `const engine = new ReactiveEngine()` at the top level of a module outside of `setup()` — doing so would cause state leakage across concurrent user requests on the server.
 
-The recommended Nuxt 3 pattern combines:
-1. **Per-request engine isolation inside `<script setup>` (or a per-request Nuxt plugin).**
-2. **Nuxt's serializable `useState('ssr:article')`:** Automatically serializes server state into the HTML payload and restores it on the client.
-3. **`onServerPrefetch`:** Awaits API data fetching during server rendering and writes the snapshot into `useState`.
+A reliable pattern for Nuxt 3 / 4 combines:
+1. **Per-request instance isolation inside `<script setup>` (or a per-request Nuxt plugin).**
+2. **A serializable `useState('article:...')` container:** Nuxt automatically serializes it into the HTML payload on the server and restores it on the client.
+3. **`onServerPrefetch` (or `useAsyncData`):** Fetches API data during server-side rendering and saves the snapshot into `useState`.
+
+> **Note:** In Nuxt 3 and Nuxt 4, `useRoute()`, `useState()`, and `useAsyncData()` are global auto-imported composables (generated in `.nuxt/imports.d.ts`), so they do not need to be imported manually.
 
 ### Step 1. Service with Hydration Support (`ArticleService.ts`)
 
@@ -123,7 +125,7 @@ export class ArticleService extends AbstractService {
     this.error.value = null
 
     try {
-      const res = await fetch(`https://example.com{encodeURIComponent(id)}`)
+      const res = await fetch(`https://example.com/api/article/${encodeURIComponent(id)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: ArticleDto = await res.json()
@@ -145,7 +147,7 @@ export class ArticleService extends AbstractService {
 }
 ```
 
-### Step 2. Nuxt 3 Page Component (`pages/articles/[id].vue`)
+### Step 2. Nuxt 3 / 4 Page (`pages/articles/[id].vue` or `app/pages/articles/[id].vue`)
 
 ```vue
 <script setup lang="ts">
@@ -153,35 +155,36 @@ import { onServerPrefetch, onMounted } from 'vue'
 import { ReactiveEngine } from '@pravosleva/reactive-engine/vue'
 import { ArticleService, type ArticleDto } from '~/services/ArticleService'
 
+// useRoute and useState are auto-imported by Nuxt 3 / 4
 const route = useRoute()
 const articleId = String(route.params.id)
 
-// 1. Create an isolated engine instance scoped strictly to the current request/setup
+// 1. Create an isolated engine instance scoped strictly to the current render/request
 const engine = new ReactiveEngine()
 const service = engine.inject(ArticleService)
 
-// 2. Nuxt's useState transfers the serialized payload from server to client
+// 2. Nuxt useState automatically transfers serialized data from server to client
 const ssrSnapshot = useState<ArticleDto | null>(`article:${articleId}`, () => null)
 
-// 3. On the client, hydrate the signal synchronously before the first template render
+// 3. On the client, immediately hydrate the signal from the snapshot before initial render
 if (ssrSnapshot.value) {
   service.hydrate(ssrSnapshot.value)
 }
 
-// 4. On the server, await the API fetch and store the snapshot in useState
+// 4. On the server, await the API fetch and store the result in useState
 onServerPrefetch(async () => {
   const loaded = await service.loadArticle(articleId)
   ssrSnapshot.value = loaded
 })
 
-// 5. On client-side SPA navigation, fetch only if no matching snapshot exists
+// 5. On the client, fetch data only during SPA navigation when no snapshot exists yet
 onMounted(() => {
   if (service.article.value?.id !== articleId) {
     void service.loadArticle(articleId)
   }
 })
 
-// Bind Vue 3 template to the service signals
+// Subscribe the Vue 3 template to service signals
 const article = engine.use(service.article)
 const isLoading = engine.use(service.isLoading)
 const error = engine.use(service.error)

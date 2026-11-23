@@ -138,7 +138,7 @@ export class ArticleService extends AbstractService {
     this.error.value = null
 
     try {
-      const res = await fetch(`https://example.com{encodeURIComponent(id)}`)
+      const res = await fetch(`https://example.com/api/articles/${encodeURIComponent(id)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: ArticleDto = await res.json()
@@ -181,8 +181,16 @@ const ARTICLE_STATE_KEY = makeStateKey<ArticleDto | null>('ssr:article')
 
 @Component({
   selector: 'app-article-page',
-  // Isolated ReactiveEngine instance scoped per request / component subtree
-  providers: [ReactiveEngine],
+  providers: [
+    {
+      provide: ReactiveEngine,
+      useFactory: () => {
+        const engine = new ReactiveEngine()
+        inject(DestroyRef).onDestroy(() => engine.dispose())
+        return engine
+      },
+    },
+  ],
   template: `
     <div>
       @if (isLoading() && !article()) {

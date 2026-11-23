@@ -138,7 +138,7 @@ export class ArticleService extends AbstractService {
     this.error.value = null
 
     try {
-      const res = await fetch(`https://example.com{encodeURIComponent(id)}`)
+      const res = await fetch(`https://example.com/api/articles/${encodeURIComponent(id)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: ArticleDto = await res.json()
@@ -181,8 +181,17 @@ const ARTICLE_STATE_KEY = makeStateKey<ArticleDto | null>('ssr:article')
 
 @Component({
   selector: 'app-article-page',
-  // Изолированный экземпляр ReactiveEngine на каждый запрос / дерево компонента
-  providers: [ReactiveEngine],
+  providers: [
+    {
+      provide: ReactiveEngine,
+      useFactory: () => {
+        const engine = new ReactiveEngine()
+        // Чтобы при удалении компонента или завершении SSR-рендера очищались все эффекты и ресурсы ядра
+        inject(DestroyRef).onDestroy(() => engine.dispose())
+        return engine
+      },
+    },
+  ],
   template: `
     <div>
       @if (isLoading() && !article()) {
@@ -197,6 +206,7 @@ const ARTICLE_STATE_KEY = makeStateKey<ArticleDto | null>('ssr:article')
       }
     </div>
   `,
+  // standalone: true, // В Angular 20+ является значением по умолчанию, поэтому его можно опускать
 })
 export class ArticlePageComponent {
   // Сигнальный инпут (стандарт Angular 20+)
