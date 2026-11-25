@@ -2,7 +2,7 @@
 
 Unlike raw browser `WebSocket`, **Socket.IO v4+** handles namespace multiplexing, rooms, automatic reconnection, packet buffering during disconnects, and delivery **Acknowledgements**.
 
-When integrating Socket.IO into a **`@pravosleva/reactive-engine` v3.0.1** service, follow modern Socket.IO v4 best practices:
+When integrating Socket.IO into a **`@pravosleva/reactive-engine` v3.0.x** service, follow modern Socket.IO v4 best practices:
 
 1. **Strict event contracts (`Socket<ServerToClientEvents, ClientToServerEvents>`):** Define all incoming and outgoing events using TypeScript interfaces without `any`.
 2. **Dynamic `auth` callback (`auth: (cb) => cb({ token })`):** Instead of passing a static object at initialization time, read the auth token from a reactive signal on every initial connection and automatic reconnect.

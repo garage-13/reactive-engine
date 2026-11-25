@@ -2,7 +2,7 @@
 
 In real-world applications, the dependency graph is rarely static: `computed` values and `effect` callbacks continuously switch conditional branches (`if / else`), filter changing datasets, or subscribe to the currently active view.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, dynamic dependency tracking is built on **doubly-linked intrusive lists** with ordered edge reuse (`depsTail` / `subsTail`):
+In **`@pravosleva/reactive-engine` v3.0.x**, dynamic dependency tracking is built on **doubly-linked intrusive lists** with ordered edge reuse (`depsTail` / `subsTail`):
 
 1. **`O(1)` branch switching:** During re-evaluation, the engine matches incoming signal reads against the existing link chain. When dependency order remains stable, zero new allocations and zero `Set` / `Map` lookups occur.
 2. **Instant unsubscription from stale branches:** When an `if / else` branch switches, obsolete edges are unlinked via pointer reassignment in `O(1)` without collection rehashing.
@@ -39,7 +39,7 @@ console.log(LinkPool.stats) // { size: 0, maxPoolSize: 8192 }
 When switching execution branches, the engine achieves both **zero redundant computations** and **minimal Garbage Collector (GC) pressure**:
 
 1. **Automatic unsubscription from inactive branches:** Signals that are no longer read in the new branch are immediately detached from the consumer node. Subsequent writes to those inactive signals will never wake up the `computed` or `effect`.
-2. **Object pooling via `LinkPool`:** In **v3.0.1**, detached `NodeLink` edges are not discarded onto the heap for garbage collection. Instead, they are reset and returned to a static `LinkPool`, ready to be reused on the next subscription.
+2. **Object pooling via `LinkPool`:** In **v3.0.x**, detached `NodeLink` edges are not discarded onto the heap for garbage collection. Instead, they are reset and returned to a static `LinkPool`, ready to be reused on the next subscription.
 3. **O(1) cursor fast path (`depsCursor`):** Common dependencies read before the branch point (such as the condition flag itself) remain intact and are verified via `depsCursor` in **O(1)** time without relinking.
 
 ## Practical Example: Switching Between Draft and Published Modes

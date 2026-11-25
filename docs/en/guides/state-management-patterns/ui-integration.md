@@ -1,6 +1,6 @@
 # Connecting Services to UI Frameworks (View Layer Integration)
 
-A core architectural principle of **`@pravosleva/reactive-engine` v3.0.1** is the complete decoupling of business logic and the reactive state graph (`signal`, `computed`, `resource`, `AbstractService`) from any specific rendering framework.
+A core architectural principle of **`@pravosleva/reactive-engine` v3.0.x** is the complete decoupling of business logic and the reactive state graph (`signal`, `computed`, `resource`, `AbstractService`) from any specific rendering framework.
 
 The exact same service layer can power **React**, **Vue 3**, **Angular**, or **Vanilla DOM** applications simultaneously without rewriting domain logic or unit tests.
 

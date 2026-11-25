@@ -4,7 +4,7 @@ When WebSockets or Server-Sent Events (SSE) are overkill or unavailable due to i
 
 However, naive implementations built around `setInterval` or recursive `setTimeout` quickly lead to memory leaks, overlapping requests on slow networks, and accidental DDoS spikes against a struggling backend.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, these issues are handled out of the box by the **`withLongPolling`** decorator, purpose-built to integrate with `engine.resource()`.
+In **`@pravosleva/reactive-engine` v3.0.x**, these issues are handled out of the box by the **`withLongPolling`** decorator, purpose-built to integrate with `engine.resource()`.
 
 ## How the Polling Pipeline Works Under the Hood
 

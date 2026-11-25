@@ -2,7 +2,7 @@
 
 User preferences (selected UI theme, interface language, sidebar collapse state, filter drafts) should survive page reloads and synchronize instantaneously across all open browser tabs of the same application.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, this pattern is implemented without external plugins by combining `signal`, `effect`, and the native browser `window.addEventListener('storage', ...)` event:
+In **`@pravosleva/reactive-engine` v3.0.x**, this pattern is implemented without external plugins by combining `signal`, `effect`, and the native browser `window.addEventListener('storage', ...)` event:
 
 1. **SSR-safe hydration on startup:** When creating the signal, the service safely reads and validates JSON from `localStorage` (guarding with `typeof window !== 'undefined'` so server-side rendering never throws).
 2. **Automatic persistence via `effect`:** Any change to the signal is automatically serialized to `localStorage` inside a standard scheduler microtask.

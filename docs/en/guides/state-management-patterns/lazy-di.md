@@ -4,7 +4,7 @@ In large applications, core services often depend on auxiliary modules that are 
 
 If you inject such a service via an eager class field (`private exporter = this.engine.inject(ReportExportService)`), it is instantiated—allocating its internal signals, effects, and caches—**immediately when the parent service is created**, even if the user never clicks the "Export" button.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, the DI container (`engine.inject(...)`) resolves lazily at call time and caches the created instance per `ReactiveEngine`. This lets you defer instantiating child services until the exact moment they are first accessed.
+In **`@pravosleva/reactive-engine` v3.0.x**, the DI container (`engine.inject(...)`) resolves lazily at call time and caches the created instance per `ReactiveEngine`. This lets you defer instantiating child services until the exact moment they are first accessed.
 
 ## Key Benefits of Lazy Injection
 

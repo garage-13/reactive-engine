@@ -1,6 +1,6 @@
 # Async Resources & Race Condition Protection (`resource`)
 
-In **`@pravosleva/reactive-engine` v3.0.1**, network requests and asynchronous workflows are encapsulated in a dedicated declarative primitive: **`engine.resource()`**. It eliminates boilerplate around manual `isLoading` flags, `AbortController` instances, and effects that re-trigger fetches whenever query parameters change.
+In **`@pravosleva/reactive-engine` v3.0.x**, network requests and asynchronous workflows are encapsulated in a dedicated declarative primitive: **`engine.resource()`**. It eliminates boilerplate around manual `isLoading` flags, `AbortController` instances, and effects that re-trigger fetches whenever query parameters change.
 
 ## How `engine.resource()` Works Under the Hood
 

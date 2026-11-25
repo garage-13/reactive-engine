@@ -173,3 +173,10 @@ export interface LogDetailMap {
   resource: ResourceLogDetail;
   reactive: ReactiveDetail;
 }
+
+export interface WhenOptions {
+  /** Максимальное время ожидания в миллисекундах. По истечении промис отклоняется с ошибкой таймаута. */
+  timeoutMs?: number
+  /** Опциональный внешний AbortSignal для отмены ожидания. */
+  signal?: AbortSignal
+}

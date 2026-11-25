@@ -1,6 +1,6 @@
 # Unit Testing Services, Signals & Resources (Vitest / Jest)
 
-Because all business logic in **`@pravosleva/reactive-engine` v3.0.1** lives inside pure TypeScript `AbstractService` classes with zero coupling to the DOM or any UI framework, unit tests execute in Node.js in milliseconds—without needing Testing Library or JSDOM component mounts.
+Because all business logic in **`@pravosleva/reactive-engine` v3.0.x** lives inside pure TypeScript `AbstractService` classes with zero coupling to the DOM or any UI framework, unit tests execute in Node.js in milliseconds—without needing Testing Library or JSDOM component mounts.
 
 ## Three Golden Rules for Testing the Reactive Graph
 

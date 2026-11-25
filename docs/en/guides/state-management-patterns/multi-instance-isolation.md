@@ -1,6 +1,6 @@
 # Multi-Instance Isolation & Cross-Engine Bridges
 
-In **`@pravosleva/reactive-engine` v3.0.1**, each instance of `ReactiveEngine` provides an isolated reactive environment with its own dependency tracker and scheduler, preventing global state pollution.
+In **`@pravosleva/reactive-engine` v3.0.x**, each instance of `ReactiveEngine` provides an isolated reactive environment with its own dependency tracker and scheduler, preventing global state pollution.
 
 ## Core Capabilities
 
@@ -12,7 +12,7 @@ For comprehensive code examples and full architectural patterns, please consult 
 
 ## Cross-Engine Synchronization Bridges
 
-Because `hostEngine` and `widgetEngine` operate in isolation, explicit synchronization bridges are required to connect them, such as direct signal subscriptions using `.subscribe()` or reactive effect bridges using `engine.effect()` [v3.0.1].
+Because `hostEngine` and `widgetEngine` operate in isolation, explicit synchronization bridges are required to connect them, such as direct signal subscriptions using `.subscribe()` or reactive effect bridges using `engine.effect()`.
 
 ## Dynamic Widget Lifecycle & Memory Cleanup
 

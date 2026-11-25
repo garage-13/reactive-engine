@@ -1,6 +1,6 @@
 # State Management Patterns
 
-This section covers architectural techniques and practical scenarios for designing business logic with **`@pravosleva/reactive-engine` v3.0.1**.
+This section covers architectural techniques and practical scenarios for designing business logic with **`@pravosleva/reactive-engine` v3.0.x**.
 
 Powered by an intrusive graph (`NodeLink`), object pooling (`LinkPool`), and **O(1)** cursor-based tracking, the engine enables you to build scalable, modular applications with minimal Garbage Collector overhead and zero boilerplate.
 
@@ -64,6 +64,9 @@ High-level blueprint for binding `AbstractService` instances to the view layer w
 
 ### 19. [Lazy Service Injection (Lazy Dependency Injection)](./lazy-di)
 Deferring instantiation of auxiliary services via a `get service()` getter or dynamic `import()` to speed up cold starts, reduce memory footprint, and break circular dependencies.
+
+### 20. [Server-Side Rendering (SSR) & Cascading Multi-API Data Fetching](./ssr-data-fetching)
+Per-request `ReactiveEngine` isolation, synchronous pre-validation via `computed`, dependent `engine.resource()` chains, and awaiting graph stabilization with `engine.when()` / `settleResources()` before client hydration.
 
 ## General Architectural Principles
 

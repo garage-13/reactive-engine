@@ -10,7 +10,7 @@ next:
 
 # Quick Start with Vanilla JS & Direct DOM
 
-**`@pravosleva/reactive-engine` v3.0.1** requires no UI framework or Virtual DOM. To bind reactive state directly to native DOM nodes, use **`engine.effect()`** (batched reactive side effects) or **`.subscribe()`** (point-to-point subscription on a single signal).
+**`@pravosleva/reactive-engine` v3.0.x** requires no UI framework or Virtual DOM. To bind reactive state directly to native DOM nodes, use **`engine.effect()`** (batched reactive side effects) or **`.subscribe()`** (point-to-point subscription on a single signal).
 
 ## Installation
 

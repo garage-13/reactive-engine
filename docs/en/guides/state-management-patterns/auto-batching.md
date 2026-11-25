@@ -1,6 +1,6 @@
 # Auto-Batching & High-Frequency Updates
 
-In **`ReactiveEngine` v3.0.1**, automatic update batching works out of the box via the microtask queue (`queueMicrotask`). You do not need to manually wrap consecutive state mutations in transactions — the engine automatically coalesces all synchronous writes within the current tick into a single graph pass.
+In **`ReactiveEngine` v3.0.x**, automatic update batching works out of the box via the microtask queue (`queueMicrotask`). You do not need to manually wrap consecutive state mutations in transactions — the engine automatically coalesces all synchronous writes within the current tick into a single graph pass.
 
 ## How It Works Under the Hood
 

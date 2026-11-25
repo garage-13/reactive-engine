@@ -2,7 +2,7 @@
 
 In production applications, lookup tables, user profiles, and filtered search results are frequently requested multiple times during navigation or simultaneously across independent widgets.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, this problem is solved by two composable fetcher decorators that integrate seamlessly with `engine.resource()` and honor `AbortSignal`:
+In **`@pravosleva/reactive-engine` v3.0.x**, this problem is solved by two composable fetcher decorators that integrate seamlessly with `engine.resource()` and honor `AbortSignal`:
 
 * **`withCache`** — **Cache-First strategy with TTL and Request Collapsing**. While a cached entry is fresh, no network request is dispatched. If multiple consumers request the same key concurrently, only a single network call is made while all callers share the active `Promise`.
 * **`withStaleWhileRevalidate`** — **Network-First strategy with resilient fallback and LRU eviction (`maxSize`)**. Always attempts to fetch fresh data from the server, but falls back to valid cached data if a network error or request cancellation occurs.

@@ -2,7 +2,7 @@
 
 When working with large forms, multi-hundred-field questionnaires, or deeply nested configurations, the classic immutable approach (`{ ...prev, field: value }`) introduces heavy runtime overhead: every keystroke recreates the entire state tree and triggers cascading UI checks, leading to noticeable input lag.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, this problem is solved by **`engine.reactive()`**, which delivers granular, property-level reactivity (Fine-grained Property Tracking).
+In **`@pravosleva/reactive-engine` v3.0.x**, this problem is solved by **`engine.reactive()`**, which delivers granular, property-level reactivity (Fine-grained Property Tracking).
 
 ## How It Works Under the Hood
 

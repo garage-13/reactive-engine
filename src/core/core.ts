@@ -11,7 +11,8 @@ import type {
   Factory,
   Resource,
   ResourceOptions,
-  ComputedOptions
+  ComputedOptions,
+  WhenOptions
 } from './types'
 import { ReactiveDebounceLogger, queueLog } from './core.logger'
 import { createReactive } from './core.method.reactive'
@@ -991,6 +992,96 @@ str.startsWith('class{') ||
     } finally {
       this.cycleDetectionStack.delete(token)
     }
+  }
+
+  /**
+   * Асинхронно ожидает, пока реактивный предикат вернёт `true`.
+   * Автоматически отписывается от графа сразу после выполнения условия, при ошибке или таймауте.
+   */
+  public when(predicate: () => boolean, options?: WhenOptions): Promise<void> {
+    if (options?.signal?.aborted) {
+      return Promise.reject(options.signal.reason ?? new Error('ReactiveEngine.when() was aborted'))
+    }
+
+    // Быстрый путь (fast path): условие уже выполнено синхронно — эффект не создаётся
+    try {
+      if (predicate()) return Promise.resolve()
+    } catch (err) {
+      return Promise.reject(err)
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let disposeEffect: (() => void) | undefined
+
+      const cleanup = () => {
+        if (timer !== undefined) {
+          clearTimeout(timer)
+          timer = undefined
+        }
+        if (options?.signal && onAbort) {
+          options.signal.removeEventListener('abort', onAbort)
+        }
+        if (disposeEffect) {
+          disposeEffect()
+          disposeEffect = undefined
+        }
+      }
+
+      const onAbort = () => {
+        if (settled) return
+        settled = true
+        cleanup()
+        reject(options?.signal?.reason ?? new Error('ReactiveEngine.when() was aborted'))
+      }
+
+      if (options?.signal) {
+        options.signal.addEventListener('abort', onAbort, { once: true })
+      }
+
+      if (options?.timeoutMs !== undefined && options.timeoutMs > 0) {
+        timer = setTimeout(() => {
+          if (settled) return
+          settled = true
+          cleanup()
+          reject(new Error(`ReactiveEngine.when() timed out after ${options.timeoutMs}ms`))
+        }, options.timeoutMs)
+      }
+
+      disposeEffect = this.effect(() => {
+        if (settled) return
+        try {
+          if (predicate()) {
+            settled = true
+            // Если сработало синхронно в момент инициализации effect(), откладываем cleanup
+            // в микрозадачу, чтобы ссылка disposeEffect уже была присвоена
+            if (disposeEffect) cleanup()
+            else queueMicrotask(cleanup)
+            resolve()
+          }
+        } catch (err) {
+          settled = true
+          if (disposeEffect) cleanup()
+          else queueMicrotask(cleanup)
+          reject(err)
+        }
+      })
+    })
+  }
+
+  /**
+   * Удобная обёртка над `when()` для ожидания завершения загрузки одного или нескольких `Resource`.
+   * Полезно в SSR перед снятием снимка состояния (`exportSnapshot`) и в интеграционных тестах.
+   */
+  public settleResources(
+    resources: ReadonlyArray<{ readonly isLoading: { readonly value: boolean } }>,
+    options?: WhenOptions
+  ): Promise<void> {
+    return this.when(
+      () => resources.every((res) => !res.isLoading.value),
+      options
+    )
   }
 }
 export let currentEngineInstance = new ReactiveEngineCore()

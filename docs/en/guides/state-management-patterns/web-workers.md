@@ -2,7 +2,7 @@
 
 When an application needs to parse multi-megabyte CSV/JSON files, aggregate tens of thousands of records, generate reports, or process images on the client, running that logic on the Main Thread blocks the UI and causes animation and input stutter.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, integrating **Web Workers** builds cleanly on top of **`engine.resource()`** and **`AbstractService`**:
+In **`@pravosleva/reactive-engine` v3.0.x**, integrating **Web Workers** builds cleanly on top of **`engine.resource()`** and **`AbstractService`**:
 
 1. **Promise wrapper over `postMessage`:** The service encapsulates the `Worker` instance and correlates each message with a unique `requestId`, turning asynchronous worker messaging into a standard `Promise` compatible with `engine.resource()`.
 2. **Automatic cancellation of stale runs (`AbortSignal`):** If the user updates filter parameters before the worker finishes the previous job, `resource` automatically triggers `abort()`, rejecting the outdated promise and ignoring late worker replies.

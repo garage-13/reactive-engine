@@ -21,4 +21,8 @@ features:
   - title: effect
     details: This method allows you to create automatic functions that execute when dependent signals change. These effects can be used to update the UI or other dependencies.
     link: /en/methods/effect
+  - title: when
+    details: The when method (and settleResources helper) asynchronously awaits a reactive condition with timeout and AbortSignal support, automatically cleaning up its subscription once settled. Ideal for SSR and async tests.
+    link: /en/methods/when
+
 ---

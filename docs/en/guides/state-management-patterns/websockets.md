@@ -2,7 +2,7 @@
 
 When working with bidirectional real-time streams (market tickers, live chats, collaborative boards, telemetry), it is essential to keep the socket transport layer cleanly separated from reactive application state.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, encapsulating a `WebSocket` instance inside an `AbstractService` provides three key advantages:
+In **`@pravosleva/reactive-engine` v3.0.x**, encapsulating a `WebSocket` instance inside an `AbstractService` provides three key advantages:
 
 1. **Automatic batching of message bursts:** If 20 socket frames arrive within a single millisecond, signal writes inside `onmessage` are automatically coalesced into a single microtask (`queueMicrotask`), sparing the UI from redundant re-renders.
 2. **Reactive reconnection via `effect`:** The service observes auth tokens or active channels (such as `activeSymbol.value`) and automatically re-establishes the connection whenever they change.

@@ -2,7 +2,7 @@
 
 When dealing with rapid user typing, page scrolling, drag-and-drop gestures, or real-time telemetry streams, the reactive graph can receive dozens of updates per second. Without rate limiting, this triggers cascading network calls or expensive synchronous recomputations.
 
-In **`@pravosleva/reactive-engine` v3.0.1**, three specialized decorators protect both the network and computation layers:
+In **`@pravosleva/reactive-engine` v3.0.x**, three specialized decorators protect both the network and computation layers:
 
 * **`withDebounce`** — delays a network `fetcher` inside `engine.resource()` until incoming updates settle for `delay` milliseconds. Earlier pending promises are rejected with `AbortError`.
 * **`withThrottle`** — executes the first request immediately (**Leading edge**), then coalesces intermediate calls within the `limit` window and guarantees execution of the latest state at the end of the window (**Trailing edge**).
