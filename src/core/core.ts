@@ -109,6 +109,8 @@ export class ReactiveNode {
   public wrapper: any = null
   public engine: ReactiveEngineCore | null = null
   public _cleanups: Set<CleanupFn> | null = null
+  public _batchValue: any = undefined
+  public _batchVersion: number = -1
 
   public get cleanups(): Set<CleanupFn> {
     if (this._cleanups === null) {
@@ -204,8 +206,10 @@ export class SignalNode<T> extends ReactiveNode implements Signal<T> {
     const oldVal = this._value
     this._prevValue = oldVal
 
-    if (engine.batchDepth > 0 && !engine.batchInitialValues.has(this)) {
-      engine.batchInitialValues.set(this, { value: oldVal, version: this.version })
+    if (engine.batchDepth > 0 && this._batchVersion === -1) {
+      this._batchValue = oldVal
+      this._batchVersion = this.version
+      engine.batchedSignals.push(this)
     }
 
     this._value = newValue
@@ -217,11 +221,7 @@ export class SignalNode<T> extends ReactiveNode implements Signal<T> {
 
     engine.notifySubscribers(this, 2)
 
-    if (engine.batchDepth > 0) {
-      if (!engine.batchedSignals.includes(this)) {
-        engine.batchedSignals.push(this)
-      }
-    } else if (engine.activeConsumer === null) {
+    if (engine.activeConsumer === null) {
       // Флушим эффекты только на верхнем уровне, не прерывая текущее вычисление computed/effect (#186)
       engine.flushEffects()
     }
@@ -401,7 +401,7 @@ export class ReactiveEngineCore {
   public activeConsumer: ReactiveNode | null = null
   public batchDepth = 0
   public batchedSignals: ReactiveNode[] = []
-  public batchInitialValues = new Map<ReactiveNode, { value: any; version: number }>()
+  // public batchInitialValues = new Map<ReactiveNode, { value: any; version: number }>()
   public computedCache = new WeakMap<Function, any>()
   public logger: EngineLoggerOptions
 
@@ -563,16 +563,19 @@ export class ReactiveEngineCore {
       this.batchDepth--
       if (this.batchDepth === 0) {
         // Проверка Net-Zero откатов (#147)
-        for (const sig of this.batchedSignals) {
-          const initial = this.batchInitialValues.get(sig)
+        const batched = this.batchedSignals
+        for (let i = 0; i < batched.length; i++) {
+          const sig = batched[i]
+          const initVer = sig._batchVersion
+          sig._batchVersion = -1
           const isObj = sig._value !== null && typeof sig._value === 'object'
-          if (initial && !isObj && Object.is(sig._value, initial.value)) {
-            sig.version = initial.version
+          if (!isObj && Object.is(sig._value, sig._batchValue)) {
+            sig.version = initVer
             this.resetCleanState(sig)
           }
+          sig._batchValue = undefined
         }
-        this.batchedSignals = []
-        this.batchInitialValues.clear()
+        batched.length = 0
         this.flushEffects()
       }
     }
@@ -857,6 +860,7 @@ export class ReactiveEngineCore {
       }
     }
 
+    const fn = node.fn
     try {
       this.executeCleanups(node)
     } catch (e) {
@@ -872,7 +876,7 @@ export class ReactiveEngineCore {
     this.activeConsumer = node
     this.currentOwner = node
     try {
-      node.fn!()
+      fn!()
     } finally {
       this.endTracking(node)
       this.activeConsumer = prevConsumer
@@ -923,6 +927,11 @@ export class ReactiveEngineCore {
       LinkPool.release(link)
       link = next
     }
+
+    node.fn = null
+    node._value = undefined
+    node._batchValue = undefined
+    node.engine = null
   }
   public reactive<T extends object>(target: T, name?: string): T {
     return createReactive<T>(this, target, name)

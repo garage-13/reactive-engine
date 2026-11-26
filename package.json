@@ -1,6 +1,6 @@
 {
   "name": "@pravosleva/reactive-engine",
-  "version": "3.0.5-alpha.0",
+  "version": "3.0.5",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -59,7 +59,7 @@
     "test": "NODE_OPTIONS='--expose-gc' vitest run --exclude '**/report/reactive-framework-test-suite/**' --exclude '**/core.advanced.dynamic.test.ts'",
     "test:ui": "NODE_OPTIONS='--expose-gc' vitest --ui --exclude '**/core.advanced.dynamic.test.ts'",
     "test:watch": "vitest",
-    "test:dynamic": "vitest run src/core/core.advanced.dynamic.test.ts --reporter=verbose",
+    "test:dynamic": "NODE_OPTIONS='--expose-gc' vitest run src/core/core.advanced.dynamic.test.ts --reporter=verbose",
     "test:types": "tsc --noEmit --strict --module nodenext --moduleResolution nodenext --skipLibCheck false dist/index.d.ts dist/react/index.d.ts dist/vue/index.d.ts dist/angular/index.d.ts",
     "preversion": "npm run test",
     "prepublishOnly": "npm run test && npm run build && npm run test:types",
