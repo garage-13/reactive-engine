@@ -181,6 +181,60 @@ export async function handleSsrRequest(
 }
 ```
 
+## Alternative Approach: Declarative Waiting via `engine.when()` (No `batch` or Resource Array)
+
+When a service involves multiple conditional branches or resources that evolve over time, it is often cleaner to define a **single graph-readiness predicate** using `engine.when()` instead of manually listing every resource in `settleResources()`.
+
+The predicate inside `engine.when()` automatically tracks all signals, `computed` nodes, and resources read during its evaluation, re-checking the condition at every step of the cascade:
+
+```typescript
+export async function handleSsrRequestWithWhen(
+  userId: string,
+  token: string | null,
+  requestAbortSignal?: AbortSignal
+): Promise<DashboardSnapshot> {
+  // 1. Create an isolated container per incoming HTTP request
+  const serverEngine = new ReactiveEngine()
+  const dashboard = serverEngine.inject(DashboardSsrService)
+
+  // 2. Assign input parameters directly (resources start lazily when read)
+  dashboard.rawUserId.value = userId
+  dashboard.authToken.value = token
+
+  try {
+    // 3. Declaratively wait until the entire cascade (validation + dependent resources) settles
+    await serverEngine.when(
+      () => {
+        // Exit immediately if pre-validation fails—no network requests will be fired
+        if (!dashboard.validatedRequest.value.ok) return true
+
+        // Wait for all active cascade stages to finish loading
+        return (
+          !dashboard.userResource.value.loading &&
+          !dashboard.orgResource.value.loading &&
+          !dashboard.permissionsResource.value.loading
+        )
+      },
+      {
+        timeoutMs: 2500,
+        signal: requestAbortSignal,
+      }
+    )
+  } catch (err) {
+    // On timeout or client abort, fall back to a partial snapshot for client-side recovery
+    console.warn('[SSR] Partial hydration fallback:', err)
+  }
+
+  // 4. Export a serializable JSON snapshot to embed into the HTML payload
+  return dashboard.exportSnapshot()
+}
+```
+
+::: info Which one should you choose?
+- `settleResources([...])` is ideal when you have a fixed list of independent or cascading resources and want to wait for all of them to settle.
+- `engine.when(() => ...)` shines when readiness depends on custom business logic—such as early exit on failed pre-validation (`validatedRequest.value.ok === false`) or role-based branching.
+:::
+
 ## Best Practices for Safe SSR
 
 1. **Never instantiate `new ReactiveEngine()` at module top level** on the server — always scope it strictly to the incoming request or render tree.
